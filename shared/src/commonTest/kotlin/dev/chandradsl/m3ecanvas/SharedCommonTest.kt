@@ -1,0 +1,12 @@
+package dev.chandradsl.m3ecanvas
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class SharedCommonTest {
+
+    @Test
+    fun example() {
+        assertEquals(3, 1 + 2)
+    }
+}
