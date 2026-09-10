@@ -1,9 +1,7 @@
 package dev.chandradsl.m3ecanvas
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -12,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
 import dev.chandradsl.m3ecanvas.editor.canvas.CanvasScreen
 import dev.chandradsl.m3ecanvas.editor.inspector.LayersPanel
+import dev.chandradsl.m3ecanvas.editor.inspector.PropertiesPanel
 import dev.chandradsl.m3ecanvas.editor.palette.ComponentPalette
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
@@ -42,15 +41,22 @@ fun App() {
                         )
                     }
                 },
-                modifier = Modifier.width(240.dp)
+                modifier = Modifier.width(width = 240.dp)
             )
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(weight = 1f)) {
                 CanvasScreen(controller = controller)
             }
-            LayersPanel(
-                controller = controller,
-                modifier = Modifier.width(240.dp)
-            )
+            Column(modifier = Modifier.width(width = 280.dp)) {
+                LayersPanel(
+                    controller = controller,
+                    modifier = Modifier.weight(weight = 1f)
+                )
+                HorizontalDivider()
+                PropertiesPanel(
+                    controller = controller,
+                    modifier = Modifier.weight(weight = 1f)
+                )
+            }
         }
     }
 }

@@ -7,9 +7,7 @@ import dev.chandradsl.m3ecanvas.domain.model.*
 
 /**
  * Manages the editor's state in response to user actions.
- *
- * Hierarchy-aware: nodes can be top-level or nested inside containers,
- * and all operations search the full tree.
+ * Hierarchy-aware: nodes can be top-level or nested inside containers.
  */
 class EditorController(
     initialProject: M3EProject
@@ -82,6 +80,35 @@ class EditorController(
         )
     }
 
+    /** Applies or replaces a [property] on the node with [nodeId], wherever it is. */
+    fun updateNodeProperty(nodeId: String, property: ComponentProperty) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        val updatedNode = node.withProperty(property = property)
+        state = state.copy(
+            project = state.project.updateNode(node = updatedNode)
+        )
+    }
+
+    /** Renames the node with [nodeId]. */
+    fun renameNode(nodeId: String, name: String) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        state = state.copy(
+            project = state.project.updateNode(node = node.copy(name = name))
+        )
+    }
+
+    /** Replaces the layout config of the container with [nodeId]. */
+    fun updateLayoutConfig(nodeId: String, config: LayoutConfig) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        state = state.copy(
+            project = state.project.updateNode(node = node.copy(layoutConfig = config))
+        )
+    }
+
+    //endregion
+
+    //region Reorder
+
     /** Moves the node one position earlier among its siblings (or root nodes). */
     fun moveNodeUp(nodeId: String) {
         reorderNode(nodeId = nodeId, delta = -1)
@@ -92,10 +119,6 @@ class EditorController(
         reorderNode(nodeId = nodeId, delta = 1)
     }
 
-    /**
-     * Reorders a node within its parent's children, or within the root list
-     * if it is a top-level node. [delta] of -1 moves earlier, 1 moves later.
-     */
     private fun reorderNode(nodeId: String, delta: Int) {
         val parent = findParentInProject(nodeId = nodeId)
 
@@ -125,7 +148,6 @@ class EditorController(
         }
     }
 
-    /** Finds the parent of [nodeId] anywhere in the tree, or null if top-level. */
     private fun findParentInProject(nodeId: String): CanvasNode? {
         for (root in state.project.nodes) {
             val found = findParent(node = root, targetId = nodeId)
@@ -141,15 +163,6 @@ class EditorController(
             if (deeper != null) return deeper
         }
         return null
-    }
-
-    /** Applies or replaces a [property] on the node with [nodeId], wherever it is. */
-    fun updateNodeProperty(nodeId: String, property: ComponentProperty) {
-        val node = state.project.findNode(nodeId = nodeId) ?: return
-        val updatedNode = node.withProperty(property = property)
-        state = state.copy(
-            project = state.project.updateNode(node = updatedNode)
-        )
     }
 
     //endregion

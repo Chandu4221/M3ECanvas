@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,8 +24,7 @@ import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 /**
  * Renders a single [CanvasNode] as its corresponding composable.
- * Container types render recursively; leaf types render real Material 3
- * components or a placeholder.
+ * Supports variant-aware rendering for Button, Card, IconButton, and Chip.
  */
 @Composable
 fun CanvasNodeRenderer(
@@ -31,72 +32,50 @@ fun CanvasNodeRenderer(
     controller: EditorController
 ) {
     when (node.type) {
+        // Layout containers
         ComponentType.COLUMN -> Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(all = node.layoutConfig.padding.dp),
+            modifier = Modifier.fillMaxSize().padding(all = node.layoutConfig.padding.dp),
             verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
         ) {
-            node.children.forEach { child ->
-                ContainerChild(child = child, controller = controller)
-            }
+            node.children.forEach { child -> ContainerChild(child = child, controller = controller) }
         }
 
         ComponentType.ROW -> Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(all = node.layoutConfig.padding.dp),
+            modifier = Modifier.fillMaxSize().padding(all = node.layoutConfig.padding.dp),
             horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
         ) {
-            node.children.forEach { child ->
-                ContainerChild(child = child, controller = controller)
-            }
+            node.children.forEach { child -> ContainerChild(child = child, controller = controller) }
         }
 
         ComponentType.BOX -> Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(all = node.layoutConfig.padding.dp)
+            modifier = Modifier.fillMaxSize().padding(all = node.layoutConfig.padding.dp)
         ) {
-            node.children.forEach { child ->
-                ContainerChild(child = child, controller = controller)
-            }
+            node.children.forEach { child -> ContainerChild(child = child, controller = controller) }
         }
 
         ComponentType.LAZY_COLUMN -> LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(all = node.layoutConfig.padding.dp),
+            modifier = Modifier.fillMaxSize().padding(all = node.layoutConfig.padding.dp),
             verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
         ) {
-            items(items = node.children, key = { child -> child.id }) { child ->
+            items(items = node.children, key = { it.id }) { child ->
                 ContainerChild(child = child, controller = controller)
             }
         }
 
         ComponentType.LAZY_ROW -> LazyRow(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(all = node.layoutConfig.padding.dp),
+            modifier = Modifier.fillMaxSize().padding(all = node.layoutConfig.padding.dp),
             horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
         ) {
-            items(items = node.children, key = { child -> child.id }) { child ->
+            items(items = node.children, key = { it.id }) { child ->
                 ContainerChild(child = child, controller = controller)
             }
         }
 
-        ComponentType.BUTTON -> Button(
-            onClick = {},
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Text(text = node.textOrDefault(default = "Button"))
-        }
-
-        ComponentType.CARD -> Card(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(modifier = Modifier.fillMaxSize())
-        }
+        // Leaf components with variant support
+        ComponentType.BUTTON -> RenderButton(node = node)
+        ComponentType.CARD -> RenderCard(node = node)
+        ComponentType.ICON_BUTTON -> RenderIconButton(node = node)
+        ComponentType.CHIPS -> RenderChip(node = node)
 
         ComponentType.TEXT_FIELD -> TextField(
             value = node.textOrDefault(default = ""),
@@ -108,23 +87,76 @@ fun CanvasNodeRenderer(
     }
 }
 
-/**
- * Renders a child inside a container with an explicit size, a selection
- * border when selected, and press-to-select.
- */
+@Composable
+private fun RenderButton(node: CanvasNode) {
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Button
+        ?: MaterialVariant.Button.FILLED
+    val text = node.textOrDefault(default = "Button")
+    val onClick = {}
+    val modifier = Modifier.fillMaxSize()
+
+    when (variant) {
+        MaterialVariant.Button.FILLED -> Button(onClick = onClick, modifier = modifier) { Text(text = text) }
+        MaterialVariant.Button.TONAL -> FilledTonalButton(onClick = onClick, modifier = modifier) { Text(text = text) }
+        MaterialVariant.Button.OUTLINED -> OutlinedButton(onClick = onClick, modifier = modifier) { Text(text = text) }
+        MaterialVariant.Button.ELEVATED -> ElevatedButton(onClick = onClick, modifier = modifier) { Text(text = text) }
+        MaterialVariant.Button.TEXT -> TextButton(onClick = onClick, modifier = modifier) { Text(text = text) }
+    }
+}
+
+@Composable
+private fun RenderCard(node: CanvasNode) {
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Card
+        ?: MaterialVariant.Card.FILLED
+    val modifier = Modifier.fillMaxSize()
+
+    when (variant) {
+        MaterialVariant.Card.FILLED -> Card(modifier = modifier) { Box(modifier = Modifier.fillMaxSize()) }
+        MaterialVariant.Card.ELEVATED -> ElevatedCard(modifier = modifier) { Box(modifier = Modifier.fillMaxSize()) }
+        MaterialVariant.Card.OUTLINED -> OutlinedCard(modifier = modifier) { Box(modifier = Modifier.fillMaxSize()) }
+    }
+}
+
+@Composable
+private fun RenderIconButton(node: CanvasNode) {
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.IconButton
+        ?: MaterialVariant.IconButton.STANDARD
+    val onClick = {}
+    val modifier = Modifier.fillMaxSize()
+    val icon = @Composable { Icon(imageVector = Icons.Filled.Add, contentDescription = null) }
+
+    when (variant) {
+        MaterialVariant.IconButton.STANDARD -> IconButton(onClick = onClick, modifier = modifier, content = icon)
+        MaterialVariant.IconButton.FILLED -> FilledIconButton(onClick = onClick, modifier = modifier, content = icon)
+        MaterialVariant.IconButton.TONAL -> FilledTonalIconButton(onClick = onClick, modifier = modifier, content = icon)
+        MaterialVariant.IconButton.OUTLINED -> OutlinedIconButton(onClick = onClick, modifier = modifier, content = icon)
+    }
+}
+
+@Composable
+private fun RenderChip(node: CanvasNode) {
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Chip
+        ?: MaterialVariant.Chip.ASSIST
+    val label = @Composable { Text(text = node.textOrDefault(default = "Chip")) }
+    val onClick = {}
+
+    when (variant) {
+        MaterialVariant.Chip.ASSIST -> AssistChip(onClick = onClick, label = label)
+        MaterialVariant.Chip.FILTER -> FilterChip(selected = false, onClick = onClick, label = label)
+        MaterialVariant.Chip.INPUT -> InputChip(selected = false, onClick = onClick, label = label)
+        MaterialVariant.Chip.SUGGESTION -> SuggestionChip(onClick = onClick, label = label)
+    }
+}
+
 @Composable
 private fun ContainerChild(
     child: CanvasNode,
     controller: EditorController
 ) {
     val isSelected = controller.state.isNodeSelected(nodeId = child.id)
-
     Box(
         modifier = Modifier
-            .size(
-                width = child.size.width.dp,
-                height = child.size.height.dp
-            )
+            .size(width = child.size.width.dp, height = child.size.height.dp)
             .border(
                 width = if (isSelected) 2.dp else 0.dp,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -136,14 +168,6 @@ private fun ContainerChild(
     }
 }
 
-/**
- * Selects the node as soon as a pointer press lands on it.
- *
- * Uses the Initial pointer pass and does NOT consume the event, so the
- * composables underneath still receive their own events normally.
- * [awaitEachGesture] is the supported replacement for the deprecated
- * forEachGesture and already provides the AwaitPointerEventScope context.
- */
 @Composable
 internal fun Modifier.selectOnPress(
     nodeId: String,
@@ -151,10 +175,7 @@ internal fun Modifier.selectOnPress(
 ): Modifier {
     return this.pointerInput(nodeId) {
         awaitEachGesture {
-            awaitFirstDown(
-                pass = PointerEventPass.Initial,
-                requireUnconsumed = false
-            )
+            awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
             controller.selectNode(nodeId = nodeId)
         }
     }
@@ -163,16 +184,10 @@ internal fun Modifier.selectOnPress(
 @Composable
 private fun NodePlaceholder(node: CanvasNode) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFDDDDDD)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFFDDDDDD)),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = node.type.displayName,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF555555)
-        )
+        Text(text = node.type.displayName, style = MaterialTheme.typography.labelMedium, color = Color(0xFF555555))
     }
 }
 
@@ -182,9 +197,7 @@ private fun CanvasNode.textOrDefault(default: String): String {
 }
 
 private fun resolveVerticalArrangement(config: LayoutConfig): Arrangement.Vertical {
-    if (config.spacing > 0f) {
-        return Arrangement.spacedBy(space = config.spacing.dp)
-    }
+    if (config.spacing > 0f) return Arrangement.spacedBy(space = config.spacing.dp)
     return when (config.arrangement) {
         LayoutArrangement.START -> Arrangement.Top
         LayoutArrangement.CENTER -> Arrangement.Center
@@ -196,9 +209,7 @@ private fun resolveVerticalArrangement(config: LayoutConfig): Arrangement.Vertic
 }
 
 private fun resolveHorizontalArrangement(config: LayoutConfig): Arrangement.Horizontal {
-    if (config.spacing > 0f) {
-        return Arrangement.spacedBy(space = config.spacing.dp)
-    }
+    if (config.spacing > 0f) return Arrangement.spacedBy(space = config.spacing.dp)
     return when (config.arrangement) {
         LayoutArrangement.START -> Arrangement.Start
         LayoutArrangement.CENTER -> Arrangement.Center
