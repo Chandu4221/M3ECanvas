@@ -1,9 +1,12 @@
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents the size of a component on the canvas.
  * Uses Float to support smooth resizing and zoom calculations.
  */
+@Serializable
 data class CanvasSize(
     val width: Float,
     val height: Float

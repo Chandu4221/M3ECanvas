@@ -1,9 +1,12 @@
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents the position of a component on the canvas.
  * Uses Float to support sub-pixel precision during drag, zoom, and pan operations.
  */
+@Serializable
 data class CanvasPosition(
     val x: Float,
     val y: Float

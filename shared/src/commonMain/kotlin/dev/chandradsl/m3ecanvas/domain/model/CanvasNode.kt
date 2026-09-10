@@ -1,5 +1,6 @@
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -10,6 +11,7 @@ import kotlin.uuid.Uuid
  * its [children] and [layoutConfig] for containers, and its [modifiers]
  * chain for visual decoration.
  */
+@Serializable
 @OptIn(ExperimentalUuidApi::class)
 data class CanvasNode(
     val id: String = Uuid.random().toString(),

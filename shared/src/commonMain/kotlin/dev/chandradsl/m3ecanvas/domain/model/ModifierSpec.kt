@@ -2,6 +2,7 @@
 
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -13,51 +14,61 @@ import kotlin.uuid.Uuid
  * [CanvasNode.modifiers] equals the order of the Compose modifier chain,
  * which is semantically significant.
  */
+@Serializable
 sealed interface ModifierSpec {
 
     /** Stable identity so rows can be reordered and deleted safely. */
     val id: String
 
+    @Serializable
     data class Padding(
         override val id: String = Uuid.random().toString(),
         val all: Float = 8f
     ) : ModifierSpec
 
+    @Serializable
     data class Background(
         override val id: String = Uuid.random().toString(),
         val colorHex: String = "#FF6200EE"
     ) : ModifierSpec
 
+    @Serializable
     data class Border(
         override val id: String = Uuid.random().toString(),
         val width: Float = 2f,
         val colorHex: String = "#FF3700B3"
     ) : ModifierSpec
 
+    @Serializable
     data class Clip(
         override val id: String = Uuid.random().toString(),
         val cornerRadius: Float = 8f
     ) : ModifierSpec
 
+    @Serializable
     data class Alpha(
         override val id: String = Uuid.random().toString(),
         val value: Float = 0.5f
     ) : ModifierSpec
 
+    @Serializable
     data class Rotation(
         override val id: String = Uuid.random().toString(),
         val degrees: Float = 45f
     ) : ModifierSpec
 
+    @Serializable
     data class Scale(
         override val id: String = Uuid.random().toString(),
         val value: Float = 1.2f
     ) : ModifierSpec
 
+    @Serializable
     data class FillMaxWidth(
         override val id: String = Uuid.random().toString()
     ) : ModifierSpec
 
+    @Serializable
     data class FillMaxHeight(
         override val id: String = Uuid.random().toString()
     ) : ModifierSpec

@@ -1,5 +1,7 @@
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Defines how a layout container distributes its children along its main axis.
  *
@@ -22,6 +24,7 @@ enum class LayoutArrangement(val displayName: String) {
  * and whether the container scrolls. Applied to COLUMN, ROW, BOX,
  * LAZY_COLUMN, and LAZY_ROW nodes.
  */
+@Serializable
 data class LayoutConfig(
     val arrangement: LayoutArrangement = LayoutArrangement.START,
     val spacing: Float = 0f,

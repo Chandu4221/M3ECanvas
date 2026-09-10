@@ -1,5 +1,6 @@
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -14,6 +15,7 @@ import kotlin.uuid.Uuid
  * persistence layer, keeping this domain model free of platform time APIs.
  */
 @OptIn(ExperimentalUuidApi::class)
+@Serializable
 data class M3EProject(
     val id: String = Uuid.random().toString(),
     val name: String,

@@ -1,5 +1,7 @@
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Categories of device form factors.
  */
@@ -16,6 +18,7 @@ enum class DeviceCategory(val displayName: String) {
  * Mirrors the device profiles provided by Android Studio.
  * All dimensions are in dp, matching Compose's unit system.
  */
+@Serializable
 data class DeviceProfile(
     val id: String,
     val displayName: String,
