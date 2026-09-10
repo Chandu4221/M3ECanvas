@@ -138,6 +138,53 @@ class EditorController(
 
     //endregion
 
+    //region Modifier chain
+
+    /** Appends [spec] to the end of the modifier chain of [nodeId]. */
+    fun addModifier(nodeId: String, spec: ModifierSpec) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        state = state.copy(
+            project = state.project.updateNode(node = node.withModifier(spec = spec))
+        )
+    }
+
+    /** Removes the modifier matching [specId] from [nodeId]. */
+    fun removeModifier(nodeId: String, specId: String) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        state = state.copy(
+            project = state.project.updateNode(node = node.withoutModifier(specId = specId))
+        )
+    }
+
+    /** Replaces the modifier matching [spec.id] on [nodeId]. */
+    fun updateModifier(nodeId: String, spec: ModifierSpec) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        state = state.copy(
+            project = state.project.updateNode(node = node.updateModifier(spec = spec))
+        )
+    }
+
+    /** Moves the modifier matching [specId] one position earlier. */
+    fun moveModifierUp(nodeId: String, specId: String) {
+        moveModifier(nodeId = nodeId, specId = specId, delta = -1)
+    }
+
+    /** Moves the modifier matching [specId] one position later. */
+    fun moveModifierDown(nodeId: String, specId: String) {
+        moveModifier(nodeId = nodeId, specId = specId, delta = 1)
+    }
+
+    private fun moveModifier(nodeId: String, specId: String, delta: Int) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        state = state.copy(
+            project = state.project.updateNode(
+                node = node.moveModifier(specId = specId, delta = delta)
+            )
+        )
+    }
+
+    //endregion
+
     //region Reorder
 
     /** Moves the node one position earlier among its siblings (or root nodes). */

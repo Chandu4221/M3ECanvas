@@ -80,6 +80,7 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
     if (node.isContainer) {
         LayoutSection(node = node, controller = controller)
     }
+    ModifierSection(node = node, controller = controller)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
