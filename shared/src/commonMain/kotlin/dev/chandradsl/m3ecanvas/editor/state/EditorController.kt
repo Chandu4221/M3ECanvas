@@ -281,6 +281,15 @@ class EditorController(
         )
     }
 
+    /** Replaces the entire project and resets transient UI state (used by Load). */
+    fun replaceProject(project: M3EProject) {
+        state = state.copy(
+            project = project,
+            selectedNodeIds = emptySet(),
+            drag = null
+        )
+    }
+
     //endregion
 
     /**
