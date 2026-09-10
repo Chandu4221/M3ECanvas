@@ -80,6 +80,37 @@ class EditorController(
         )
     }
 
+    /** Deletes all currently selected nodes and clears the selection. */
+    fun deleteSelected() {
+        val ids = state.selectedNodeIds
+        if (ids.isEmpty()) return
+        var project = state.project
+        for (id in ids) {
+            project = project.removeNode(nodeId = id)
+        }
+        state = state.copy(
+            project = project,
+            selectedNodeIds = emptySet()
+        )
+    }
+
+    /**
+     * Nudges selected top-level nodes by the given delta. Children are skipped
+     * because their position is controlled by their container's layout.
+     */
+    fun nudgeSelected(dx: Float, dy: Float) {
+        val ids = state.selectedNodeIds
+        if (ids.isEmpty()) return
+        var project = state.project
+        for (id in ids) {
+            val isTopLevel = project.nodes.any { it.id == id }
+            if (!isTopLevel) continue
+            val node = project.findNode(nodeId = id) ?: continue
+            project = project.updateNode(node = node.movedBy(dx = dx, dy = dy))
+        }
+        state = state.copy(project = project)
+    }
+
     /** Applies or replaces a [property] on the node with [nodeId], wherever it is. */
     fun updateNodeProperty(nodeId: String, property: ComponentProperty) {
         val node = state.project.findNode(nodeId = nodeId) ?: return

@@ -2,6 +2,7 @@ package dev.chandradsl.m3ecanvas.editor.canvas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,14 +26,20 @@ fun CanvasScreen(controller: EditorController) {
     val deviceProfile = state.project.deviceProfile
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFE8E8E8)),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE8E8E8)),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(width = deviceProfile.size.width.dp, height = deviceProfile.size.height.dp)
+                .size(
+                    width = deviceProfile.size.width.dp,
+                    height = deviceProfile.size.height.dp
+                )
                 .clip(RoundedCornerShape(24.dp))
                 .background(MaterialTheme.colorScheme.surface)
+                .focusable()
         ) {
             state.project.nodes.forEach { node ->
                 CanvasNodePlacement(node = node, controller = controller)
@@ -55,12 +62,18 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
                 shape = RoundedCornerShape(4.dp)
             )
             .selectOnPress(nodeId = node.id, controller = controller)
+            .focusable()
             .pointerInput(node.id) {
                 detectDragGestures(
-                    onDragStart = { controller.startDrag(nodeId = node.id) },
+                    onDragStart = {
+                        controller.startDrag(nodeId = node.id)
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        controller.updateDrag(deltaX = dragAmount.x, deltaY = dragAmount.y)
+                        controller.updateDrag(
+                            deltaX = dragAmount.x,
+                            deltaY = dragAmount.y
+                        )
                     },
                     onDragEnd = { controller.endDrag() },
                     onDragCancel = { controller.endDrag() }
