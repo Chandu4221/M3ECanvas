@@ -7,8 +7,8 @@ import kotlin.uuid.Uuid
  * Represents a single component instance placed on the canvas.
  *
  * A node combines the component type, its transform, its editable properties,
- * and — for containers — its [children] and [layoutConfig]. This lets the
- * canvas form a tree: containers hold children, leaves do not.
+ * its [children] and [layoutConfig] for containers, and its [modifiers]
+ * chain for visual decoration.
  */
 @OptIn(ExperimentalUuidApi::class)
 data class CanvasNode(
@@ -19,7 +19,8 @@ data class CanvasNode(
     val size: CanvasSize,
     val properties: List<ComponentProperty> = emptyList(),
     val children: List<CanvasNode> = emptyList(),
-    val layoutConfig: LayoutConfig = LayoutConfig.default
+    val layoutConfig: LayoutConfig = LayoutConfig.default,
+    val modifiers: List<ModifierSpec> = emptyList()
 ) {
 
     /** Whether this node can hold children, based on its type. */
@@ -82,9 +83,7 @@ data class CanvasNode(
 
     //region Recursive tree operations
 
-    /**
-     * Recursively searches this node and all descendants for a node matching [nodeId].
-     */
+    /** Recursively searches this node and all descendants for [nodeId]. */
     fun findNode(nodeId: String): CanvasNode? {
         if (id == nodeId) return this
         for (child in children) {
@@ -94,19 +93,14 @@ data class CanvasNode(
         return null
     }
 
-    /**
-     * Recursively finds the node matching [node.id] anywhere in the subtree
-     * and replaces it. Returns a copy of the tree with the node updated.
-     */
+    /** Recursively replaces the node matching [node.id] anywhere below. */
     fun updateNodeDeep(node: CanvasNode): CanvasNode {
         if (id == node.id) return node
         val updatedChildren = children.map { it.updateNodeDeep(node = node) }
         return copy(children = updatedChildren)
     }
 
-    /**
-     * Recursively finds the container matching [containerId] and adds [child] to it.
-     */
+    /** Recursively adds [child] to the container matching [containerId]. */
     fun addChildDeep(containerId: String, child: CanvasNode): CanvasNode {
         if (id == containerId) return withChild(child = child)
         val updatedChildren = children.map {
@@ -115,14 +109,47 @@ data class CanvasNode(
         return copy(children = updatedChildren)
     }
 
-    /**
-     * Recursively removes the node matching [nodeId] from anywhere in the subtree.
-     */
+    /** Recursively removes the node matching [nodeId] from anywhere below. */
     fun removeNodeDeep(nodeId: String): CanvasNode {
         val updatedChildren = children
             .filterNot { it.id == nodeId }
             .map { it.removeNodeDeep(nodeId = nodeId) }
         return copy(children = updatedChildren)
+    }
+
+    //endregion
+
+    //region Modifier chain
+
+    /** Returns a copy with [spec] appended to the end of the chain. */
+    fun withModifier(spec: ModifierSpec): CanvasNode {
+        return copy(modifiers = modifiers + spec)
+    }
+
+    /** Returns a copy with the modifier matching [specId] removed. */
+    fun withoutModifier(specId: String): CanvasNode {
+        return copy(modifiers = modifiers.filterNot { it.id == specId })
+    }
+
+    /** Returns a copy with the modifier matching [spec.id] replaced. */
+    fun updateModifier(spec: ModifierSpec): CanvasNode {
+        val updated = modifiers.map { if (it.id == spec.id) spec else it }
+        return copy(modifiers = updated)
+    }
+
+    /**
+     * Returns a copy with the modifier matching [specId] moved by [delta]
+     * (-1 earlier, +1 later). Order is semantically significant in Compose.
+     */
+    fun moveModifier(specId: String, delta: Int): CanvasNode {
+        val index = modifiers.indexOfFirst { it.id == specId }
+        val target = index + delta
+        if (index < 0 || target < 0 || target >= modifiers.size) return this
+        val reordered = modifiers.toMutableList().apply {
+            val item = removeAt(index = index)
+            add(index = target, element = item)
+        }
+        return copy(modifiers = reordered)
     }
 
     //endregion
