@@ -1,36 +1,45 @@
 package dev.chandradsl.m3ecanvas.editor.canvas
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 /**
  * Renders a single [CanvasNode] as its corresponding composable.
- *
- * Container types render recursively, laying out their children.
- * Leaf types render as real Material 3 components, or a placeholder
- * if a renderer is not implemented yet.
+ * Container types render recursively; leaf types render real Material 3
+ * components or a placeholder.
  */
 @Composable
-fun CanvasNodeRenderer(node: CanvasNode) {
+fun CanvasNodeRenderer(
+    node: CanvasNode,
+    controller: EditorController
+) {
     when (node.type) {
-        // Layout containers — render recursively.
         ComponentType.COLUMN -> Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(all = node.layoutConfig.padding.dp),
             verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
         ) {
-            node.children.forEach { child -> ContainerChild(child = child) }
+            node.children.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
         }
 
         ComponentType.ROW -> Row(
@@ -39,7 +48,9 @@ fun CanvasNodeRenderer(node: CanvasNode) {
                 .padding(all = node.layoutConfig.padding.dp),
             horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
         ) {
-            node.children.forEach { child -> ContainerChild(child = child) }
+            node.children.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
         }
 
         ComponentType.BOX -> Box(
@@ -47,7 +58,9 @@ fun CanvasNodeRenderer(node: CanvasNode) {
                 .fillMaxSize()
                 .padding(all = node.layoutConfig.padding.dp)
         ) {
-            node.children.forEach { child -> ContainerChild(child = child) }
+            node.children.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
         }
 
         ComponentType.LAZY_COLUMN -> LazyColumn(
@@ -57,7 +70,7 @@ fun CanvasNodeRenderer(node: CanvasNode) {
             verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
         ) {
             items(items = node.children, key = { child -> child.id }) { child ->
-                ContainerChild(child = child)
+                ContainerChild(child = child, controller = controller)
             }
         }
 
@@ -68,11 +81,10 @@ fun CanvasNodeRenderer(node: CanvasNode) {
             horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
         ) {
             items(items = node.children, key = { child -> child.id }) { child ->
-                ContainerChild(child = child)
+                ContainerChild(child = child, controller = controller)
             }
         }
 
-        // Leaf components — real Material 3 rendering.
         ComponentType.BUTTON -> Button(
             onClick = {},
             modifier = Modifier.fillMaxSize()
@@ -92,30 +104,62 @@ fun CanvasNodeRenderer(node: CanvasNode) {
             modifier = Modifier.fillMaxSize()
         )
 
-        // Everything else — labelled placeholder.
         else -> NodePlaceholder(node = node)
     }
 }
 
 /**
- * Renders a child inside a container, wrapped in a box that respects the
- * child's explicit size.
+ * Renders a child inside a container with an explicit size, a selection
+ * border when selected, and press-to-select.
  */
 @Composable
-private fun ContainerChild(child: CanvasNode) {
+private fun ContainerChild(
+    child: CanvasNode,
+    controller: EditorController
+) {
+    val isSelected = controller.state.isNodeSelected(nodeId = child.id)
+
     Box(
-        modifier = Modifier.size(
-            width = child.size.width.dp,
-            height = child.size.height.dp
-        )
+        modifier = Modifier
+            .size(
+                width = child.size.width.dp,
+                height = child.size.height.dp
+            )
+            .border(
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(4.dp)
+            )
+            .selectOnPress(nodeId = child.id, controller = controller)
     ) {
-        CanvasNodeRenderer(node = child)
+        CanvasNodeRenderer(node = child, controller = controller)
     }
 }
 
 /**
- * Placeholder for components whose renderer is not implemented yet.
+ * Selects the node as soon as a pointer press lands on it.
+ *
+ * Uses the Initial pointer pass and does NOT consume the event, so the
+ * composables underneath still receive their own events normally.
+ * [awaitEachGesture] is the supported replacement for the deprecated
+ * forEachGesture and already provides the AwaitPointerEventScope context.
  */
+@Composable
+internal fun Modifier.selectOnPress(
+    nodeId: String,
+    controller: EditorController
+): Modifier {
+    return this.pointerInput(nodeId) {
+        awaitEachGesture {
+            awaitFirstDown(
+                pass = PointerEventPass.Initial,
+                requireUnconsumed = false
+            )
+            controller.selectNode(nodeId = nodeId)
+        }
+    }
+}
+
 @Composable
 private fun NodePlaceholder(node: CanvasNode) {
     Box(
@@ -132,19 +176,11 @@ private fun NodePlaceholder(node: CanvasNode) {
     }
 }
 
-/**
- * Reads the node's "text" property, falling back to [default] if absent.
- */
 private fun CanvasNode.textOrDefault(default: String): String {
     val property = property(key = "text")
     return if (property is ComponentProperty.Text) property.value else default
 }
 
-/**
- * Resolves the arrangement for a vertical container (Column / LazyColumn).
- * Maps START to Top and END to Bottom, since "start" means the top edge
- * in a vertical layout.
- */
 private fun resolveVerticalArrangement(config: LayoutConfig): Arrangement.Vertical {
     if (config.spacing > 0f) {
         return Arrangement.spacedBy(space = config.spacing.dp)
@@ -159,11 +195,6 @@ private fun resolveVerticalArrangement(config: LayoutConfig): Arrangement.Vertic
     }
 }
 
-/**
- * Resolves the arrangement for a horizontal container (Row / LazyRow).
- * Maps START to Start and END to End, since "start" means the leading edge
- * in a horizontal layout.
- */
 private fun resolveHorizontalArrangement(config: LayoutConfig): Arrangement.Horizontal {
     if (config.spacing > 0f) {
         return Arrangement.spacedBy(space = config.spacing.dp)

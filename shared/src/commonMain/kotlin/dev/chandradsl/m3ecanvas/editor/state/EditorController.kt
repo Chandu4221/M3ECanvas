@@ -82,6 +82,67 @@ class EditorController(
         )
     }
 
+    /** Moves the node one position earlier among its siblings (or root nodes). */
+    fun moveNodeUp(nodeId: String) {
+        reorderNode(nodeId = nodeId, delta = -1)
+    }
+
+    /** Moves the node one position later among its siblings (or root nodes). */
+    fun moveNodeDown(nodeId: String) {
+        reorderNode(nodeId = nodeId, delta = 1)
+    }
+
+    /**
+     * Reorders a node within its parent's children, or within the root list
+     * if it is a top-level node. [delta] of -1 moves earlier, 1 moves later.
+     */
+    private fun reorderNode(nodeId: String, delta: Int) {
+        val parent = findParentInProject(nodeId = nodeId)
+
+        if (parent == null) {
+            val nodes = state.project.nodes
+            val index = nodes.indexOfFirst { it.id == nodeId }
+            val target = index + delta
+            if (index < 0 || target < 0 || target >= nodes.size) return
+            val reordered = nodes.toMutableList().apply {
+                val item = removeAt(index = index)
+                add(index = target, element = item)
+            }
+            state = state.copy(project = state.project.copy(nodes = reordered))
+        } else {
+            val children = parent.children
+            val index = children.indexOfFirst { it.id == nodeId }
+            val target = index + delta
+            if (index < 0 || target < 0 || target >= children.size) return
+            val reordered = children.toMutableList().apply {
+                val item = removeAt(index = index)
+                add(index = target, element = item)
+            }
+            val updatedParent = parent.copy(children = reordered)
+            state = state.copy(
+                project = state.project.updateNode(node = updatedParent)
+            )
+        }
+    }
+
+    /** Finds the parent of [nodeId] anywhere in the tree, or null if top-level. */
+    private fun findParentInProject(nodeId: String): CanvasNode? {
+        for (root in state.project.nodes) {
+            val found = findParent(node = root, targetId = nodeId)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun findParent(node: CanvasNode, targetId: String): CanvasNode? {
+        for (child in node.children) {
+            if (child.id == targetId) return node
+            val deeper = findParent(node = child, targetId = targetId)
+            if (deeper != null) return deeper
+        }
+        return null
+    }
+
     /** Applies or replaces a [property] on the node with [nodeId], wherever it is. */
     fun updateNodeProperty(nodeId: String, property: ComponentProperty) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
@@ -95,14 +156,14 @@ class EditorController(
 
     //region Drag
 
+    /** Begins a drag on the node with [nodeId]. Selection is not changed here. */
     fun startDrag(nodeId: String) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
         state = state.copy(
             drag = DragState(
                 nodeId = nodeId,
                 originalNodePosition = node.position
-            ),
-            selectedNodeIds = setOf(nodeId)
+            )
         )
     }
 

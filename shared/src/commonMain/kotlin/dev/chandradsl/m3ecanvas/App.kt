@@ -25,14 +25,22 @@ fun App() {
         Row(modifier = Modifier.fillMaxSize()) {
             ComponentPalette(
                 onAddComponent = { type ->
-                    val count = controller.state.project.nodes.size
-                    controller.addNode(
-                        type = type,
-                        position = CanvasPosition(
-                            x = 40f + count * 24f,
-                            y = 40f + count * 24f
+                    val selected = controller.state.selectedNodes.firstOrNull()
+                    if (selected != null && selected.isContainer) {
+                        controller.addChildToContainer(
+                            containerId = selected.id,
+                            type = type
                         )
-                    )
+                    } else {
+                        val count = controller.state.project.nodes.size
+                        controller.addNode(
+                            type = type,
+                            position = CanvasPosition(
+                                x = 40f + count * 24f,
+                                y = 40f + count * 24f
+                            )
+                        )
+                    }
                 },
                 modifier = Modifier.width(240.dp)
             )

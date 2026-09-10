@@ -2,7 +2,6 @@ package dev.chandradsl.m3ecanvas.editor.canvas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -67,7 +66,7 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(4.dp)
             )
-            .clickable { controller.selectNode(nodeId = node.id) }
+            .selectOnPress(nodeId = node.id, controller = controller)
             .pointerInput(node.id) {
                 detectDragGestures(
                     onDragStart = {
@@ -85,6 +84,6 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
                 )
             }
     ) {
-        CanvasNodeRenderer(node = node)
+        CanvasNodeRenderer(node = node, controller = controller)
     }
 }
