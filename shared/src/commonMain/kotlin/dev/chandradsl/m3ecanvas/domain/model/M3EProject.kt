@@ -33,24 +33,39 @@ data class M3EProject(
         const val DEFAULT_THEME_ID = "m3_baseline"
     }
 
-    /** Returns the node matching [nodeId], or null if it is not present. */
-    fun nodeById(nodeId: String): CanvasNode? {
-        return nodes.firstOrNull { it.id == nodeId }
+    /** Recursively finds a node by [nodeId] across all top-level trees. */
+    fun findNode(nodeId: String): CanvasNode? {
+        for (node in nodes) {
+            val found = node.findNode(nodeId = nodeId)
+            if (found != null) return found
+        }
+        return null
     }
 
-    /** Returns a copy with the given node added. */
+    /** Returns a copy with the given node added at the top level. */
     fun withNode(node: CanvasNode): M3EProject {
         return copy(nodes = nodes + node)
     }
 
-    /** Returns a copy with the given node replaced. */
+    /** Recursively updates a node anywhere in the tree. */
     fun updateNode(node: CanvasNode): M3EProject {
-        val updated = nodes.map { if (it.id == node.id) node else it }
+        val updated = nodes.map { it.updateNodeDeep(node = node) }
         return copy(nodes = updated)
     }
 
-    /** Returns a copy with the node matching [nodeId] removed. */
-    fun withoutNode(nodeId: String): M3EProject {
-        return copy(nodes = nodes.filterNot { it.id == nodeId })
+    /** Recursively adds [child] to the container matching [containerId]. */
+    fun addChildToContainer(containerId: String, child: CanvasNode): M3EProject {
+        val updated = nodes.map {
+            it.addChildDeep(containerId = containerId, child = child)
+        }
+        return copy(nodes = updated)
+    }
+
+    /** Recursively removes the node matching [nodeId] from anywhere in the tree. */
+    fun removeNode(nodeId: String): M3EProject {
+        val updated = nodes
+            .filterNot { it.id == nodeId }
+            .map { it.removeNodeDeep(nodeId = nodeId) }
+        return copy(nodes = updated)
     }
 }

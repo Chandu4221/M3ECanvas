@@ -22,10 +22,11 @@ data class EditorState(
     fun isNodeSelected(nodeId: String): Boolean {
         return nodeId in selectedNodeIds
     }
-
-    /** The currently selected nodes, resolved from the project. */
+    /** The currently selected nodes, resolved from anywhere in the tree. */
     val selectedNodes: List<CanvasNode>
-        get() = project.nodes.filter { it.id in selectedNodeIds }
+        get() = selectedNodeIds.mapNotNull { nodeId ->
+            project.findNode(nodeId = nodeId)
+        }
 }
 
 /**

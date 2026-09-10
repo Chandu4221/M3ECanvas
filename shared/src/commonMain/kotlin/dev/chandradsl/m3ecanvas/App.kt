@@ -11,7 +11,11 @@ import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 @Composable
 fun App() {
-    val controller = remember { EditorController(initialProject = EditorController.newProject()) }
+    val controller = remember {
+        EditorController(initialProject = EditorController.newProject()).also {
+            it.addNode(type = ComponentType.LAZY_COLUMN, position = CanvasPosition(x = 40f, y = 40f))
+        }
+    }
 
     LaunchedEffect(Unit) {
         controller.addNode(

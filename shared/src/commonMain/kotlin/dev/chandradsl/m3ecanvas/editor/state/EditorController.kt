@@ -8,9 +8,8 @@ import dev.chandradsl.m3ecanvas.domain.model.*
 /**
  * Manages the editor's state in response to user actions.
  *
- * The controller holds a Compose-observable [EditorState]. Every user action
- * produces a new immutable state, which triggers UI recomposition. All actual
- * edit logic lives in the pure domain models; the controller only orchestrates.
+ * Hierarchy-aware: nodes can be top-level or nested inside containers,
+ * and all operations search the full tree.
  */
 class EditorController(
     initialProject: M3EProject
@@ -21,12 +20,10 @@ class EditorController(
 
     //region Selection
 
-    /** Selects a single node, replacing any existing selection. */
     fun selectNode(nodeId: String) {
         state = state.copy(selectedNodeIds = setOf(nodeId))
     }
 
-    /** Clears the current selection. */
     fun clearSelection() {
         state = state.copy(selectedNodeIds = emptySet())
     }
@@ -35,7 +32,7 @@ class EditorController(
 
     //region Node editing
 
-    /** Adds a new component of [type] at [position] and selects it. */
+    /** Adds a new top-level component of [type] at [position] and selects it. */
     fun addNode(type: ComponentType, position: CanvasPosition) {
         val existingCount = state.project.nodes.count { it.type == type }
         val name = "${type.displayName} ${existingCount + 1}"
@@ -53,17 +50,41 @@ class EditorController(
         )
     }
 
-    /** Removes the node with [nodeId] and deselects it. */
+    /** Adds a new child of [type] inside the container with [containerId]. */
+    fun addChildToContainer(containerId: String, type: ComponentType) {
+        val container = state.project.findNode(nodeId = containerId) ?: return
+        if (!container.isContainer) return
+
+        val childCount = container.children.count { it.type == type }
+        val name = "${type.displayName} ${childCount + 1}"
+
+        val child = CanvasNode(
+            type = type,
+            name = name,
+            position = CanvasPosition.Zero,
+            size = defaultSizeFor(type = type)
+        )
+
+        state = state.copy(
+            project = state.project.addChildToContainer(
+                containerId = containerId,
+                child = child
+            ),
+            selectedNodeIds = setOf(child.id)
+        )
+    }
+
+    /** Removes the node with [nodeId] from anywhere in the tree. */
     fun removeNode(nodeId: String) {
         state = state.copy(
-            project = state.project.withoutNode(nodeId = nodeId),
+            project = state.project.removeNode(nodeId = nodeId),
             selectedNodeIds = state.selectedNodeIds - nodeId
         )
     }
 
-    /** Applies or replaces a single [property] on the node with [nodeId]. */
+    /** Applies or replaces a [property] on the node with [nodeId], wherever it is. */
     fun updateNodeProperty(nodeId: String, property: ComponentProperty) {
-        val node = state.project.nodeById(nodeId = nodeId) ?: return
+        val node = state.project.findNode(nodeId = nodeId) ?: return
         val updatedNode = node.withProperty(property = property)
         state = state.copy(
             project = state.project.updateNode(node = updatedNode)
@@ -74,9 +95,8 @@ class EditorController(
 
     //region Drag
 
-    /** Begins a drag on the node with [nodeId] and selects it. */
     fun startDrag(nodeId: String) {
-        val node = state.project.nodeById(nodeId = nodeId) ?: return
+        val node = state.project.findNode(nodeId = nodeId) ?: return
         state = state.copy(
             drag = DragState(
                 nodeId = nodeId,
@@ -86,28 +106,23 @@ class EditorController(
         )
     }
 
-    /** Applies a drag delta to the node currently being dragged. */
     fun updateDrag(deltaX: Float, deltaY: Float) {
         val drag = state.drag ?: return
-        val node = state.project.nodeById(nodeId = drag.nodeId) ?: return
+        val node = state.project.findNode(nodeId = drag.nodeId) ?: return
         val movedNode = node.movedBy(dx = deltaX, dy = deltaY)
         state = state.copy(
             project = state.project.updateNode(node = movedNode)
         )
     }
 
-    /** Ends the current drag operation. */
     fun endDrag() {
         state = state.copy(drag = null)
     }
-
-//endregion
 
     //endregion
 
     //region Device
 
-    /** Changes the project's target device frame. */
     fun setDeviceProfile(profile: DeviceProfile) {
         state = state.copy(
             project = state.project.copy(deviceProfile = profile)
@@ -117,20 +132,24 @@ class EditorController(
     //endregion
 
     /**
-     * Placeholder sizes per component. The ComponentRegistry built in a later
-     * step will provide accurate Material defaults and default properties.
+     * Placeholder sizes per component. The ComponentRegistry will replace this
+     * with accurate Material defaults in a later step.
      */
     private fun defaultSizeFor(type: ComponentType): CanvasSize {
         return when (type) {
             ComponentType.BUTTON -> CanvasSize(width = 120f, height = 40f)
             ComponentType.CARD -> CanvasSize(width = 280f, height = 160f)
             ComponentType.TEXT_FIELD -> CanvasSize(width = 280f, height = 56f)
+            ComponentType.COLUMN,
+            ComponentType.LAZY_COLUMN -> CanvasSize(width = 300f, height = 400f)
+            ComponentType.ROW,
+            ComponentType.LAZY_ROW -> CanvasSize(width = 400f, height = 120f)
+            ComponentType.BOX -> CanvasSize(width = 300f, height = 300f)
             else -> CanvasSize(width = 160f, height = 48f)
         }
     }
 
     companion object {
-        /** Creates a fresh project with the default device profile. */
         fun newProject(name: String = "Untitled"): M3EProject {
             return M3EProject(
                 name = name,

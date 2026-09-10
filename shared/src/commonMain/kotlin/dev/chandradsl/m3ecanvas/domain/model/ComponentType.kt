@@ -2,7 +2,8 @@ package dev.chandradsl.m3ecanvas.domain.model
 
 /**
  * Categories used to group components in the palette.
- * These mirror the official Material 3 component categories.
+ * These mirror the official Material 3 component categories,
+ * plus a Layout category for Compose container composables.
  */
 enum class ComponentCategory(val displayName: String) {
     ACTION(displayName = "Action"),
@@ -10,16 +11,20 @@ enum class ComponentCategory(val displayName: String) {
     COMMUNICATION(displayName = "Communication"),
     NAVIGATION(displayName = "Navigation"),
     SELECTION(displayName = "Selection"),
-    TEXT_INPUT(displayName = "Text input")
+    TEXT_INPUT(displayName = "Text input"),
+    LAYOUT(displayName = "Layout")
 }
 
 /**
  * All Material 3 components available in the M3E Canvas.
- * Each type maps to a real Material 3 composable that will be rendered on the canvas.
+ * Each type maps to a real Material 3 or Compose composable rendered on the canvas.
+ *
+ * [isContainer] marks types that can hold child nodes, enabling hierarchical layouts.
  */
 enum class ComponentType(
     val displayName: String,
-    val category: ComponentCategory
+    val category: ComponentCategory,
+    val isContainer: Boolean = false
 ) {
     // Action
     BUTTON(displayName = "Button", category = ComponentCategory.ACTION),
@@ -62,5 +67,12 @@ enum class ComponentType(
     MENUS(displayName = "Menus", category = ComponentCategory.SELECTION),
 
     // Text input
-    TEXT_FIELD(displayName = "Text Field", category = ComponentCategory.TEXT_INPUT)
+    TEXT_FIELD(displayName = "Text Field", category = ComponentCategory.TEXT_INPUT),
+
+    // Layout containers
+    COLUMN(displayName = "Column", category = ComponentCategory.LAYOUT, isContainer = true),
+    ROW(displayName = "Row", category = ComponentCategory.LAYOUT, isContainer = true),
+    BOX(displayName = "Box", category = ComponentCategory.LAYOUT, isContainer = true),
+    LAZY_COLUMN(displayName = "Lazy Column", category = ComponentCategory.LAYOUT, isContainer = true),
+    LAZY_ROW(displayName = "Lazy Row", category = ComponentCategory.LAYOUT, isContainer = true)
 }
