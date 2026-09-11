@@ -2,7 +2,6 @@ package dev.chandradsl.m3ecanvas.editor.canvas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -38,13 +37,7 @@ fun CanvasScreen(controller: EditorController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE2E4E8))
-            .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null
-            ) {
-                controller.clearSelection()
-            },
+            .background(Color(0xFFE2E4E8)),
         contentAlignment = Alignment.Center
     ) {
         Column(
