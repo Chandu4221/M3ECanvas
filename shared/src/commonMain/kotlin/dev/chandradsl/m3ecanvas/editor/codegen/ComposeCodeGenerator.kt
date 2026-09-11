@@ -18,6 +18,7 @@ object ComposeCodeGenerator {
             appendLine()
             appendLine("import androidx.compose.foundation.background")
             appendLine("import androidx.compose.foundation.border")
+            appendLine("import androidx.compose.foundation.clickable")
             appendLine("import androidx.compose.foundation.horizontalScroll")
             appendLine("import androidx.compose.foundation.layout.*")
             appendLine("import androidx.compose.foundation.lazy.LazyColumn")
@@ -42,10 +43,12 @@ object ComposeCodeGenerator {
             appendLine("import androidx.compose.ui.draw.clip")
             appendLine("import androidx.compose.ui.draw.rotate")
             appendLine("import androidx.compose.ui.draw.scale")
+            appendLine("import androidx.compose.ui.draw.shadow")
             appendLine("import androidx.compose.ui.graphics.Color")
             appendLine("import androidx.compose.ui.graphics.RectangleShape")
             appendLine("import androidx.compose.ui.text.font.FontWeight")
             appendLine("import androidx.compose.ui.unit.dp")
+            appendLine("import androidx.compose.ui.zIndex")
             appendLine()
             appendLine("@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)")
             appendLine("@Composable")
@@ -123,11 +126,13 @@ object ComposeCodeGenerator {
             ComponentType.COLUMN -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 val arrangement = resolveArrangementString(node.layoutConfig, isVertical = true)
+                val alignment = resolveHorizontalAlignmentString(node.layoutConfig.horizontalAlignment)
                 val scroll = if (node.layoutConfig.scrollable) ".verticalScroll(rememberScrollState())" else ""
                 val fullMod = if (scroll.isNotEmpty()) "$mod$scroll" else mod
                 appendLine("${indent}Column(")
                 appendLine("${indent}    modifier = $fullMod,")
-                appendLine("${indent}    verticalArrangement = $arrangement")
+                appendLine("${indent}    verticalArrangement = $arrangement,")
+                appendLine("${indent}    horizontalAlignment = $alignment")
                 appendLine("${indent}) {")
                 node.children.forEach { child ->
                     append(generateNodeCode(child, indent = "$indent    "))
@@ -138,11 +143,13 @@ object ComposeCodeGenerator {
             ComponentType.ROW -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 val arrangement = resolveArrangementString(node.layoutConfig, isVertical = false)
+                val alignment = resolveVerticalAlignmentString(node.layoutConfig.verticalAlignment)
                 val scroll = if (node.layoutConfig.scrollable) ".horizontalScroll(rememberScrollState())" else ""
                 val fullMod = if (scroll.isNotEmpty()) "$mod$scroll" else mod
                 appendLine("${indent}Row(")
                 appendLine("${indent}    modifier = $fullMod,")
-                appendLine("${indent}    horizontalArrangement = $arrangement")
+                appendLine("${indent}    horizontalArrangement = $arrangement,")
+                appendLine("${indent}    verticalAlignment = $alignment")
                 appendLine("${indent}) {")
                 node.children.forEach { child ->
                     append(generateNodeCode(child, indent = "$indent    "))
@@ -152,8 +159,10 @@ object ComposeCodeGenerator {
 
             ComponentType.BOX -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val alignment = resolveBoxAlignmentString(node.layoutConfig.boxAlignment)
                 appendLine("${indent}Box(")
-                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    contentAlignment = $alignment")
                 appendLine("${indent}) {")
                 node.children.forEach { child ->
                     append(generateNodeCode(child, indent = "$indent    "))
@@ -164,9 +173,11 @@ object ComposeCodeGenerator {
             ComponentType.LAZY_COLUMN -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 val arrangement = resolveArrangementString(node.layoutConfig, isVertical = true)
+                val alignment = resolveHorizontalAlignmentString(node.layoutConfig.horizontalAlignment)
                 appendLine("${indent}LazyColumn(")
                 appendLine("${indent}    modifier = $mod,")
-                appendLine("${indent}    verticalArrangement = $arrangement")
+                appendLine("${indent}    verticalArrangement = $arrangement,")
+                appendLine("${indent}    horizontalAlignment = $alignment")
                 appendLine("${indent}) {")
                 node.children.forEach { child ->
                     appendLine("${indent}    item {")
@@ -179,9 +190,11 @@ object ComposeCodeGenerator {
             ComponentType.LAZY_ROW -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 val arrangement = resolveArrangementString(node.layoutConfig, isVertical = false)
+                val alignment = resolveVerticalAlignmentString(node.layoutConfig.verticalAlignment)
                 appendLine("${indent}LazyRow(")
                 appendLine("${indent}    modifier = $mod,")
-                appendLine("${indent}    horizontalArrangement = $arrangement")
+                appendLine("${indent}    horizontalArrangement = $arrangement,")
+                appendLine("${indent}    verticalAlignment = $alignment")
                 appendLine("${indent}) {")
                 node.children.forEach { child ->
                     appendLine("${indent}    item {")
@@ -807,6 +820,7 @@ object ComposeCodeGenerator {
                     MaterialVariant.Surface.CIRCLE -> "CircleShape"
                 }
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val alignment = resolveBoxAlignmentString(node.layoutConfig.boxAlignment)
                 appendLine("${indent}Surface(")
                 appendLine("${indent}    shape = $shapeCode,")
                 appendLine("${indent}    color = MaterialTheme.colorScheme.surfaceContainer,")
@@ -814,9 +828,9 @@ object ComposeCodeGenerator {
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 if (node.children.isEmpty()) {
-                    appendLine("${indent}    Box(modifier = Modifier.fillMaxSize())")
+                    appendLine("${indent}    Box(modifier = Modifier.fillMaxSize(), contentAlignment = $alignment)")
                 } else {
-                    appendLine("${indent}    Box(modifier = Modifier.fillMaxSize()) {")
+                    appendLine("${indent}    Box(modifier = Modifier.fillMaxSize(), contentAlignment = $alignment) {")
                     node.children.forEach { child ->
                         append(generateNodeCode(child, indent = "$indent        "))
                     }
@@ -897,15 +911,59 @@ object ComposeCodeGenerator {
 
         for (spec in node.modifiers) {
             when (spec) {
-                is ModifierSpec.Padding -> parts.add("padding(${spec.all.toInt()}.dp)")
-                is ModifierSpec.Background -> parts.add("background(Color(0x${spec.colorHex.removePrefix("#")}))")
-                is ModifierSpec.Border -> parts.add("border(${spec.width.toInt()}.dp, Color(0x${spec.colorHex.removePrefix("#")}), RoundedCornerShape(8.dp))")
+                is ModifierSpec.Padding -> {
+                    if (spec.horizontal > 0f || spec.vertical > 0f) {
+                        if (spec.horizontal > 0f && spec.vertical > 0f) {
+                            parts.add("padding(horizontal = ${spec.horizontal.toInt()}.dp, vertical = ${spec.vertical.toInt()}.dp)")
+                        } else if (spec.horizontal > 0f) {
+                            parts.add("padding(horizontal = ${spec.horizontal.toInt()}.dp)")
+                        } else {
+                            parts.add("padding(vertical = ${spec.vertical.toInt()}.dp)")
+                        }
+                    } else {
+                        parts.add("padding(${spec.all.toInt()}.dp)")
+                    }
+                }
+                is ModifierSpec.Background -> {
+                    if (spec.cornerRadius > 0f) {
+                        parts.add("background(Color(0x${spec.colorHex.removePrefix("#")}), RoundedCornerShape(${spec.cornerRadius.toInt()}.dp))")
+                    } else {
+                        parts.add("background(Color(0x${spec.colorHex.removePrefix("#")}))")
+                    }
+                }
+                is ModifierSpec.Border -> {
+                    parts.add("border(${spec.width.toInt()}.dp, Color(0x${spec.colorHex.removePrefix("#")}), RoundedCornerShape(${spec.cornerRadius.toInt()}.dp))")
+                }
                 is ModifierSpec.Clip -> parts.add("clip(RoundedCornerShape(${spec.cornerRadius.toInt()}.dp))")
+                is ModifierSpec.Shadow -> parts.add("shadow(elevation = ${spec.elevation.toInt()}.dp, shape = RoundedCornerShape(${spec.cornerRadius.toInt()}.dp))")
                 is ModifierSpec.Alpha -> parts.add("alpha(${spec.value}f)")
                 is ModifierSpec.Rotation -> parts.add("rotate(${spec.degrees}f)")
                 is ModifierSpec.Scale -> parts.add("scale(${spec.value}f)")
+                is ModifierSpec.FillMaxSize -> {
+                    if (spec.fraction == 1f) {
+                        parts.add("fillMaxSize()")
+                    } else {
+                        parts.add("fillMaxSize(${spec.fraction}f)")
+                    }
+                }
                 is ModifierSpec.FillMaxWidth -> parts.add("fillMaxWidth()")
                 is ModifierSpec.FillMaxHeight -> parts.add("fillMaxHeight()")
+                is ModifierSpec.WrapContentSize -> parts.add("wrapContentSize()")
+                is ModifierSpec.Width -> parts.add("width(${spec.dp.toInt()}.dp)")
+                is ModifierSpec.Height -> parts.add("height(${spec.dp.toInt()}.dp)")
+                is ModifierSpec.Size -> parts.add("size(width = ${spec.width.toInt()}.dp, height = ${spec.height.toInt()}.dp)")
+                is ModifierSpec.AspectRatio -> parts.add("aspectRatio(${spec.ratio}f)")
+                is ModifierSpec.Offset -> parts.add("offset(x = ${spec.x.toInt()}.dp, y = ${spec.y.toInt()}.dp)")
+                is ModifierSpec.Weight -> {
+                    if (spec.fill) {
+                        parts.add("weight(${spec.weight}f)")
+                    } else {
+                        parts.add("weight(${spec.weight}f, fill = false)")
+                    }
+                }
+                is ModifierSpec.Align -> parts.add("align(${resolveAlignTargetCode(spec.alignment)})")
+                is ModifierSpec.ZIndex -> parts.add("zIndex(${spec.value}f)")
+                is ModifierSpec.Clickable -> parts.add("clickable(enabled = ${spec.enabled}) { /* TODO */ }")
             }
         }
 
@@ -913,6 +971,56 @@ object ComposeCodeGenerator {
             "Modifier"
         } else {
             "Modifier." + parts.joinToString(".")
+        }
+    }
+
+    private fun resolveHorizontalAlignmentString(align: HorizontalAlignment): String {
+        return when (align) {
+            HorizontalAlignment.START -> "Alignment.Start"
+            HorizontalAlignment.CENTER_HORIZONTALLY -> "Alignment.CenterHorizontally"
+            HorizontalAlignment.END -> "Alignment.End"
+        }
+    }
+
+    private fun resolveVerticalAlignmentString(align: VerticalAlignment): String {
+        return when (align) {
+            VerticalAlignment.TOP -> "Alignment.Top"
+            VerticalAlignment.CENTER_VERTICALLY -> "Alignment.CenterVertically"
+            VerticalAlignment.BOTTOM -> "Alignment.Bottom"
+        }
+    }
+
+    private fun resolveBoxAlignmentString(align: BoxAlignment): String {
+        return when (align) {
+            BoxAlignment.TOP_START -> "Alignment.TopStart"
+            BoxAlignment.TOP_CENTER -> "Alignment.TopCenter"
+            BoxAlignment.TOP_END -> "Alignment.TopEnd"
+            BoxAlignment.CENTER_START -> "Alignment.CenterStart"
+            BoxAlignment.CENTER -> "Alignment.Center"
+            BoxAlignment.CENTER_END -> "Alignment.CenterEnd"
+            BoxAlignment.BOTTOM_START -> "Alignment.BottomStart"
+            BoxAlignment.BOTTOM_CENTER -> "Alignment.BottomCenter"
+            BoxAlignment.BOTTOM_END -> "Alignment.BottomEnd"
+        }
+    }
+
+    private fun resolveAlignTargetCode(target: AlignTarget): String {
+        return when (target) {
+            AlignTarget.TOP_START -> "Alignment.TopStart"
+            AlignTarget.TOP_CENTER -> "Alignment.TopCenter"
+            AlignTarget.TOP_END -> "Alignment.TopEnd"
+            AlignTarget.CENTER_START -> "Alignment.CenterStart"
+            AlignTarget.CENTER -> "Alignment.Center"
+            AlignTarget.CENTER_END -> "Alignment.CenterEnd"
+            AlignTarget.BOTTOM_START -> "Alignment.BottomStart"
+            AlignTarget.BOTTOM_CENTER -> "Alignment.BottomCenter"
+            AlignTarget.BOTTOM_END -> "Alignment.BottomEnd"
+            AlignTarget.START -> "Alignment.Start"
+            AlignTarget.CENTER_HORIZONTALLY -> "Alignment.CenterHorizontally"
+            AlignTarget.END -> "Alignment.End"
+            AlignTarget.TOP -> "Alignment.Top"
+            AlignTarget.CENTER_VERTICALLY -> "Alignment.CenterVertically"
+            AlignTarget.BOTTOM -> "Alignment.Bottom"
         }
     }
 

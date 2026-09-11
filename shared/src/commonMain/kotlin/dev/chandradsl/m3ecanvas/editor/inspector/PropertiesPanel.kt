@@ -209,7 +209,123 @@ private fun ProjectSection(controller: EditorController) {
 private fun LayoutSection(node: CanvasNode, controller: EditorController) {
     val config = node.layoutConfig
 
-    SectionLabel(text = "Layout")
+    SectionLabel(text = "Layout & Alignment")
+
+    when (node.type) {
+        ComponentType.COLUMN, ComponentType.LAZY_COLUMN -> {
+            InspectorDropdown(
+                label = "Vertical Arrangement",
+                value = config.arrangement.displayName,
+                options = LayoutArrangement.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val arr = LayoutArrangement.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(arrangement = arr))
+                }
+            )
+            InspectorDropdown(
+                label = "Horizontal Alignment",
+                value = config.horizontalAlignment.displayName,
+                options = HorizontalAlignment.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val align = HorizontalAlignment.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(horizontalAlignment = align))
+                }
+            )
+        }
+        ComponentType.ROW, ComponentType.LAZY_ROW -> {
+            InspectorDropdown(
+                label = "Horizontal Arrangement",
+                value = config.arrangement.displayName,
+                options = LayoutArrangement.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val arr = LayoutArrangement.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(arrangement = arr))
+                }
+            )
+            InspectorDropdown(
+                label = "Vertical Alignment",
+                value = config.verticalAlignment.displayName,
+                options = VerticalAlignment.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val align = VerticalAlignment.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(verticalAlignment = align))
+                }
+            )
+        }
+        ComponentType.BOX, ComponentType.SURFACE -> {
+            InspectorDropdown(
+                label = "Content Alignment",
+                value = config.boxAlignment.displayName,
+                options = BoxAlignment.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val align = BoxAlignment.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(boxAlignment = align))
+                }
+            )
+        }
+        ComponentType.FLOW_ROW -> {
+            InspectorDropdown(
+                label = "Horizontal Arrangement",
+                value = config.arrangement.displayName,
+                options = LayoutArrangement.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val arr = LayoutArrangement.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(arrangement = arr))
+                }
+            )
+            InspectorDropdown(
+                label = "Vertical Alignment",
+                value = config.verticalAlignment.displayName,
+                options = VerticalAlignment.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val align = VerticalAlignment.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(verticalAlignment = align))
+                }
+            )
+        }
+        ComponentType.FLOW_COLUMN -> {
+            InspectorDropdown(
+                label = "Vertical Arrangement",
+                value = config.arrangement.displayName,
+                options = LayoutArrangement.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val arr = LayoutArrangement.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(arrangement = arr))
+                }
+            )
+            InspectorDropdown(
+                label = "Horizontal Alignment",
+                value = config.horizontalAlignment.displayName,
+                options = HorizontalAlignment.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val align = HorizontalAlignment.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(horizontalAlignment = align))
+                }
+            )
+        }
+        ComponentType.LAZY_VERTICAL_GRID -> {
+            InspectorDropdown(
+                label = "Vertical Arrangement",
+                value = config.arrangement.displayName,
+                options = LayoutArrangement.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val arr = LayoutArrangement.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(arrangement = arr))
+                }
+            )
+        }
+        else -> {
+            InspectorDropdown(
+                label = "Arrangement",
+                value = config.arrangement.displayName,
+                options = LayoutArrangement.entries.map { it.displayName },
+                onSelect = { selected ->
+                    val arr = LayoutArrangement.entries.first { it.displayName == selected }
+                    controller.updateLayoutConfig(node.id, config.copy(arrangement = arr))
+                }
+            )
+        }
+    }
 
     SliderRow(
         label = "Spacing",
@@ -233,23 +349,23 @@ private fun LayoutSection(node: CanvasNode, controller: EditorController) {
         }
     )
 
-    ArrangementDropdown(node = node, config = config, controller = controller)
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(text = "Scrollable", style = MaterialTheme.typography.bodyMedium)
-        Switch(
-            checked = config.scrollable,
-            onCheckedChange = {
-                controller.updateLayoutConfig(
-                    nodeId = node.id,
-                    config = config.copy(scrollable = it)
-                )
-            }
-        )
+    if (node.type == ComponentType.COLUMN || node.type == ComponentType.ROW) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = "Scrollable", style = MaterialTheme.typography.bodyMedium)
+            Switch(
+                checked = config.scrollable,
+                onCheckedChange = {
+                    controller.updateLayoutConfig(
+                        nodeId = node.id,
+                        config = config.copy(scrollable = it)
+                    )
+                }
+            )
+        }
     }
 }
 
@@ -323,10 +439,11 @@ private fun VariantDropdown(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ArrangementDropdown(
-    node: CanvasNode,
-    config: LayoutConfig,
-    controller: EditorController
+private fun InspectorDropdown(
+    label: String,
+    value: String,
+    options: List<String>,
+    onSelect: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(value = false) }
 
@@ -335,10 +452,10 @@ private fun ArrangementDropdown(
         onExpandedChange = { expanded = it }
     ) {
         OutlinedTextField(
-            value = config.arrangement.displayName,
+            value = value,
             onValueChange = {},
             readOnly = true,
-            label = { Text(text = "Arrangement") },
+            label = { Text(text = label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -348,14 +465,11 @@ private fun ArrangementDropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-            LayoutArrangement.entries.forEach { arrangement ->
+            options.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(text = arrangement.displayName) },
+                    text = { Text(text = option) },
                     onClick = {
-                        controller.updateLayoutConfig(
-                            nodeId = node.id,
-                            config = config.copy(arrangement = arrangement)
-                        )
+                        onSelect(option)
                         expanded = false
                     }
                 )

@@ -490,4 +490,190 @@ class SharedCommonTest {
         assertEquals(1, controller.state.project.nodes.size)
         assertEquals(ComponentType.BUTTON, controller.state.project.nodes.first().type)
     }
+
+    @Test
+    fun testAll21ModifiersCreationAndSerialization() {
+        assertEquals(21, ModifierKind.entries.size)
+
+        val allSpecs: List<ModifierSpec> = listOf(
+            ModifierSpec.Padding(all = 12f, horizontal = 8f, vertical = 4f),
+            ModifierSpec.Background(colorHex = "#FF123456", cornerRadius = 16f),
+            ModifierSpec.Border(width = 3f, colorHex = "#FF654321", cornerRadius = 8f),
+            ModifierSpec.Clip(cornerRadius = 10f),
+            ModifierSpec.Shadow(elevation = 6f, cornerRadius = 12f),
+            ModifierSpec.Alpha(value = 0.75f),
+            ModifierSpec.Rotation(degrees = 90f),
+            ModifierSpec.Scale(value = 1.5f),
+            ModifierSpec.FillMaxSize(fraction = 0.8f),
+            ModifierSpec.FillMaxWidth(),
+            ModifierSpec.FillMaxHeight(),
+            ModifierSpec.WrapContentSize(),
+            ModifierSpec.Width(dp = 150f),
+            ModifierSpec.Height(dp = 200f),
+            ModifierSpec.Size(width = 80f, height = 90f),
+            ModifierSpec.AspectRatio(ratio = 1.77f),
+            ModifierSpec.Offset(x = 10f, y = 20f),
+            ModifierSpec.Weight(weight = 2f, fill = false),
+            ModifierSpec.Align(alignment = AlignTarget.BOTTOM_END),
+            ModifierSpec.ZIndex(value = 5f),
+            ModifierSpec.Clickable(enabled = true)
+        )
+
+        assertEquals(21, allSpecs.size)
+
+        // Verify factory method creates correct instance for every kind
+        ModifierKind.entries.forEach { kind ->
+            val created = kind.create()
+            assertNotNull(created)
+            assertNotEquals(created.id, created.withNewId().id)
+        }
+
+        val testNode = CanvasNode(
+            type = ComponentType.BOX,
+            name = "TestBox",
+            position = CanvasPosition(10f, 10f),
+            size = CanvasSize(200f, 200f),
+            modifiers = allSpecs
+        )
+
+        val json = M3EJson.encodeToString(testNode)
+        val decoded = M3EJson.decodeFromString<CanvasNode>(json)
+
+        assertEquals(21, decoded.modifiers.size)
+        val decodedAlign = decoded.modifiers.filterIsInstance<ModifierSpec.Align>().first()
+        assertEquals(AlignTarget.BOTTOM_END, decodedAlign.alignment)
+
+        val decodedWeight = decoded.modifiers.filterIsInstance<ModifierSpec.Weight>().first()
+        assertEquals(2f, decodedWeight.weight)
+        assertFalse(decodedWeight.fill)
+
+        val decodedPadding = decoded.modifiers.filterIsInstance<ModifierSpec.Padding>().first()
+        assertEquals(8f, decodedPadding.horizontal)
+        assertEquals(4f, decodedPadding.vertical)
+    }
+
+    @Test
+    fun testContainerAlignmentSerializationAndCodegen() {
+        val colConfig = LayoutConfig(
+            horizontalAlignment = HorizontalAlignment.CENTER_HORIZONTALLY,
+            arrangement = LayoutArrangement.CENTER
+        )
+        val rowConfig = LayoutConfig(
+            verticalAlignment = VerticalAlignment.BOTTOM,
+            arrangement = LayoutArrangement.SPACE_BETWEEN
+        )
+        val boxConfig = LayoutConfig(
+            boxAlignment = BoxAlignment.TOP_END
+        )
+
+        val colJson = M3EJson.encodeToString(colConfig)
+        val decodedCol = M3EJson.decodeFromString<LayoutConfig>(colJson)
+        assertEquals(HorizontalAlignment.CENTER_HORIZONTALLY, decodedCol.horizontalAlignment)
+
+        val rowJson = M3EJson.encodeToString(rowConfig)
+        val decodedRow = M3EJson.decodeFromString<LayoutConfig>(rowJson)
+        assertEquals(VerticalAlignment.BOTTOM, decodedRow.verticalAlignment)
+
+        val boxJson = M3EJson.encodeToString(boxConfig)
+        val decodedBox = M3EJson.decodeFromString<LayoutConfig>(boxJson)
+        assertEquals(BoxAlignment.TOP_END, decodedBox.boxAlignment)
+
+        // Test ComposeCodeGenerator output for alignments
+        val colNode = CanvasNode(
+            type = ComponentType.COLUMN,
+            name = "TestColumn",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(200f, 200f),
+            layoutConfig = colConfig
+        )
+        val rowNode = CanvasNode(
+            type = ComponentType.ROW,
+            name = "TestRow",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(200f, 200f),
+            layoutConfig = rowConfig
+        )
+        val boxNode = CanvasNode(
+            type = ComponentType.BOX,
+            name = "TestBox",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(200f, 200f),
+            layoutConfig = boxConfig
+        )
+
+        val project = M3EProject(
+            id = "test-project",
+            name = "TestScreen",
+            nodes = listOf(colNode, rowNode, boxNode)
+        )
+
+        val code = ComposeCodeGenerator.generateFile(project)
+        assertTrue(code.contains("horizontalAlignment = Alignment.CenterHorizontally"))
+        assertTrue(code.contains("verticalAlignment = Alignment.Bottom"))
+        assertTrue(code.contains("contentAlignment = Alignment.TopEnd"))
+    }
+
+    @Test
+    fun testAll21ModifiersComposeCodeGeneration() {
+        val allSpecs: List<ModifierSpec> = listOf(
+            ModifierSpec.Padding(all = 12f, horizontal = 8f, vertical = 4f),
+            ModifierSpec.Background(colorHex = "#FF123456", cornerRadius = 16f),
+            ModifierSpec.Border(width = 3f, colorHex = "#FF654321", cornerRadius = 8f),
+            ModifierSpec.Clip(cornerRadius = 10f),
+            ModifierSpec.Shadow(elevation = 6f, cornerRadius = 12f),
+            ModifierSpec.Alpha(value = 0.75f),
+            ModifierSpec.Rotation(degrees = 90f),
+            ModifierSpec.Scale(value = 1.5f),
+            ModifierSpec.FillMaxSize(fraction = 0.8f),
+            ModifierSpec.FillMaxWidth(),
+            ModifierSpec.FillMaxHeight(),
+            ModifierSpec.WrapContentSize(),
+            ModifierSpec.Width(dp = 150f),
+            ModifierSpec.Height(dp = 200f),
+            ModifierSpec.Size(width = 80f, height = 90f),
+            ModifierSpec.AspectRatio(ratio = 1.77f),
+            ModifierSpec.Offset(x = 10f, y = 20f),
+            ModifierSpec.Weight(weight = 2f, fill = false),
+            ModifierSpec.Align(alignment = AlignTarget.BOTTOM_END),
+            ModifierSpec.ZIndex(value = 5f),
+            ModifierSpec.Clickable(enabled = true)
+        )
+
+        val node = CanvasNode(
+            type = ComponentType.BUTTON,
+            name = "MyButton",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(100f, 50f),
+            modifiers = allSpecs
+        )
+
+        val project = M3EProject(
+            id = "proj",
+            name = "Screen",
+            nodes = listOf(node)
+        )
+
+        val code = ComposeCodeGenerator.generateFile(project)
+        assertTrue(code.contains("padding(horizontal = 8.dp, vertical = 4.dp)"))
+        assertTrue(code.contains("background(Color(0xFF123456), RoundedCornerShape(16.dp))"))
+        assertTrue(code.contains("border(3.dp, Color(0xFF654321), RoundedCornerShape(8.dp))"))
+        assertTrue(code.contains("clip(RoundedCornerShape(10.dp))"))
+        assertTrue(code.contains("shadow(elevation = 6.dp, shape = RoundedCornerShape(12.dp))"))
+        assertTrue(code.contains("alpha(0.75f)"))
+        assertTrue(code.contains("rotate(90.0f)"))
+        assertTrue(code.contains("scale(1.5f)"))
+        assertTrue(code.contains("fillMaxSize(0.8f)"))
+        assertTrue(code.contains("fillMaxWidth()"))
+        assertTrue(code.contains("fillMaxHeight()"))
+        assertTrue(code.contains("wrapContentSize()"))
+        assertTrue(code.contains("width(150.dp)"))
+        assertTrue(code.contains("height(200.dp)"))
+        assertTrue(code.contains("size(width = 80.dp, height = 90.dp)"))
+        assertTrue(code.contains("aspectRatio(1.77f)"))
+        assertTrue(code.contains("offset(x = 10.dp, y = 20.dp)"))
+        assertTrue(code.contains("weight(2.0f, fill = false)"))
+        assertTrue(code.contains("align(Alignment.BottomEnd)"))
+        assertTrue(code.contains("zIndex(5.0f)"))
+        assertTrue(code.contains("clickable(enabled = true)"))
+    }
 }

@@ -29,10 +29,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,10 +67,16 @@ fun CanvasNodeRenderer(
                         }
                     )
                     .padding(all = node.layoutConfig.padding.dp),
-                verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
+                verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig),
+                horizontalAlignment = resolveHorizontalAlignment(config = node.layoutConfig)
             ) {
                 node.children.forEach { child ->
-                    ContainerChild(child = child, controller = controller)
+                    val weightSpec = child.modifiers.filterIsInstance<ModifierSpec.Weight>().firstOrNull()
+                    val alignSpec = child.modifiers.filterIsInstance<ModifierSpec.Align>().firstOrNull()
+                    val scopeModifier = Modifier
+                        .then(if (weightSpec != null) Modifier.weight(weightSpec.weight, weightSpec.fill) else Modifier)
+                        .then(if (alignSpec != null) Modifier.align(alignSpec.alignment.toColumnAlignment()) else Modifier)
+                    ContainerChild(child = child, controller = controller, modifier = scopeModifier)
                 }
             }
         }
@@ -86,10 +94,16 @@ fun CanvasNodeRenderer(
                         }
                     )
                     .padding(all = node.layoutConfig.padding.dp),
-                horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
+                horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig),
+                verticalAlignment = resolveVerticalAlignment(config = node.layoutConfig)
             ) {
                 node.children.forEach { child ->
-                    ContainerChild(child = child, controller = controller)
+                    val weightSpec = child.modifiers.filterIsInstance<ModifierSpec.Weight>().firstOrNull()
+                    val alignSpec = child.modifiers.filterIsInstance<ModifierSpec.Align>().firstOrNull()
+                    val scopeModifier = Modifier
+                        .then(if (weightSpec != null) Modifier.weight(weightSpec.weight, weightSpec.fill) else Modifier)
+                        .then(if (alignSpec != null) Modifier.align(alignSpec.alignment.toRowAlignment()) else Modifier)
+                    ContainerChild(child = child, controller = controller, modifier = scopeModifier)
                 }
             }
         }
@@ -97,10 +111,13 @@ fun CanvasNodeRenderer(
         ComponentType.BOX -> Box(
             modifier = node.modifiers.toModifier()
                 .fillMaxSize()
-                .padding(all = node.layoutConfig.padding.dp)
+                .padding(all = node.layoutConfig.padding.dp),
+            contentAlignment = resolveContentAlignment(config = node.layoutConfig)
         ) {
             node.children.forEach { child ->
-                ContainerChild(child = child, controller = controller)
+                val alignSpec = child.modifiers.filterIsInstance<ModifierSpec.Align>().firstOrNull()
+                val scopeModifier = if (alignSpec != null) Modifier.align(alignSpec.alignment.toBoxAlignment()) else Modifier
+                ContainerChild(child = child, controller = controller, modifier = scopeModifier)
             }
         }
 
@@ -108,7 +125,8 @@ fun CanvasNodeRenderer(
             modifier = node.modifiers.toModifier()
                 .fillMaxSize()
                 .padding(all = node.layoutConfig.padding.dp),
-            verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
+            verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig),
+            horizontalAlignment = resolveHorizontalAlignment(config = node.layoutConfig)
         ) {
             items(items = node.children, key = { child -> child.id }) { child ->
                 ContainerChild(child = child, controller = controller)
@@ -119,7 +137,8 @@ fun CanvasNodeRenderer(
             modifier = node.modifiers.toModifier()
                 .fillMaxSize()
                 .padding(all = node.layoutConfig.padding.dp),
-            horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
+            horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig),
+            verticalAlignment = resolveVerticalAlignment(config = node.layoutConfig)
         ) {
             items(items = node.children, key = { child -> child.id }) { child ->
                 ContainerChild(child = child, controller = controller)
@@ -438,7 +457,8 @@ private fun SlotContainer(
 @Composable
 private fun ContainerChild(
     child: CanvasNode,
-    controller: EditorController
+    controller: EditorController,
+    modifier: Modifier = Modifier
 ) {
     val isSelected = controller.state.isNodeSelected(nodeId = child.id)
     val focusRequester = remember { FocusRequester() }
@@ -451,9 +471,30 @@ private fun ContainerChild(
         }
     }
 
+    val fillMaxSize = child.modifiers.filterIsInstance<ModifierSpec.FillMaxSize>().firstOrNull()
+    val fillMaxWidth = child.modifiers.filterIsInstance<ModifierSpec.FillMaxWidth>().firstOrNull()
+    val fillMaxHeight = child.modifiers.filterIsInstance<ModifierSpec.FillMaxHeight>().firstOrNull()
+    val widthSpec = child.modifiers.filterIsInstance<ModifierSpec.Width>().firstOrNull()
+    val heightSpec = child.modifiers.filterIsInstance<ModifierSpec.Height>().firstOrNull()
+    val sizeSpec = child.modifiers.filterIsInstance<ModifierSpec.Size>().firstOrNull()
+    val wrapContent = child.modifiers.filterIsInstance<ModifierSpec.WrapContentSize>().firstOrNull()
+
+    val sizeModifier = when {
+        fillMaxSize != null -> Modifier.fillMaxSize(fraction = fillMaxSize.fraction)
+        fillMaxWidth != null && fillMaxHeight != null -> Modifier.fillMaxWidth().fillMaxHeight()
+        fillMaxWidth != null -> Modifier.fillMaxWidth().height(heightSpec?.dp?.dp ?: sizeSpec?.height?.dp ?: child.size.height.dp)
+        fillMaxHeight != null -> Modifier.fillMaxHeight().width(widthSpec?.dp?.dp ?: sizeSpec?.width?.dp ?: child.size.width.dp)
+        sizeSpec != null -> Modifier.size(width = sizeSpec.width.dp, height = sizeSpec.height.dp)
+        widthSpec != null && heightSpec != null -> Modifier.size(width = widthSpec.dp.dp, height = heightSpec.dp.dp)
+        widthSpec != null -> Modifier.width(widthSpec.dp.dp).height(child.size.height.dp)
+        heightSpec != null -> Modifier.width(child.size.width.dp).height(heightSpec.dp.dp)
+        wrapContent != null -> Modifier.wrapContentSize()
+        else -> Modifier.size(width = child.size.width.dp, height = child.size.height.dp)
+    }
+
     Box(
-        modifier = Modifier
-            .size(width = child.size.width.dp, height = child.size.height.dp)
+        modifier = modifier
+            .then(sizeModifier)
             .border(
                 width = if (isSelected) 2.dp else 0.dp,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -1189,10 +1230,13 @@ private fun RenderSurface(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(all = node.layoutConfig.padding.dp)
+                .padding(all = node.layoutConfig.padding.dp),
+            contentAlignment = resolveContentAlignment(config = node.layoutConfig)
         ) {
             node.children.forEach { child ->
-                ContainerChild(child = child, controller = controller)
+                val alignSpec = child.modifiers.filterIsInstance<ModifierSpec.Align>().firstOrNull()
+                val scopeModifier = if (alignSpec != null) Modifier.align(alignSpec.alignment.toBoxAlignment()) else Modifier
+                ContainerChild(child = child, controller = controller, modifier = scopeModifier)
             }
         }
     }
@@ -1338,21 +1382,51 @@ private fun List<ModifierSpec>.toModifier(): Modifier {
     return fold(Modifier) { acc: Modifier, spec: ModifierSpec ->
         acc.then(
             when (spec) {
-                is ModifierSpec.Padding -> Modifier.padding(all = spec.all.dp)
-                is ModifierSpec.Background -> Modifier.background(color = parseHex(hex = spec.colorHex))
+                is ModifierSpec.Padding -> {
+                    if (spec.horizontal > 0f || spec.vertical > 0f) {
+                        Modifier.padding(horizontal = spec.horizontal.dp, vertical = spec.vertical.dp)
+                    } else {
+                        Modifier.padding(all = spec.all.dp)
+                    }
+                }
+                is ModifierSpec.Background -> {
+                    if (spec.cornerRadius > 0f) {
+                        Modifier.background(
+                            color = parseHex(hex = spec.colorHex),
+                            shape = RoundedCornerShape(spec.cornerRadius.dp)
+                        )
+                    } else {
+                        Modifier.background(color = parseHex(hex = spec.colorHex))
+                    }
+                }
                 is ModifierSpec.Border -> Modifier.border(
                     width = spec.width.dp,
                     color = parseHex(hex = spec.colorHex),
-                    shape = RectangleShape
+                    shape = if (spec.cornerRadius > 0f) RoundedCornerShape(spec.cornerRadius.dp) else RectangleShape
                 )
                 is ModifierSpec.Clip -> Modifier.clip(
                     shape = RoundedCornerShape(corner = CornerSize(spec.cornerRadius.dp))
                 )
+                is ModifierSpec.Shadow -> Modifier.shadow(
+                    elevation = spec.elevation.dp,
+                    shape = RoundedCornerShape(spec.cornerRadius.dp)
+                )
                 is ModifierSpec.Alpha -> Modifier.alpha(alpha = spec.value)
                 is ModifierSpec.Rotation -> Modifier.rotate(degrees = spec.degrees)
                 is ModifierSpec.Scale -> Modifier.scale(scale = spec.value)
+                is ModifierSpec.FillMaxSize -> Modifier.fillMaxSize(fraction = spec.fraction)
                 is ModifierSpec.FillMaxWidth -> Modifier.fillMaxWidth()
                 is ModifierSpec.FillMaxHeight -> Modifier.fillMaxHeight()
+                is ModifierSpec.WrapContentSize -> Modifier.wrapContentSize()
+                is ModifierSpec.Width -> Modifier.width(spec.dp.dp)
+                is ModifierSpec.Height -> Modifier.height(spec.dp.dp)
+                is ModifierSpec.Size -> Modifier.size(width = spec.width.dp, height = spec.height.dp)
+                is ModifierSpec.AspectRatio -> Modifier.aspectRatio(ratio = spec.ratio)
+                is ModifierSpec.Offset -> Modifier.offset(x = spec.x.dp, y = spec.y.dp)
+                is ModifierSpec.Weight -> Modifier
+                is ModifierSpec.Align -> Modifier
+                is ModifierSpec.ZIndex -> Modifier.zIndex(spec.value)
+                is ModifierSpec.Clickable -> Modifier.clickable(enabled = spec.enabled) { }
             }
         )
     }
@@ -1398,4 +1472,66 @@ private fun resolveHorizontalArrangement(config: LayoutConfig): Arrangement.Hori
         LayoutArrangement.SPACE_AROUND -> Arrangement.SpaceAround
         LayoutArrangement.SPACE_EVENLY -> Arrangement.SpaceEvenly
     }
+}
+
+private fun resolveHorizontalAlignment(config: LayoutConfig): Alignment.Horizontal {
+    return when (config.horizontalAlignment) {
+        HorizontalAlignment.START -> Alignment.Start
+        HorizontalAlignment.CENTER_HORIZONTALLY -> Alignment.CenterHorizontally
+        HorizontalAlignment.END -> Alignment.End
+    }
+}
+
+private fun resolveVerticalAlignment(config: LayoutConfig): Alignment.Vertical {
+    return when (config.verticalAlignment) {
+        VerticalAlignment.TOP -> Alignment.Top
+        VerticalAlignment.CENTER_VERTICALLY -> Alignment.CenterVertically
+        VerticalAlignment.BOTTOM -> Alignment.Bottom
+    }
+}
+
+private fun resolveContentAlignment(config: LayoutConfig): Alignment {
+    return when (config.boxAlignment) {
+        BoxAlignment.TOP_START -> Alignment.TopStart
+        BoxAlignment.TOP_CENTER -> Alignment.TopCenter
+        BoxAlignment.TOP_END -> Alignment.TopEnd
+        BoxAlignment.CENTER_START -> Alignment.CenterStart
+        BoxAlignment.CENTER -> Alignment.Center
+        BoxAlignment.CENTER_END -> Alignment.CenterEnd
+        BoxAlignment.BOTTOM_START -> Alignment.BottomStart
+        BoxAlignment.BOTTOM_CENTER -> Alignment.BottomCenter
+        BoxAlignment.BOTTOM_END -> Alignment.BottomEnd
+    }
+}
+
+private fun AlignTarget.toBoxAlignment(): Alignment = when (this) {
+    AlignTarget.TOP_START -> Alignment.TopStart
+    AlignTarget.TOP_CENTER -> Alignment.TopCenter
+    AlignTarget.TOP_END -> Alignment.TopEnd
+    AlignTarget.CENTER_START -> Alignment.CenterStart
+    AlignTarget.CENTER -> Alignment.Center
+    AlignTarget.CENTER_END -> Alignment.CenterEnd
+    AlignTarget.BOTTOM_START -> Alignment.BottomStart
+    AlignTarget.BOTTOM_CENTER -> Alignment.BottomCenter
+    AlignTarget.BOTTOM_END -> Alignment.BottomEnd
+    AlignTarget.START -> Alignment.CenterStart
+    AlignTarget.CENTER_HORIZONTALLY -> Alignment.Center
+    AlignTarget.END -> Alignment.CenterEnd
+    AlignTarget.TOP -> Alignment.TopCenter
+    AlignTarget.CENTER_VERTICALLY -> Alignment.Center
+    AlignTarget.BOTTOM -> Alignment.BottomCenter
+}
+
+private fun AlignTarget.toColumnAlignment(): Alignment.Horizontal = when (this) {
+    AlignTarget.START, AlignTarget.TOP_START, AlignTarget.CENTER_START, AlignTarget.BOTTOM_START -> Alignment.Start
+    AlignTarget.CENTER_HORIZONTALLY, AlignTarget.TOP_CENTER, AlignTarget.CENTER, AlignTarget.BOTTOM_CENTER -> Alignment.CenterHorizontally
+    AlignTarget.END, AlignTarget.TOP_END, AlignTarget.CENTER_END, AlignTarget.BOTTOM_END -> Alignment.End
+    else -> Alignment.CenterHorizontally
+}
+
+private fun AlignTarget.toRowAlignment(): Alignment.Vertical = when (this) {
+    AlignTarget.TOP, AlignTarget.TOP_START, AlignTarget.TOP_CENTER, AlignTarget.TOP_END -> Alignment.Top
+    AlignTarget.CENTER_VERTICALLY, AlignTarget.CENTER_START, AlignTarget.CENTER, AlignTarget.CENTER_END -> Alignment.CenterVertically
+    AlignTarget.BOTTOM, AlignTarget.BOTTOM_START, AlignTarget.BOTTOM_CENTER, AlignTarget.BOTTOM_END -> Alignment.Bottom
+    else -> Alignment.CenterVertically
 }

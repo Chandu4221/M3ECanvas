@@ -155,17 +155,39 @@ private fun ModifierParams(
     onChange: (ModifierSpec) -> Unit
 ) {
     when (spec) {
-        is ModifierSpec.Padding -> MiniSlider(
-            label = "All",
-            value = spec.all,
-            valueRange = 0f..64f,
-            onValueChange = { onChange(spec.copy(all = it)) }
-        )
+        is ModifierSpec.Padding -> {
+            MiniSlider(
+                label = "All",
+                value = spec.all,
+                valueRange = 0f..64f,
+                onValueChange = { onChange(spec.copy(all = it)) }
+            )
+            MiniSlider(
+                label = "Horiz",
+                value = spec.horizontal,
+                valueRange = 0f..64f,
+                onValueChange = { onChange(spec.copy(horizontal = it)) }
+            )
+            MiniSlider(
+                label = "Vert",
+                value = spec.vertical,
+                valueRange = 0f..64f,
+                onValueChange = { onChange(spec.copy(vertical = it)) }
+            )
+        }
 
-        is ModifierSpec.Background -> HexField(
-            value = spec.colorHex,
-            onChange = { onChange(spec.copy(colorHex = it)) }
-        )
+        is ModifierSpec.Background -> {
+            HexField(
+                value = spec.colorHex,
+                onChange = { onChange(spec.copy(colorHex = it)) }
+            )
+            MiniSlider(
+                label = "Radius",
+                value = spec.cornerRadius,
+                valueRange = 0f..32f,
+                onValueChange = { onChange(spec.copy(cornerRadius = it)) }
+            )
+        }
 
         is ModifierSpec.Border -> {
             MiniSlider(
@@ -178,14 +200,35 @@ private fun ModifierParams(
                 value = spec.colorHex,
                 onChange = { onChange(spec.copy(colorHex = it)) }
             )
+            MiniSlider(
+                label = "Radius",
+                value = spec.cornerRadius,
+                valueRange = 0f..32f,
+                onValueChange = { onChange(spec.copy(cornerRadius = it)) }
+            )
         }
 
         is ModifierSpec.Clip -> MiniSlider(
             label = "Radius",
             value = spec.cornerRadius,
-            valueRange = 0f..32f,
+            valueRange = 0f..64f,
             onValueChange = { onChange(spec.copy(cornerRadius = it)) }
         )
+
+        is ModifierSpec.Shadow -> {
+            MiniSlider(
+                label = "Elevation",
+                value = spec.elevation,
+                valueRange = 0f..24f,
+                onValueChange = { onChange(spec.copy(elevation = it)) }
+            )
+            MiniSlider(
+                label = "Radius",
+                value = spec.cornerRadius,
+                valueRange = 0f..32f,
+                onValueChange = { onChange(spec.copy(cornerRadius = it)) }
+            )
+        }
 
         is ModifierSpec.Alpha -> MiniSlider(
             label = "Alpha",
@@ -204,12 +247,149 @@ private fun ModifierParams(
         is ModifierSpec.Scale -> MiniSlider(
             label = "Scale",
             value = spec.value,
-            valueRange = 0.5f..2f,
+            valueRange = 0.1f..3f,
             onValueChange = { onChange(spec.copy(value = it)) }
+        )
+
+        is ModifierSpec.FillMaxSize -> MiniSlider(
+            label = "Fraction",
+            value = spec.fraction,
+            valueRange = 0.1f..1f,
+            onValueChange = { onChange(spec.copy(fraction = it)) }
         )
 
         is ModifierSpec.FillMaxWidth -> Unit
         is ModifierSpec.FillMaxHeight -> Unit
+        is ModifierSpec.WrapContentSize -> Unit
+
+        is ModifierSpec.Width -> MiniSlider(
+            label = "Width",
+            value = spec.dp,
+            valueRange = 10f..400f,
+            onValueChange = { onChange(spec.copy(dp = it)) }
+        )
+
+        is ModifierSpec.Height -> MiniSlider(
+            label = "Height",
+            value = spec.dp,
+            valueRange = 10f..400f,
+            onValueChange = { onChange(spec.copy(dp = it)) }
+        )
+
+        is ModifierSpec.Size -> {
+            MiniSlider(
+                label = "Width",
+                value = spec.width,
+                valueRange = 10f..400f,
+                onValueChange = { onChange(spec.copy(width = it)) }
+            )
+            MiniSlider(
+                label = "Height",
+                value = spec.height,
+                valueRange = 10f..400f,
+                onValueChange = { onChange(spec.copy(height = it)) }
+            )
+        }
+
+        is ModifierSpec.AspectRatio -> MiniSlider(
+            label = "Ratio",
+            value = spec.ratio,
+            valueRange = 0.25f..3f,
+            onValueChange = { onChange(spec.copy(ratio = it)) }
+        )
+
+        is ModifierSpec.Offset -> {
+            MiniSlider(
+                label = "X",
+                value = spec.x,
+                valueRange = -100f..100f,
+                onValueChange = { onChange(spec.copy(x = it)) }
+            )
+            MiniSlider(
+                label = "Y",
+                value = spec.y,
+                valueRange = -100f..100f,
+                onValueChange = { onChange(spec.copy(y = it)) }
+            )
+        }
+
+        is ModifierSpec.Weight -> {
+            MiniSlider(
+                label = "Weight",
+                value = spec.weight,
+                valueRange = 0.1f..10f,
+                onValueChange = { onChange(spec.copy(weight = it)) }
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Fill remaining", style = MaterialTheme.typography.bodySmall)
+                Switch(
+                    checked = spec.fill,
+                    onCheckedChange = { onChange(spec.copy(fill = it)) }
+                )
+            }
+        }
+
+        is ModifierSpec.Align -> {
+            AlignDropdown(
+                current = spec.alignment,
+                onChange = { onChange(spec.copy(alignment = it)) }
+            )
+        }
+
+        is ModifierSpec.ZIndex -> MiniSlider(
+            label = "Z-Index",
+            value = spec.value,
+            valueRange = -10f..10f,
+            onValueChange = { onChange(spec.copy(value = it)) }
+        )
+
+        is ModifierSpec.Clickable -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Enabled", style = MaterialTheme.typography.bodySmall)
+                Switch(
+                    checked = spec.enabled,
+                    onCheckedChange = { onChange(spec.copy(enabled = it)) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlignDropdown(
+    current: AlignTarget,
+    onChange: (AlignTarget) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "Alignment: ${current.displayName}")
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            AlignTarget.entries.forEach { target ->
+                DropdownMenuItem(
+                    text = { Text(text = target.displayName) },
+                    onClick = {
+                        onChange(target)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }
 
