@@ -719,4 +719,33 @@ class SharedCommonTest {
         assertTrue(code.contains("zIndex(5.0f)"))
         assertTrue(code.contains("clickable(enabled = true)"))
     }
+
+    @Test
+    fun testSetDeviceProfileUpdatesRootScaffoldAndSupportsUndo() {
+        val initialProject = EditorController.newProject(name = "DeviceSwitchTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = initialProject)
+
+        val defaultProfile = controller.state.project.deviceProfile
+        val rootScaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        assertEquals(defaultProfile.size, rootScaffold.size)
+
+        val tabletProfile = DeviceProfile.presets.first { it.category == DeviceCategory.TABLET }
+        controller.setDeviceProfile(tabletProfile)
+
+        assertEquals(tabletProfile, controller.state.project.deviceProfile)
+        val updatedScaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        assertEquals(tabletProfile.size, updatedScaffold.size)
+
+        val updatedContent = updatedScaffold.childInSlot(SlotRole.CONTENT)
+        assertNotNull(updatedContent)
+        assertEquals(tabletProfile.size.width, updatedContent.size.width)
+        assertEquals(tabletProfile.size.height - 144f, updatedContent.size.height)
+
+        assertTrue(controller.canUndo)
+        controller.undo()
+
+        assertEquals(defaultProfile, controller.state.project.deviceProfile)
+        val revertedScaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        assertEquals(defaultProfile.size, revertedScaffold.size)
+    }
 }

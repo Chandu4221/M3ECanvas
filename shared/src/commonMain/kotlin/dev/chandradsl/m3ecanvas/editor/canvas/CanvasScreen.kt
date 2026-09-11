@@ -8,18 +8,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BatteryFull
-import androidx.compose.material.icons.outlined.SignalCellular4Bar
-import androidx.compose.material.icons.outlined.Smartphone
-import androidx.compose.material.icons.outlined.Wifi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.Typography
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import dev.chandradsl.m3ecanvas.domain.model.DeviceCategory
+import dev.chandradsl.m3ecanvas.domain.model.DeviceProfile
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,11 +45,10 @@ fun CanvasScreen(controller: EditorController) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(16.dp)
         ) {
-            // Device Information Header Badge
+            // Device Information Header Badge & Switcher
             DeviceHeaderBadge(
-                displayName = deviceProfile.displayName,
-                sizeWidth = deviceProfile.size.width,
-                sizeHeight = deviceProfile.size.height
+                currentProfile = deviceProfile,
+                onSelectProfile = { controller.setDeviceProfile(it) }
             )
 
             // Outer Device Hardware Frame with Bezel & Drop Shadow
@@ -113,28 +105,109 @@ fun CanvasScreen(controller: EditorController) {
 }
 
 @Composable
-private fun DeviceHeaderBadge(displayName: String, sizeWidth: Float, sizeHeight: Float) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+private fun DeviceHeaderBadge(
+    currentProfile: DeviceProfile,
+    onSelectProfile: (DeviceProfile) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Smartphone,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = "$displayName • ${sizeWidth.toInt()} × ${sizeHeight.toInt()} dp",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium)
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = getDeviceCategoryIcon(currentProfile.category),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "${currentProfile.displayName} • ${currentProfile.size.width.toInt()} × ${currentProfile.size.height.toInt()} dp",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = "Switch Device",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 280.dp)
+        ) {
+            Text(
+                text = "Switch Device Preset",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            HorizontalDivider(modifier = Modifier.padding(bottom = 4.dp))
+            DeviceProfile.presets.forEach { profile ->
+                val isSelected = profile.id == currentProfile.id
+                DropdownMenuItem(
+                    leadingIcon = {
+                        Icon(
+                            imageVector = getDeviceCategoryIcon(profile.category),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    text = {
+                        Column {
+                            Text(
+                                text = profile.displayName,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                ),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${profile.category.displayName} • ${profile.size.width.toInt()} × ${profile.size.height.toInt()} dp",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    },
+                    trailingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Outlined.Check,
+                                contentDescription = "Active device",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else null,
+                    onClick = {
+                        onSelectProfile(profile)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+private fun getDeviceCategoryIcon(category: DeviceCategory): androidx.compose.ui.graphics.vector.ImageVector {
+    return when (category) {
+        DeviceCategory.PHONE -> Icons.Outlined.Smartphone
+        DeviceCategory.FOLDABLE -> Icons.Outlined.DevicesFold
+        DeviceCategory.TABLET -> Icons.Outlined.Tablet
+        DeviceCategory.DESKTOP -> Icons.Outlined.Computer
+        DeviceCategory.CUSTOM -> Icons.Outlined.AspectRatio
     }
 }
 

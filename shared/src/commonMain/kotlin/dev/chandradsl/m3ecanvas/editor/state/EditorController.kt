@@ -460,7 +460,21 @@ class EditorController(
     fun setDeviceProfile(profile: DeviceProfile) {
         if (state.project.deviceProfile != profile) {
             pushState()
-            updateProject(newProject = state.project.copy(deviceProfile = profile))
+            val updatedNodes = state.project.nodes.map { node ->
+                if (node.type == ComponentType.SCAFFOLD) {
+                    val updatedChildren = node.children.map { child ->
+                        if (child.slot == SlotRole.CONTENT) {
+                            child.copy(size = CanvasSize(width = profile.size.width, height = (profile.size.height - 144f).coerceAtLeast(0f)))
+                        } else {
+                            child
+                        }
+                    }
+                    node.copy(size = profile.size, children = updatedChildren)
+                } else {
+                    node
+                }
+            }
+            updateProject(newProject = state.project.copy(deviceProfile = profile, nodes = updatedNodes))
         }
     }
 
