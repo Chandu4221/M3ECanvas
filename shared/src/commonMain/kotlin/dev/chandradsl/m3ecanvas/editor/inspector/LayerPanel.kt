@@ -14,7 +14,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,31 +37,15 @@ fun LayersPanel(
 
     LazyColumn(modifier = modifier.fillMaxHeight()) {
         item(key = "layers_header") {
-            Row(
+            Text(
+                text = "Layers",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Bold
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Layers",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                if (controller.state.selectedNodeIds.isNotEmpty()) {
-                    TextButton(
-                        onClick = { controller.clearSelection() },
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "Project",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
-                        )
-                    }
-                }
-            }
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+            )
             HorizontalDivider()
         }
         item(key = "project_root_row") {
