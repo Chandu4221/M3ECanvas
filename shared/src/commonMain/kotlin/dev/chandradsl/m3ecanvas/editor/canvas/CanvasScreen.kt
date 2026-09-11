@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -83,23 +84,27 @@ fun CanvasScreen(controller: EditorController) {
                         .background(MaterialTheme.colorScheme.surface)
                         .focusable()
                 ) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        // Simulated Android Status Bar
-                        SimulatedStatusBar()
+                    MaterialTheme(
+                        typography = Typography()
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // Simulated Android Status Bar
+                            SimulatedStatusBar()
 
-                        // Screen Content Area
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                        ) {
-                            state.project.nodes.forEach { node ->
-                                CanvasNodePlacement(node = node, controller = controller)
+                            // Screen Content Area
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                            ) {
+                                state.project.nodes.forEach { node ->
+                                    CanvasNodePlacement(node = node, controller = controller)
+                                }
                             }
-                        }
 
-                        // Simulated Android Gesture Navigation Bar
-                        SimulatedNavigationBar()
+                            // Simulated Android Gesture Navigation Bar
+                            SimulatedNavigationBar()
+                        }
                     }
                 }
             }

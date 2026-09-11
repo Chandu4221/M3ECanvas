@@ -31,6 +31,7 @@ import dev.chandradsl.m3ecanvas.editor.palette.ComponentPalette
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.persistence.ProjectRepository
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
+import dev.chandradsl.m3ecanvas.editor.theme.EditorTheme
 
 @Composable
 fun App(repository: ProjectRepository) {
@@ -49,7 +50,7 @@ fun App(repository: ProjectRepository) {
         focusRequester.requestFocus()
     }
 
-    MaterialTheme {
+    EditorTheme {
         Column(
             modifier = Modifier
                 .fillMaxSize()
