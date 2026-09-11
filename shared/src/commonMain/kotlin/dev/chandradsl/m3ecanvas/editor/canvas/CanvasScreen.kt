@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -222,12 +223,20 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
     Box(
         modifier = baseModifier
             .border(
-                width = if (isSelected && !isScaffold) 2.dp else 0.dp,
-                color = if (isSelected && !isScaffold) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(4.dp)
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = if (isScaffold) RoundedCornerShape(36.dp) else RoundedCornerShape(4.dp)
             )
             .selectOnPress(nodeId = node.id, controller = controller)
             .focusable()
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.removeNode(nodeId = node.id)
+                    true
+                } else {
+                    false
+                }
+            }
             .then(
                 if (!isLocked) {
                     Modifier.pointerInput(node.id) {
@@ -252,5 +261,12 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
             )
     ) {
         CanvasNodeRenderer(node = node, controller = controller)
+
+        if (isSelected && !isScaffold) {
+            CanvasDeleteBadge(
+                onDelete = { controller.removeNode(nodeId = node.id) },
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
+        }
     }
 }

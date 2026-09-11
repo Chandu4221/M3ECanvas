@@ -3,6 +3,8 @@ package dev.chandradsl.m3ecanvas.editor.inspector
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -114,6 +116,24 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
         LayoutSection(node = node, controller = controller)
     }
     ModifierSection(node = node, controller = controller)
+
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+    Button(
+        onClick = { controller.removeNode(nodeId = node.id) },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Delete,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = "Delete ${node.type.displayName}")
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

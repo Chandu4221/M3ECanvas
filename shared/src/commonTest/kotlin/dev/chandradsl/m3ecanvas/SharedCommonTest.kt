@@ -360,4 +360,100 @@ class SharedCommonTest {
             assertTrue(size.height > 0f, "Height must be > 0 for ${type.name}")
         }
     }
+
+    @Test
+    fun testEveryComponentTypeIsDeletableFromProject() {
+        assertEquals(37, ComponentType.entries.size)
+        for (type in ComponentType.entries) {
+            val project = EditorController.newProject(name = "DeleteTest_${type.name}", withDefaultScaffold = false)
+            val controller = EditorController(initialProject = project)
+
+            // Add node
+            controller.addNode(type = type, position = CanvasPosition.Zero)
+            val addedNode = controller.state.project.nodes.firstOrNull { it.type == type }
+            assertNotNull(addedNode, "Failed to add component ${type.name}")
+
+            // Select and delete
+            controller.selectNode(addedNode.id)
+            assertTrue(controller.state.selectedNodeIds.contains(addedNode.id))
+            controller.deleteSelected()
+
+            // Verify completely deleted
+            assertNull(
+                controller.state.project.findNode(addedNode.id),
+                "Component ${type.name} was not deleted from project"
+            )
+            assertFalse(
+                controller.state.selectedNodeIds.contains(addedNode.id),
+                "Selection was not cleared after deleting ${type.name}"
+            )
+        }
+    }
+
+    @Test
+    fun testScaffoldSlotsAreDeletableIndividually() {
+        val project = EditorController.newProject(name = "SlotsDeleteTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+
+        // Add bottom bar, fab, and snackbar
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.NAVIGATION_BAR)
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.FAB)
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.SNACKBAR)
+
+        val scaffoldWithAll = controller.state.project.findNode(scaffold.id)!!
+        val topBar = scaffoldWithAll.childInSlot(SlotRole.TOP_BAR)
+        val bottomBar = scaffoldWithAll.childInSlot(SlotRole.BOTTOM_BAR)
+        val fab = scaffoldWithAll.childInSlot(SlotRole.FAB)
+        val snackbar = scaffoldWithAll.childInSlot(SlotRole.SNACKBAR)
+
+        assertNotNull(topBar, "Missing TopBar")
+        assertNotNull(bottomBar, "Missing BottomBar")
+        assertNotNull(fab, "Missing FAB")
+        assertNotNull(snackbar, "Missing Snackbar")
+
+        // 1. Delete TopBar
+        controller.removeNode(nodeId = topBar.id)
+        var currentScaffold = controller.state.project.findNode(scaffold.id)!!
+        assertNull(currentScaffold.childInSlot(SlotRole.TOP_BAR))
+        assertNotNull(currentScaffold.childInSlot(SlotRole.BOTTOM_BAR))
+        assertNotNull(currentScaffold.childInSlot(SlotRole.FAB))
+        assertNotNull(currentScaffold.childInSlot(SlotRole.SNACKBAR))
+
+        // 2. Delete BottomBar
+        controller.removeNode(nodeId = bottomBar.id)
+        currentScaffold = controller.state.project.findNode(scaffold.id)!!
+        assertNull(currentScaffold.childInSlot(SlotRole.BOTTOM_BAR))
+        assertNotNull(currentScaffold.childInSlot(SlotRole.FAB))
+        assertNotNull(currentScaffold.childInSlot(SlotRole.SNACKBAR))
+
+        // 3. Delete FAB
+        controller.removeNode(nodeId = fab.id)
+        currentScaffold = controller.state.project.findNode(scaffold.id)!!
+        assertNull(currentScaffold.childInSlot(SlotRole.FAB))
+        assertNotNull(currentScaffold.childInSlot(SlotRole.SNACKBAR))
+
+        // 4. Delete Snackbar
+        controller.removeNode(nodeId = snackbar.id)
+        currentScaffold = controller.state.project.findNode(scaffold.id)!!
+        assertNull(currentScaffold.childInSlot(SlotRole.SNACKBAR))
+    }
+
+    @Test
+    fun testRootScaffoldIsDeletable() {
+        val project = EditorController.newProject(name = "ScaffoldDeleteTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+
+        controller.selectNode(scaffold.id)
+        controller.deleteSelected()
+
+        assertTrue(controller.state.project.nodes.isEmpty(), "Scaffold was not deleted from project root")
+        assertNull(controller.state.project.findNode(scaffold.id))
+
+        // Ensure we can add a new node to the empty project
+        controller.addNode(type = ComponentType.BUTTON, position = CanvasPosition(10f, 10f))
+        assertEquals(1, controller.state.project.nodes.size)
+        assertEquals(ComponentType.BUTTON, controller.state.project.nodes.first().type)
+    }
 }

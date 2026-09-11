@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,8 +26,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
@@ -232,6 +235,7 @@ private fun RenderScaffold(
     val topBarChild = node.childInSlot(SlotRole.TOP_BAR)
     val bottomBarChild = node.childInSlot(SlotRole.BOTTOM_BAR)
     val fabChild = node.childInSlot(SlotRole.FAB)
+    val snackbarChild = node.childInSlot(SlotRole.SNACKBAR)
     val contentChildren = node.children.filter { it.slot == null || it.slot == SlotRole.CONTENT }
 
     Scaffold(
@@ -244,6 +248,11 @@ private fun RenderScaffold(
         bottomBar = {
             if (bottomBarChild != null) {
                 SlotContainer(child = bottomBarChild, controller = controller)
+            }
+        },
+        snackbarHost = {
+            if (snackbarChild != null) {
+                SlotContainer(child = snackbarChild, controller = controller)
             }
         },
         floatingActionButton = {
@@ -367,8 +376,24 @@ private fun SlotContainer(
                 shape = RoundedCornerShape(4.dp)
             )
             .selectOnPress(nodeId = child.id, controller = controller)
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.removeNode(nodeId = child.id)
+                    true
+                } else {
+                    false
+                }
+            }
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
+
+        if (isSelected) {
+            CanvasDeleteBadge(
+                onDelete = { controller.removeNode(nodeId = child.id) },
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
+        }
     }
 }
 
@@ -387,8 +412,47 @@ private fun ContainerChild(
                 shape = RoundedCornerShape(4.dp)
             )
             .selectOnPress(nodeId = child.id, controller = controller)
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.removeNode(nodeId = child.id)
+                    true
+                } else {
+                    false
+                }
+            }
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
+
+        if (isSelected) {
+            CanvasDeleteBadge(
+                onDelete = { controller.removeNode(nodeId = child.id) },
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
+        }
+    }
+}
+
+@Composable
+internal fun CanvasDeleteBadge(
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .offset(x = 6.dp, y = (-6).dp)
+            .size(20.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.error)
+            .clickable { onDelete() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Close,
+            contentDescription = "Delete",
+            tint = MaterialTheme.colorScheme.onError,
+            modifier = Modifier.size(12.dp)
+        )
     }
 }
 
@@ -397,9 +461,11 @@ internal fun Modifier.selectOnPress(
     nodeId: String,
     controller: EditorController
 ): Modifier {
+    val focusManager = LocalFocusManager.current
     return this.pointerInput(nodeId) {
         awaitEachGesture {
             awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+            focusManager.clearFocus()
             controller.selectNode(nodeId = nodeId)
         }
     }
@@ -413,6 +479,7 @@ private fun RenderTextField(node: CanvasNode) {
         onValueChange = {},
         label = { Text(node.name) },
         placeholder = { Text("Enter text...") },
+        readOnly = true,
         modifier = node.modifiers.toModifier().fillMaxSize()
     )
 }

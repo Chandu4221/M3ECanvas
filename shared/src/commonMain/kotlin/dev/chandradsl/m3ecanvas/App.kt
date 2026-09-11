@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.*
@@ -140,6 +141,7 @@ fun App(repository: ProjectRepository) {
             TopBar(
                 canUndo = controller.state.canUndo,
                 canRedo = controller.state.canRedo,
+                hasSelection = controller.state.selectedNodeIds.isNotEmpty(),
                 onUndo = {
                     controller.undo()
                     statusMessage = "Undo"
@@ -147,6 +149,10 @@ fun App(repository: ProjectRepository) {
                 onRedo = {
                     controller.redo()
                     statusMessage = "Redo"
+                },
+                onDelete = {
+                    controller.deleteSelected()
+                    statusMessage = "Deleted"
                 },
                 onSave = {
                     repository.save(project = controller.state.project)
@@ -237,8 +243,10 @@ fun App(repository: ProjectRepository) {
 private fun TopBar(
     canUndo: Boolean,
     canRedo: Boolean,
+    hasSelection: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onDelete: () -> Unit,
     onSave: () -> Unit,
     onLoad: () -> Unit,
     statusMessage: String,
@@ -272,6 +280,15 @@ private fun TopBar(
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.Redo,
                 contentDescription = "Redo (Ctrl+Shift+Z)"
+            )
+        }
+        IconButton(
+            onClick = onDelete,
+            enabled = hasSelection
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = "Delete Selected (Del / Backspace)"
             )
         }
         Spacer(modifier = Modifier.weight(weight = 1f))

@@ -191,10 +191,11 @@ class EditorController(
         val existingCount = state.project.nodes.count { it.type == type }
         val name = "${type.displayName} ${existingCount + 1}"
 
+        val targetPosition = if (type == ComponentType.SCAFFOLD) CanvasPosition.Zero else position
         val node = CanvasNode(
             type = type,
             name = name,
-            position = position,
+            position = targetPosition,
             size = defaultSizeFor(type = type)
         )
 
