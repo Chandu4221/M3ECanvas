@@ -15,7 +15,10 @@ data class EditorState(
     val project: M3EProject,
     val selectedNodeIds: Set<String> = emptySet(),
     val drag: DragState? = null,
-    val viewport: ViewportState = ViewportState()
+    val viewport: ViewportState = ViewportState(),
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
+    val clipboard: CanvasNode? = null
 ) {
 
     /** Returns true if the node with [nodeId] is currently selected. */

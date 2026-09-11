@@ -3,6 +3,8 @@ package dev.chandradsl.m3ecanvas
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Redo
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Save
@@ -13,7 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
 import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.domain.model.SlotRole
@@ -22,6 +27,7 @@ import dev.chandradsl.m3ecanvas.editor.codegen.CodeExportPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.LayersPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.PropertiesPanel
 import dev.chandradsl.m3ecanvas.editor.palette.ComponentPalette
+import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.persistence.ProjectRepository
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
@@ -33,6 +39,8 @@ fun App(repository: ProjectRepository) {
         )
     }
     val focusRequester = remember { FocusRequester() }
+    @Suppress("DEPRECATION")
+    val clipboardManager = LocalClipboardManager.current
     var statusMessage by remember { mutableStateOf(value = "") }
     var showCodeExport by remember { mutableStateOf(value = false) }
 
@@ -48,9 +56,60 @@ fun App(repository: ProjectRepository) {
                 .focusable()
                 .onKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    val isCtrlOrCmd = event.isCtrlPressed || event.isMetaPressed
+                    if (isCtrlOrCmd) {
+                        when {
+                            (event.key == Key.Z && event.isShiftPressed) || event.key == Key.Y -> {
+                                controller.redo()
+                                statusMessage = "Redo"
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.Z -> {
+                                controller.undo()
+                                statusMessage = "Undo"
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.C -> {
+                                val copied = controller.copySelected()
+                                if (copied != null) {
+                                    try {
+                                        val json = M3EJson.encodeToString(copied)
+                                        clipboardManager.setText(AnnotatedString(json))
+                                    } catch (_: Exception) {}
+                                    statusMessage = "Copied ${copied.name}"
+                                }
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.V -> {
+                                val pasted = if (controller.state.clipboard != null) {
+                                    controller.paste()
+                                } else {
+                                    val text = clipboardManager.getText()?.text
+                                    val parsed = try {
+                                        if (text != null) M3EJson.decodeFromString<CanvasNode>(text) else null
+                                    } catch (_: Exception) {
+                                        null
+                                    }
+                                    controller.paste(sourceNode = parsed)
+                                }
+                                if (pasted != null) {
+                                    statusMessage = "Pasted ${pasted.name}"
+                                }
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.D -> {
+                                val duplicated = controller.duplicateSelected()
+                                if (duplicated != null) {
+                                    statusMessage = "Duplicated ${duplicated.name}"
+                                }
+                                return@onKeyEvent true
+                            }
+                        }
+                    }
+
                     val step = if (event.isShiftPressed) 10f else 1f
                     when (event.key) {
-                        Key.Delete -> {
+                        Key.Delete, Key.Backspace -> {
                             controller.deleteSelected()
                             true
                         }
@@ -79,6 +138,16 @@ fun App(repository: ProjectRepository) {
                 }
         ) {
             TopBar(
+                canUndo = controller.state.canUndo,
+                canRedo = controller.state.canRedo,
+                onUndo = {
+                    controller.undo()
+                    statusMessage = "Undo"
+                },
+                onRedo = {
+                    controller.redo()
+                    statusMessage = "Redo"
+                },
                 onSave = {
                     repository.save(project = controller.state.project)
                     statusMessage = "Saved"
@@ -166,6 +235,10 @@ fun App(repository: ProjectRepository) {
 
 @Composable
 private fun TopBar(
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     onSave: () -> Unit,
     onLoad: () -> Unit,
     statusMessage: String,
@@ -182,6 +255,25 @@ private fun TopBar(
             text = "M3E Canvas",
             style = MaterialTheme.typography.titleMedium
         )
+        Spacer(modifier = Modifier.width(16.dp))
+        IconButton(
+            onClick = onUndo,
+            enabled = canUndo
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.Undo,
+                contentDescription = "Undo (Ctrl+Z)"
+            )
+        }
+        IconButton(
+            onClick = onRedo,
+            enabled = canRedo
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.Redo,
+                contentDescription = "Redo (Ctrl+Shift+Z)"
+            )
+        }
         Spacer(modifier = Modifier.weight(weight = 1f))
         if (statusMessage.isNotEmpty()) {
             Text(

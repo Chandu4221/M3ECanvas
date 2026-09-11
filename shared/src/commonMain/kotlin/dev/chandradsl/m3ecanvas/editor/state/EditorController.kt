@@ -4,17 +4,173 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
 
 /**
  * Manages the editor's state in response to user actions.
  * Hierarchy-aware: nodes can be top-level or nested inside containers.
+ * Supports command undo/redo history and clipboard operations.
  */
 class EditorController(
     initialProject: M3EProject
 ) {
 
-    var state: EditorState by mutableStateOf(EditorState(project = initialProject))
+    private val history = HistoryStack<M3EProject>()
+    private var preDragProject: M3EProject? = null
+
+    var state: EditorState by mutableStateOf(
+        EditorState(
+            project = initialProject,
+            canUndo = false,
+            canRedo = false
+        )
+    )
         private set
+
+    val canUndo: Boolean
+        get() = history.canUndo
+
+    val canRedo: Boolean
+        get() = history.canRedo
+
+    private fun pushState() {
+        history.push(state.project)
+    }
+
+    private fun updateProject(
+        newProject: M3EProject,
+        selectedNodeIds: Set<String> = state.selectedNodeIds
+    ) {
+        state = state.copy(
+            project = newProject,
+            selectedNodeIds = selectedNodeIds,
+            canUndo = history.canUndo,
+            canRedo = history.canRedo
+        )
+    }
+
+    //region History & Undo/Redo
+
+    fun undo() {
+        val previous = history.undo(state.project) ?: return
+        val validSelections = state.selectedNodeIds.filter { previous.findNode(it) != null }.toSet()
+        state = state.copy(
+            project = previous,
+            selectedNodeIds = validSelections,
+            canUndo = history.canUndo,
+            canRedo = history.canRedo
+        )
+    }
+
+    fun redo() {
+        val next = history.redo(state.project) ?: return
+        val validSelections = state.selectedNodeIds.filter { next.findNode(it) != null }.toSet()
+        state = state.copy(
+            project = next,
+            selectedNodeIds = validSelections,
+            canUndo = history.canUndo,
+            canRedo = history.canRedo
+        )
+    }
+
+    //endregion
+
+    //region Clipboard
+
+    /** Stores the first currently selected node into the clipboard buffer. */
+    fun copySelected(): CanvasNode? {
+        val selected = state.selectedNodes.firstOrNull() ?: return null
+        state = state.copy(clipboard = selected)
+        return selected
+    }
+
+    /**
+     * Pastes the node currently in clipboard (or [sourceNode] if provided).
+     * Automatically handles container insertion, slot routing, or canvas root placement.
+     */
+    fun paste(sourceNode: CanvasNode? = null): CanvasNode? {
+        val nodeToPaste = sourceNode ?: state.clipboard ?: return null
+        val clone = nodeToPaste.deepCloneWithNewIds(offsetPosition = true)
+        pushState()
+
+        val selected = state.selectedNodes.firstOrNull()
+        val updatedProject = when {
+            // 1. If currently selected node is a container
+            selected != null && selected.isContainer -> {
+                if (selected.type == ComponentType.SCAFFOLD) {
+                    val slot = clone.type.canonicalSlot()
+                    if (slot != SlotRole.CONTENT) {
+                        state.project.updateNode(selected.withChildInSlot(clone, slot))
+                    } else {
+                        val content = selected.children.firstOrNull { it.slot == SlotRole.CONTENT && it.isContainer }
+                        if (content != null) {
+                            state.project.updateNode(content.withChild(clone))
+                        } else {
+                            state.project.updateNode(selected.withChild(clone))
+                        }
+                    }
+                } else {
+                    state.project.updateNode(selected.withChild(clone))
+                }
+            }
+            // 2. If selected node has a parent container, insert as sibling
+            selected != null && findParentInProject(selected.id) != null -> {
+                val parent = findParentInProject(selected.id)!!
+                val index = parent.children.indexOfFirst { it.id == selected.id }
+                val updatedChildren = parent.children.toMutableList().apply {
+                    if (index >= 0) add(index + 1, clone) else add(clone)
+                }
+                state.project.updateNode(parent.copy(children = updatedChildren))
+            }
+            // 3. If root has a Scaffold with Content container, paste into content
+            state.project.nodes.any { it.type == ComponentType.SCAFFOLD } -> {
+                val scaffold = state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+                val content = scaffold.children.firstOrNull { it.slot == SlotRole.CONTENT && it.isContainer }
+                if (content != null) {
+                    state.project.updateNode(content.withChild(clone))
+                } else {
+                    state.project.updateNode(scaffold.withChild(clone))
+                }
+            }
+            // 4. Fallback: add to root
+            else -> {
+                state.project.withNode(clone)
+            }
+        }
+
+        updateProject(updatedProject, selectedNodeIds = setOf(clone.id))
+        return clone
+    }
+
+    /**
+     * Duplicates the currently selected node (Ctrl+D), placing the clone as an immediate sibling.
+     */
+    fun duplicateSelected(): CanvasNode? {
+        val selected = state.selectedNodes.firstOrNull() ?: return null
+        if (selected.isLockedInSlot) return null // Locked slots cannot be duplicated
+        val clone = selected.deepCloneWithNewIds(offsetPosition = true)
+        pushState()
+
+        val parent = findParentInProject(selected.id)
+        val updatedProject = if (parent != null) {
+            val index = parent.children.indexOfFirst { it.id == selected.id }
+            val updatedChildren = parent.children.toMutableList().apply {
+                if (index >= 0) add(index + 1, clone) else add(clone)
+            }
+            state.project.updateNode(parent.copy(children = updatedChildren))
+        } else {
+            val index = state.project.nodes.indexOfFirst { it.id == selected.id }
+            val updatedNodes = state.project.nodes.toMutableList().apply {
+                if (index >= 0) add(index + 1, clone) else add(clone)
+            }
+            state.project.copy(nodes = updatedNodes)
+        }
+
+        updateProject(updatedProject, selectedNodeIds = setOf(clone.id))
+        return clone
+    }
+
+    //endregion
 
     //region Selection
 
@@ -42,8 +198,9 @@ class EditorController(
             size = defaultSizeFor(type = type)
         )
 
-        state = state.copy(
-            project = state.project.withNode(node = node),
+        pushState()
+        updateProject(
+            newProject = state.project.withNode(node = node),
             selectedNodeIds = setOf(node.id)
         )
     }
@@ -76,16 +233,18 @@ class EditorController(
             container.withChild(child = child)
         }
 
-        state = state.copy(
-            project = state.project.updateNode(node = updatedContainer),
+        pushState()
+        updateProject(
+            newProject = state.project.updateNode(node = updatedContainer),
             selectedNodeIds = setOf(child.id)
         )
     }
 
     /** Removes the node with [nodeId] from anywhere in the tree. */
     fun removeNode(nodeId: String) {
-        state = state.copy(
-            project = state.project.removeNode(nodeId = nodeId),
+        pushState()
+        updateProject(
+            newProject = state.project.removeNode(nodeId = nodeId),
             selectedNodeIds = state.selectedNodeIds - nodeId
         )
     }
@@ -94,12 +253,13 @@ class EditorController(
     fun deleteSelected() {
         val ids = state.selectedNodeIds
         if (ids.isEmpty()) return
+        pushState()
         var project = state.project
         for (id in ids) {
             project = project.removeNode(nodeId = id)
         }
-        state = state.copy(
-            project = project,
+        updateProject(
+            newProject = project,
             selectedNodeIds = emptySet()
         )
     }
@@ -112,39 +272,41 @@ class EditorController(
         val ids = state.selectedNodeIds
         if (ids.isEmpty()) return
         var project = state.project
+        var movedAny = false
         for (id in ids) {
             val isTopLevel = project.nodes.any { it.id == id }
             if (!isTopLevel) continue
             val node = project.findNode(nodeId = id) ?: continue
             if (node.isLockedInSlot) continue
             project = project.updateNode(node = node.movedBy(dx = dx, dy = dy))
+            movedAny = true
         }
-        state = state.copy(project = project)
+        if (movedAny) {
+            pushState()
+            updateProject(newProject = project)
+        }
     }
 
     /** Applies or replaces a [property] on the node with [nodeId], wherever it is. */
     fun updateNodeProperty(nodeId: String, property: ComponentProperty) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
         val updatedNode = node.withProperty(property = property)
-        state = state.copy(
-            project = state.project.updateNode(node = updatedNode)
-        )
+        pushState()
+        updateProject(newProject = state.project.updateNode(node = updatedNode))
     }
 
     /** Renames the node with [nodeId]. */
     fun renameNode(nodeId: String, name: String) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
-        state = state.copy(
-            project = state.project.updateNode(node = node.copy(name = name))
-        )
+        pushState()
+        updateProject(newProject = state.project.updateNode(node = node.copy(name = name)))
     }
 
     /** Replaces the layout config of the container with [nodeId]. */
     fun updateLayoutConfig(nodeId: String, config: LayoutConfig) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
-        state = state.copy(
-            project = state.project.updateNode(node = node.copy(layoutConfig = config))
-        )
+        pushState()
+        updateProject(newProject = state.project.updateNode(node = node.copy(layoutConfig = config)))
     }
 
     //endregion
@@ -154,25 +316,22 @@ class EditorController(
     /** Appends [spec] to the end of the modifier chain of [nodeId]. */
     fun addModifier(nodeId: String, spec: ModifierSpec) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
-        state = state.copy(
-            project = state.project.updateNode(node = node.withModifier(spec = spec))
-        )
+        pushState()
+        updateProject(newProject = state.project.updateNode(node = node.withModifier(spec = spec)))
     }
 
     /** Removes the modifier matching [specId] from [nodeId]. */
     fun removeModifier(nodeId: String, specId: String) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
-        state = state.copy(
-            project = state.project.updateNode(node = node.withoutModifier(specId = specId))
-        )
+        pushState()
+        updateProject(newProject = state.project.updateNode(node = node.withoutModifier(specId = specId)))
     }
 
     /** Replaces the modifier matching [spec.id] on [nodeId]. */
     fun updateModifier(nodeId: String, spec: ModifierSpec) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
-        state = state.copy(
-            project = state.project.updateNode(node = node.updateModifier(spec = spec))
-        )
+        pushState()
+        updateProject(newProject = state.project.updateNode(node = node.updateModifier(spec = spec)))
     }
 
     /** Moves the modifier matching [specId] one position earlier. */
@@ -187,11 +346,11 @@ class EditorController(
 
     private fun moveModifier(nodeId: String, specId: String, delta: Int) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
-        state = state.copy(
-            project = state.project.updateNode(
-                node = node.moveModifier(specId = specId, delta = delta)
-            )
-        )
+        val updatedNode = node.moveModifier(specId = specId, delta = delta)
+        if (updatedNode != node) {
+            pushState()
+            updateProject(newProject = state.project.updateNode(node = updatedNode))
+        }
     }
 
     //endregion
@@ -220,7 +379,8 @@ class EditorController(
                 val item = removeAt(index = index)
                 add(index = target, element = item)
             }
-            state = state.copy(project = state.project.copy(nodes = reordered))
+            pushState()
+            updateProject(newProject = state.project.copy(nodes = reordered))
         } else {
             val children = parent.children
             val index = children.indexOfFirst { it.id == nodeId }
@@ -231,9 +391,8 @@ class EditorController(
                 add(index = target, element = item)
             }
             val updatedParent = parent.copy(children = reordered)
-            state = state.copy(
-                project = state.project.updateNode(node = updatedParent)
-            )
+            pushState()
+            updateProject(newProject = state.project.updateNode(node = updatedParent))
         }
     }
 
@@ -262,6 +421,7 @@ class EditorController(
     fun startDrag(nodeId: String) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
         if (node.isLockedInSlot) return // Locked slot nodes cannot be moved arbitrarily
+        preDragProject = state.project
         state = state.copy(
             drag = DragState(
                 nodeId = nodeId,
@@ -280,7 +440,16 @@ class EditorController(
     }
 
     fun endDrag() {
-        state = state.copy(drag = null)
+        val prior = preDragProject
+        preDragProject = null
+        if (prior != null && prior != state.project) {
+            history.push(prior)
+        }
+        state = state.copy(
+            drag = null,
+            canUndo = history.canUndo,
+            canRedo = history.canRedo
+        )
     }
 
     //endregion
@@ -288,17 +457,22 @@ class EditorController(
     //region Device
 
     fun setDeviceProfile(profile: DeviceProfile) {
-        state = state.copy(
-            project = state.project.copy(deviceProfile = profile)
-        )
+        if (state.project.deviceProfile != profile) {
+            pushState()
+            updateProject(newProject = state.project.copy(deviceProfile = profile))
+        }
     }
 
     /** Replaces the entire project and resets transient UI state (used by Load). */
     fun replaceProject(project: M3EProject) {
+        history.clear()
+        preDragProject = null
         state = state.copy(
             project = project,
             selectedNodeIds = emptySet(),
-            drag = null
+            drag = null,
+            canUndo = false,
+            canRedo = false
         )
     }
 

@@ -119,3 +119,16 @@ fun ModifierSpec.label(): String {
         is ModifierSpec.FillMaxHeight -> "Fill Max Height"
     }
 }
+
+/** Creates a copy of this [ModifierSpec] with a newly generated UUID. */
+fun ModifierSpec.withNewId(): ModifierSpec = when (this) {
+    is ModifierSpec.Padding -> copy(id = Uuid.random().toString())
+    is ModifierSpec.Background -> copy(id = Uuid.random().toString())
+    is ModifierSpec.Border -> copy(id = Uuid.random().toString())
+    is ModifierSpec.Clip -> copy(id = Uuid.random().toString())
+    is ModifierSpec.Alpha -> copy(id = Uuid.random().toString())
+    is ModifierSpec.Rotation -> copy(id = Uuid.random().toString())
+    is ModifierSpec.Scale -> copy(id = Uuid.random().toString())
+    is ModifierSpec.FillMaxWidth -> copy(id = Uuid.random().toString())
+    is ModifierSpec.FillMaxHeight -> copy(id = Uuid.random().toString())
+}

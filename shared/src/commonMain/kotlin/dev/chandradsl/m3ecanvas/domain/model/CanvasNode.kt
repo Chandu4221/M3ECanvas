@@ -185,4 +185,34 @@ data class CanvasNode(
     }
 
     //endregion
+
+    //region Cloning
+
+    /**
+     * Creates a deep clone of this node with newly generated UUIDs for the node,
+     * its modifiers, and all nested descendants recursively.
+     *
+     * @param offsetPosition When true, offsets the position by ([dx], [dy]) so the duplicate does not occlude the original.
+     * @param newName Optional override for the cloned node's name. Defaults to the original name.
+     */
+    fun deepCloneWithNewIds(
+        offsetPosition: Boolean = true,
+        dx: Float = 24f,
+        dy: Float = 24f,
+        newName: String = name
+    ): CanvasNode {
+        val newId = Uuid.random().toString()
+        val newPosition = if (offsetPosition) position.offset(dx = dx, dy = dy) else position
+        val newModifiers = modifiers.map { it.withNewId() }
+        val newChildren = children.map { it.deepCloneWithNewIds(offsetPosition = false) }
+        return copy(
+            id = newId,
+            name = newName,
+            position = newPosition,
+            modifiers = newModifiers,
+            children = newChildren
+        )
+    }
+
+    //endregion
 }

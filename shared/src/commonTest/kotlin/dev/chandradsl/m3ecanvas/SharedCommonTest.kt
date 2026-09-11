@@ -185,4 +185,146 @@ class SharedCommonTest {
         assertTrue(prompt.contains("Implementation Instructions for AI"))
         assertTrue(prompt.contains("State Hoisting"))
     }
+
+    @Test
+    fun testHistoryStackBoundedPushAndUndoRedo() {
+        val stack = dev.chandradsl.m3ecanvas.editor.history.HistoryStack<String>(maxDepth = 3)
+        assertFalse(stack.canUndo)
+        assertFalse(stack.canRedo)
+
+        stack.push("State 1")
+        stack.push("State 2")
+        stack.push("State 3")
+        stack.push("State 4") // Overflows capacity, State 1 dropped
+
+        assertEquals(3, stack.undoCount)
+        assertTrue(stack.canUndo)
+
+        // Undo 1
+        val u1 = stack.undo("State Current")
+        assertEquals("State 4", u1)
+        assertTrue(stack.canRedo)
+
+        // Undo 2
+        val u2 = stack.undo(u1!!)
+        assertEquals("State 3", u2)
+
+        // Undo 3
+        val u3 = stack.undo(u2!!)
+        assertEquals("State 2", u3)
+
+        // Oldest (State 1) was evicted by maxDepth = 3
+        assertNull(stack.undo(u3!!))
+
+        // Redo 1
+        val r1 = stack.redo(u3)
+        assertEquals("State 3", r1)
+
+        // New action clears redo
+        stack.push("New State")
+        assertFalse(stack.canRedo)
+        assertEquals(2, stack.undoCount)
+    }
+
+    @Test
+    fun testCanvasNodeDeepCloneWithNewIds() {
+        val originalChild = CanvasNode(
+            type = ComponentType.BUTTON,
+            name = "Submit Button",
+            position = CanvasPosition(10f, 10f),
+            size = CanvasSize(100f, 40f),
+            modifiers = listOf(ModifierSpec.Padding(all = 12f))
+        )
+        val originalParent = CanvasNode(
+            type = ComponentType.COLUMN,
+            name = "Form",
+            position = CanvasPosition(0f, 0f),
+            size = CanvasSize(200f, 200f),
+            children = listOf(originalChild),
+            modifiers = listOf(ModifierSpec.Border(width = 1f, colorHex = "#FF000000"))
+        )
+
+        val clone = originalParent.deepCloneWithNewIds(offsetPosition = true, dx = 15f, dy = 15f)
+
+        // Root checks
+        assertNotEquals(originalParent.id, clone.id)
+        assertEquals(CanvasPosition(15f, 15f), clone.position)
+        assertEquals(1, clone.modifiers.size)
+        assertNotEquals(originalParent.modifiers.first().id, clone.modifiers.first().id)
+
+        // Child checks
+        assertEquals(1, clone.children.size)
+        val clonedChild = clone.children.first()
+        assertNotEquals(originalChild.id, clonedChild.id)
+        assertEquals("Submit Button", clonedChild.name)
+        assertNotEquals(originalChild.modifiers.first().id, clonedChild.modifiers.first().id)
+    }
+
+    @Test
+    fun testEditorControllerUndoRedoLifecycle() {
+        val project = EditorController.newProject(name = "UndoTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val contentCol = scaffold.children.first { it.slot == SlotRole.CONTENT }
+
+        assertFalse(controller.state.canUndo)
+        assertFalse(controller.state.canRedo)
+
+        // 1. Add a button inside content column
+        controller.addChildToContainer(containerId = contentCol.id, type = ComponentType.BUTTON)
+        assertTrue(controller.state.canUndo)
+        assertFalse(controller.state.canRedo)
+
+        val buttonId = controller.state.selectedNodeIds.first()
+        assertNotNull(controller.state.project.findNode(buttonId))
+
+        // 2. Undo the addition
+        controller.undo()
+        assertNull(controller.state.project.findNode(buttonId))
+        assertTrue(controller.state.canRedo)
+        assertFalse(controller.state.canUndo)
+
+        // 3. Redo the addition
+        controller.redo()
+        assertNotNull(controller.state.project.findNode(buttonId))
+        assertFalse(controller.state.canRedo)
+        assertTrue(controller.state.canUndo)
+    }
+
+    @Test
+    fun testEditorControllerDuplicateAndCopyPaste() {
+        val project = EditorController.newProject(name = "ClipboardTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val contentCol = scaffold.children.first { it.slot == SlotRole.CONTENT }
+
+        // Add initial button
+        controller.addChildToContainer(containerId = contentCol.id, type = ComponentType.BUTTON)
+        val originalButton = controller.state.selectedNodes.first()
+
+        // Test Duplicate
+        val duplicated = controller.duplicateSelected()
+        assertNotNull(duplicated)
+        assertNotEquals(originalButton.id, duplicated.id)
+        val updatedContentCol = controller.state.project.findNode(contentCol.id)!!
+        assertEquals(2, updatedContentCol.children.size)
+
+        // Test Copy and Paste
+        controller.selectNode(originalButton.id)
+        val copied = controller.copySelected()
+        assertNotNull(copied)
+        assertEquals(originalButton.id, copied.id)
+
+        val pasted = controller.paste()
+        assertNotNull(pasted)
+        assertNotEquals(originalButton.id, pasted.id)
+        val colAfterPaste = controller.state.project.findNode(contentCol.id)!!
+        assertEquals(3, colAfterPaste.children.size)
+
+        // Test Undo removes the pasted node
+        controller.undo()
+        val colAfterUndo = controller.state.project.findNode(contentCol.id)!!
+        assertEquals(2, colAfterUndo.children.size)
+        assertNull(controller.state.project.findNode(pasted.id))
+    }
 }
