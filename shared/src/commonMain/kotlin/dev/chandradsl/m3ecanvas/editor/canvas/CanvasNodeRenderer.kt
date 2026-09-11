@@ -11,6 +11,11 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -112,6 +117,11 @@ fun CanvasNodeRenderer(
             }
         }
 
+        ComponentType.SCAFFOLD -> RenderScaffold(node = node, controller = controller)
+        ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node)
+        ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node)
+        ComponentType.FAB -> RenderFab(node = node)
+        ComponentType.EXTENDED_FAB -> RenderExtendedFab(node = node)
         ComponentType.BUTTON -> RenderButton(node = node)
         ComponentType.CARD -> RenderCard(node = node)
         ComponentType.ICON_BUTTON -> RenderIconButton(node = node)
@@ -185,6 +195,154 @@ private fun RenderChip(node: CanvasNode) {
         MaterialVariant.Chip.FILTER -> FilterChip(selected = false, onClick = onClick, label = label)
         MaterialVariant.Chip.INPUT -> InputChip(selected = false, onClick = onClick, label = label)
         MaterialVariant.Chip.SUGGESTION -> SuggestionChip(onClick = onClick, label = label)
+    }
+}
+
+@Composable
+private fun RenderScaffold(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    val topBarChild = node.childInSlot(SlotRole.TOP_BAR)
+    val bottomBarChild = node.childInSlot(SlotRole.BOTTOM_BAR)
+    val fabChild = node.childInSlot(SlotRole.FAB)
+    val contentChildren = node.children.filter { it.slot == null || it.slot == SlotRole.CONTENT }
+
+    Scaffold(
+        modifier = node.modifiers.toModifier().fillMaxSize(),
+        topBar = {
+            if (topBarChild != null) {
+                SlotContainer(child = topBarChild, controller = controller)
+            }
+        },
+        bottomBar = {
+            if (bottomBarChild != null) {
+                SlotContainer(child = bottomBarChild, controller = controller)
+            }
+        },
+        floatingActionButton = {
+            if (fabChild != null) {
+                SlotContainer(child = fabChild, controller = controller)
+            }
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            contentChildren.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RenderTopAppBar(node: CanvasNode) {
+    val titleText = (node.property("title") as? ComponentProperty.Text)?.value
+        ?: (node.property("text") as? ComponentProperty.Text)?.value
+        ?: node.name
+
+    TopAppBar(
+        title = { Text(text = titleText, maxLines = 1) },
+        navigationIcon = {
+            IconButton(onClick = {}) {
+                Icon(
+                    imageVector = Icons.Outlined.Menu,
+                    contentDescription = "Navigation"
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = {}) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Search"
+                )
+            }
+            IconButton(onClick = {}) {
+                Icon(
+                    imageVector = Icons.Outlined.MoreVert,
+                    contentDescription = "More"
+                )
+            }
+        },
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    )
+}
+
+@Composable
+private fun RenderNavigationBar(node: CanvasNode) {
+    NavigationBar(
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        NavigationBarItem(
+            selected = true,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
+            label = { Text(text = "Home") }
+        )
+        NavigationBarItem(
+            selected = false,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Explore") },
+            label = { Text(text = "Explore") }
+        )
+        NavigationBarItem(
+            selected = false,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.Person, contentDescription = "Profile") },
+            label = { Text(text = "Profile") }
+        )
+    }
+}
+
+@Composable
+private fun RenderFab(node: CanvasNode) {
+    FloatingActionButton(
+        onClick = {},
+        modifier = node.modifiers.toModifier()
+    ) {
+        Icon(imageVector = Icons.Filled.Add, contentDescription = "Add")
+    }
+}
+
+@Composable
+private fun RenderExtendedFab(node: CanvasNode) {
+    val text = node.textOrDefault(default = "Action")
+    ExtendedFloatingActionButton(
+        onClick = {},
+        icon = { Icon(imageVector = Icons.Filled.Add, contentDescription = null) },
+        text = { Text(text = text) },
+        modifier = node.modifiers.toModifier()
+    )
+}
+
+@Composable
+private fun SlotContainer(
+    child: CanvasNode,
+    controller: EditorController
+) {
+    val isSelected = controller.state.isNodeSelected(nodeId = child.id)
+    Box(
+        modifier = Modifier
+            .then(
+                if (child.type == ComponentType.TOP_APP_BAR || child.type == ComponentType.NAVIGATION_BAR) {
+                    Modifier.fillMaxWidth()
+                } else {
+                    Modifier.wrapContentSize()
+                }
+            )
+            .border(
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(4.dp)
+            )
+            .selectOnPress(nodeId = child.id, controller = controller)
+    ) {
+        CanvasNodeRenderer(node = child, controller = controller)
     }
 }
 

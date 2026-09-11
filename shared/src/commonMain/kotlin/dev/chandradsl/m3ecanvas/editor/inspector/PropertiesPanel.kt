@@ -49,6 +49,21 @@ fun PropertiesPanel(
 private fun NodeSection(node: CanvasNode, controller: EditorController) {
     SectionLabel(text = node.type.displayName)
 
+    if (node.slot != null) {
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Snapped to Scaffold: ${node.slot.displayName}",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+    }
+
     OutlinedTextField(
         value = node.name,
         onValueChange = { controller.renameNode(nodeId = node.id, name = it) },
@@ -56,6 +71,24 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
         modifier = Modifier.fillMaxWidth(),
         singleLine = true
     )
+
+    if (node.type == ComponentType.TOP_APP_BAR) {
+        val currentTitle = (node.property(key = "title") as? ComponentProperty.Text)?.value
+            ?: (node.property(key = "text") as? ComponentProperty.Text)?.value
+            ?: ""
+        OutlinedTextField(
+            value = currentTitle,
+            onValueChange = {
+                controller.updateNodeProperty(
+                    nodeId = node.id,
+                    property = ComponentProperty.Text(key = "title", value = it)
+                )
+            },
+            label = { Text(text = "AppBar Title") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+    }
 
     if (supportsText(node = node)) {
         OutlinedTextField(
@@ -298,6 +331,7 @@ private fun SectionLabel(text: String) {
 private fun supportsText(node: CanvasNode): Boolean {
     return node.type == ComponentType.BUTTON ||
             node.type == ComponentType.TEXT_FIELD ||
+            node.type == ComponentType.EXTENDED_FAB ||
             node.property(key = "text") != null
 }
 

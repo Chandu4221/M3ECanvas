@@ -59,6 +59,7 @@ fun ComponentType.icon(): ImageVector {
         ComponentType.TEXT_FIELD -> Icons.Outlined.TextFields
 
         // Layout
+        ComponentType.SCAFFOLD -> Icons.Outlined.Dashboard
         ComponentType.COLUMN -> Icons.Outlined.ViewColumn
         ComponentType.ROW -> Icons.Outlined.ViewStream
         ComponentType.BOX -> Icons.Outlined.CropSquare

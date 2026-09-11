@@ -14,6 +14,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
+import dev.chandradsl.m3ecanvas.domain.model.ComponentType
+import dev.chandradsl.m3ecanvas.domain.model.SlotRole
 import dev.chandradsl.m3ecanvas.editor.canvas.CanvasScreen
 import dev.chandradsl.m3ecanvas.editor.inspector.LayersPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.PropertiesPanel
@@ -100,14 +102,30 @@ fun App(repository: ProjectRepository) {
                                 type = type
                             )
                         } else {
-                            val count = controller.state.project.nodes.size
-                            controller.addNode(
-                                type = type,
-                                position = CanvasPosition(
-                                    x = 40f + count * 24f,
-                                    y = 40f + count * 24f
+                            val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+                            if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
+                                val contentContainer = rootScaffold.children.firstOrNull {
+                                    it.slot == SlotRole.CONTENT && it.isContainer
+                                }
+                                val targetContainerId = if (type.canonicalSlot() == SlotRole.CONTENT && contentContainer != null) {
+                                    contentContainer.id
+                                } else {
+                                    rootScaffold.id
+                                }
+                                controller.addChildToContainer(
+                                    containerId = targetContainerId,
+                                    type = type
                                 )
-                            )
+                            } else {
+                                val count = controller.state.project.nodes.size
+                                controller.addNode(
+                                    type = type,
+                                    position = CanvasPosition(
+                                        x = 40f + count * 24f,
+                                        y = 40f + count * 24f
+                                    )
+                                )
+                            }
                         }
                     },
                     modifier = Modifier.width(width = 240.dp)

@@ -56,18 +56,28 @@ class EditorController(
         val childCount = container.children.count { it.type == type }
         val name = "${type.displayName} ${childCount + 1}"
 
+        val targetSlot = if (container.type == ComponentType.SCAFFOLD) {
+            type.canonicalSlot()
+        } else {
+            null
+        }
+
         val child = CanvasNode(
             type = type,
             name = name,
             position = CanvasPosition.Zero,
-            size = defaultSizeFor(type = type)
+            size = defaultSizeFor(type = type),
+            slot = targetSlot
         )
 
+        val updatedContainer = if (container.type == ComponentType.SCAFFOLD && targetSlot != null && targetSlot != SlotRole.CONTENT) {
+            container.withChildInSlot(child = child, slotRole = targetSlot)
+        } else {
+            container.withChild(child = child)
+        }
+
         state = state.copy(
-            project = state.project.addChildToContainer(
-                containerId = containerId,
-                child = child
-            ),
+            project = state.project.updateNode(node = updatedContainer),
             selectedNodeIds = setOf(child.id)
         )
     }
@@ -106,6 +116,7 @@ class EditorController(
             val isTopLevel = project.nodes.any { it.id == id }
             if (!isTopLevel) continue
             val node = project.findNode(nodeId = id) ?: continue
+            if (node.isLockedInSlot) continue
             project = project.updateNode(node = node.movedBy(dx = dx, dy = dy))
         }
         state = state.copy(project = project)
@@ -250,6 +261,7 @@ class EditorController(
     /** Begins a drag on the node with [nodeId]. Selection is not changed here. */
     fun startDrag(nodeId: String) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
+        if (node.isLockedInSlot) return // Locked slot nodes cannot be moved arbitrarily
         state = state.copy(
             drag = DragState(
                 nodeId = nodeId,
@@ -293,28 +305,67 @@ class EditorController(
     //endregion
 
     /**
-     * Placeholder sizes per component. The ComponentRegistry will replace this
-     * with accurate Material defaults in a later step.
+     * Default sizes per component, calculated relative to the active device screen.
      */
     private fun defaultSizeFor(type: ComponentType): CanvasSize {
+        val deviceWidth = state.project.deviceProfile.size.width
+        val deviceHeight = state.project.deviceProfile.size.height
         return when (type) {
+            ComponentType.SCAFFOLD -> CanvasSize(width = deviceWidth, height = deviceHeight)
+            ComponentType.TOP_APP_BAR -> CanvasSize(width = deviceWidth, height = 64f)
+            ComponentType.NAVIGATION_BAR -> CanvasSize(width = deviceWidth, height = 80f)
+            ComponentType.FAB -> CanvasSize(width = 56f, height = 56f)
+            ComponentType.EXTENDED_FAB -> CanvasSize(width = 140f, height = 56f)
             ComponentType.BUTTON -> CanvasSize(width = 120f, height = 40f)
-            ComponentType.CARD -> CanvasSize(width = 280f, height = 160f)
-            ComponentType.TEXT_FIELD -> CanvasSize(width = 280f, height = 56f)
+            ComponentType.CARD -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 160f)
+            ComponentType.TEXT_FIELD -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 56f)
             ComponentType.COLUMN,
-            ComponentType.LAZY_COLUMN -> CanvasSize(width = 300f, height = 400f)
+            ComponentType.LAZY_COLUMN -> CanvasSize(width = deviceWidth, height = (deviceHeight - 160f).coerceAtLeast(200f))
             ComponentType.ROW,
-            ComponentType.LAZY_ROW -> CanvasSize(width = 400f, height = 120f)
-            ComponentType.BOX -> CanvasSize(width = 300f, height = 300f)
+            ComponentType.LAZY_ROW -> CanvasSize(width = deviceWidth, height = 120f)
+            ComponentType.BOX -> CanvasSize(width = deviceWidth, height = 300f)
             else -> CanvasSize(width = 160f, height = 48f)
         }
     }
 
     companion object {
-        fun newProject(name: String = "Untitled"): M3EProject {
+        fun newProject(name: String = "Untitled", withDefaultScaffold: Boolean = true): M3EProject {
+            val device = DeviceProfile.default
+            val nodes = if (withDefaultScaffold) {
+                val topBar = CanvasNode(
+                    type = ComponentType.TOP_APP_BAR,
+                    name = "Top App Bar",
+                    position = CanvasPosition.Zero,
+                    size = CanvasSize(width = device.size.width, height = 64f),
+                    slot = SlotRole.TOP_BAR,
+                    properties = listOf(
+                        ComponentProperty.Text(key = "title", value = "My Screen")
+                    )
+                )
+                val contentColumn = CanvasNode(
+                    type = ComponentType.COLUMN,
+                    name = "Screen Content",
+                    position = CanvasPosition.Zero,
+                    size = CanvasSize(width = device.size.width, height = device.size.height - 144f),
+                    slot = SlotRole.CONTENT,
+                    layoutConfig = LayoutConfig(spacing = 16f, padding = 16f)
+                )
+                val scaffold = CanvasNode(
+                    type = ComponentType.SCAFFOLD,
+                    name = "Screen Scaffold",
+                    position = CanvasPosition.Zero,
+                    size = device.size,
+                    children = listOf(topBar, contentColumn)
+                )
+                listOf(scaffold)
+            } else {
+                emptyList()
+            }
+
             return M3EProject(
                 name = name,
-                deviceProfile = DeviceProfile.default
+                deviceProfile = device,
+                nodes = nodes
             )
         }
     }

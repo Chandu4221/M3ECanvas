@@ -70,9 +70,24 @@ enum class ComponentType(
     TEXT_FIELD(displayName = "Text Field", category = ComponentCategory.TEXT_INPUT),
 
     // Layout containers
+    SCAFFOLD(displayName = "Scaffold", category = ComponentCategory.LAYOUT, isContainer = true),
     COLUMN(displayName = "Column", category = ComponentCategory.LAYOUT, isContainer = true),
     ROW(displayName = "Row", category = ComponentCategory.LAYOUT, isContainer = true),
     BOX(displayName = "Box", category = ComponentCategory.LAYOUT, isContainer = true),
     LAZY_COLUMN(displayName = "Lazy Column", category = ComponentCategory.LAYOUT, isContainer = true),
-    LAZY_ROW(displayName = "Lazy Row", category = ComponentCategory.LAYOUT, isContainer = true)
+    LAZY_ROW(displayName = "Lazy Row", category = ComponentCategory.LAYOUT, isContainer = true);
+
+    /**
+     * Determines the canonical structural slot role this component type binds to
+     * when added to a Scaffold.
+     */
+    fun canonicalSlot(): SlotRole {
+        return when (this) {
+            TOP_APP_BAR -> SlotRole.TOP_BAR
+            NAVIGATION_BAR, NAVIGATION_RAIL, NAVIGATION_DRAWER -> SlotRole.BOTTOM_BAR
+            FAB, EXTENDED_FAB -> SlotRole.FAB
+            SNACKBAR -> SlotRole.SNACKBAR
+            else -> SlotRole.CONTENT
+        }
+    }
 }

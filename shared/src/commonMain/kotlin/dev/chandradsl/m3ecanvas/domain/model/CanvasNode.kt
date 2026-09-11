@@ -22,12 +22,42 @@ data class CanvasNode(
     val properties: List<ComponentProperty> = emptyList(),
     val children: List<CanvasNode> = emptyList(),
     val layoutConfig: LayoutConfig = LayoutConfig.default,
-    val modifiers: List<ModifierSpec> = emptyList()
+    val modifiers: List<ModifierSpec> = emptyList(),
+    val slot: SlotRole? = null
 ) {
 
     /** Whether this node can hold children, based on its type. */
     val isContainer: Boolean
         get() = type.isContainer
+
+    /** Whether this node is locked into a structural slot (e.g. Scaffold topBar, bottomBar, FAB). */
+    val isLockedInSlot: Boolean
+        get() = slot != null && slot != SlotRole.CONTENT
+
+    //region Slot operations
+
+    /** Returns the first child assigned to [slotRole], or null if none. */
+    fun childInSlot(slotRole: SlotRole): CanvasNode? {
+        return children.firstOrNull { it.slot == slotRole }
+    }
+
+    /** Returns all children assigned to [slotRole]. */
+    fun childrenInSlot(slotRole: SlotRole): List<CanvasNode> {
+        return children.filter { it.slot == slotRole }
+    }
+
+    /** Returns a copy with the child added into [slotRole], replacing any existing single-slot occupant. */
+    fun withChildInSlot(child: CanvasNode, slotRole: SlotRole): CanvasNode {
+        val slottedChild = child.copy(slot = slotRole)
+        val updatedChildren = if (slotRole != SlotRole.CONTENT) {
+            children.filterNot { it.slot == slotRole } + slottedChild
+        } else {
+            children + slottedChild
+        }
+        return copy(children = updatedChildren)
+    }
+
+    //endregion
 
     //region Properties
 
