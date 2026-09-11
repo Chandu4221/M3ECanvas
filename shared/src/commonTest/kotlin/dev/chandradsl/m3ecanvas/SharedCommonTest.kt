@@ -1,6 +1,8 @@
 package dev.chandradsl.m3ecanvas
 
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.canvas.AVAILABLE_MATERIAL_ICONS
+import dev.chandradsl.m3ecanvas.editor.canvas.resolveMaterialIcon
 import dev.chandradsl.m3ecanvas.editor.codegen.AIPromptGenerator
 import dev.chandradsl.m3ecanvas.editor.codegen.ComposeCodeGenerator
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
@@ -8,6 +10,16 @@ import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import kotlin.test.*
 
 class SharedCommonTest {
+
+    @Test
+    fun testMaterialIconResolver() {
+        val icon = resolveMaterialIcon("Favorite")
+        assertNotNull(icon)
+        AVAILABLE_MATERIAL_ICONS.forEach { name ->
+            val resolved = resolveMaterialIcon(name)
+            assertNotNull(resolved, "Failed to resolve icon $name")
+        }
+    }
 
     @Test
     fun testSlotRoleCanonicalMapping() {

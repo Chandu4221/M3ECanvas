@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -596,7 +597,7 @@ private fun IconDropdown(node: CanvasNode, controller: EditorController) {
             label = { Text(text = "Material Icon") },
             leadingIcon = {
                 Icon(
-                    imageVector = resolveMaterialIcon(iconName = current),
+                    imageVector = safeResolveIcon(iconName = current),
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -614,7 +615,7 @@ private fun IconDropdown(node: CanvasNode, controller: EditorController) {
                 DropdownMenuItem(
                     leadingIcon = {
                         Icon(
-                            imageVector = resolveMaterialIcon(iconName = iconName),
+                            imageVector = safeResolveIcon(iconName = iconName),
                             contentDescription = null,
                             modifier = Modifier.size(20.dp)
                         )
@@ -630,6 +631,14 @@ private fun IconDropdown(node: CanvasNode, controller: EditorController) {
                 )
             }
         }
+    }
+}
+
+private fun safeResolveIcon(iconName: String): androidx.compose.ui.graphics.vector.ImageVector {
+    return try {
+        resolveMaterialIcon(iconName = iconName)
+    } catch (_: Throwable) {
+        Icons.Outlined.Star
     }
 }
 
