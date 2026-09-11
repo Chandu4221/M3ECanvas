@@ -21,12 +21,16 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.*
@@ -383,6 +387,16 @@ private fun SlotContainer(
     controller: EditorController
 ) {
     val isSelected = controller.state.isNodeSelected(nodeId = child.id)
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isSelected) {
+        if (isSelected) {
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Throwable) {}
+        }
+    }
+
     Box(
         modifier = Modifier
             .then(
@@ -397,8 +411,16 @@ private fun SlotContainer(
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(4.dp)
             )
-            .selectOnPress(nodeId = child.id, controller = controller)
+            .focusRequester(focusRequester)
             .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.removeNode(nodeId = child.id)
+                    true
+                } else {
+                    false
+                }
+            }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
                     controller.removeNode(nodeId = child.id)
@@ -407,15 +429,9 @@ private fun SlotContainer(
                     false
                 }
             }
+            .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
-
-        if (isSelected) {
-            CanvasDeleteBadge(
-                onDelete = { controller.removeNode(nodeId = child.id) },
-                modifier = Modifier.align(Alignment.TopEnd)
-            )
-        }
     }
 }
 
@@ -425,6 +441,16 @@ private fun ContainerChild(
     controller: EditorController
 ) {
     val isSelected = controller.state.isNodeSelected(nodeId = child.id)
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isSelected) {
+        if (isSelected) {
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Throwable) {}
+        }
+    }
+
     Box(
         modifier = Modifier
             .size(width = child.size.width.dp, height = child.size.height.dp)
@@ -433,8 +459,16 @@ private fun ContainerChild(
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(4.dp)
             )
-            .selectOnPress(nodeId = child.id, controller = controller)
+            .focusRequester(focusRequester)
             .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.removeNode(nodeId = child.id)
+                    true
+                } else {
+                    false
+                }
+            }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
                     controller.removeNode(nodeId = child.id)
@@ -443,45 +477,17 @@ private fun ContainerChild(
                     false
                 }
             }
+            .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
-
-        if (isSelected) {
-            CanvasDeleteBadge(
-                onDelete = { controller.removeNode(nodeId = child.id) },
-                modifier = Modifier.align(Alignment.TopEnd)
-            )
-        }
-    }
-}
-
-@Composable
-internal fun CanvasDeleteBadge(
-    onDelete: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .offset(x = 6.dp, y = (-6).dp)
-            .size(20.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.error)
-            .clickable { onDelete() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Close,
-            contentDescription = "Delete",
-            tint = MaterialTheme.colorScheme.onError,
-            modifier = Modifier.size(12.dp)
-        )
     }
 }
 
 @Composable
 internal fun Modifier.selectOnPress(
     nodeId: String,
-    controller: EditorController
+    controller: EditorController,
+    focusRequester: FocusRequester? = null
 ): Modifier {
     val focusManager = LocalFocusManager.current
     return this.pointerInput(nodeId) {
@@ -489,6 +495,9 @@ internal fun Modifier.selectOnPress(
             awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
             focusManager.clearFocus()
             controller.selectNode(nodeId = nodeId)
+            try {
+                focusRequester?.requestFocus()
+            } catch (_: Throwable) {}
         }
     }
 }

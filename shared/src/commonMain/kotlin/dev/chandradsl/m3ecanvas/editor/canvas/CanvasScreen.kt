@@ -17,10 +17,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
@@ -211,6 +215,15 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
     val isSelected = controller.state.isNodeSelected(nodeId = node.id)
     val isScaffold = node.type == ComponentType.SCAFFOLD
     val isLocked = node.isLockedInSlot || isScaffold
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isSelected) {
+        if (isSelected) {
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Throwable) {}
+        }
+    }
 
     val baseModifier = if (isScaffold) {
         Modifier.fillMaxSize()
@@ -227,8 +240,16 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = if (isScaffold) RoundedCornerShape(36.dp) else RoundedCornerShape(4.dp)
             )
-            .selectOnPress(nodeId = node.id, controller = controller)
+            .focusRequester(focusRequester)
             .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.removeNode(nodeId = node.id)
+                    true
+                } else {
+                    false
+                }
+            }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
                     controller.removeNode(nodeId = node.id)
@@ -237,6 +258,7 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
                     false
                 }
             }
+            .selectOnPress(nodeId = node.id, controller = controller, focusRequester = focusRequester)
             .then(
                 if (!isLocked) {
                     Modifier.pointerInput(node.id) {
@@ -261,12 +283,5 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
             )
     ) {
         CanvasNodeRenderer(node = node, controller = controller)
-
-        if (isSelected && !isScaffold) {
-            CanvasDeleteBadge(
-                onDelete = { controller.removeNode(nodeId = node.id) },
-                modifier = Modifier.align(Alignment.TopEnd)
-            )
-        }
     }
 }
