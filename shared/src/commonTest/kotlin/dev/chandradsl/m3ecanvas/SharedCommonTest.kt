@@ -773,4 +773,109 @@ class SharedCommonTest {
         assertEquals(foldProfile, controller.state.project.deviceProfile)
         assertNotNull(controller.state.project.findNode(addedButton.id))
     }
+
+    @Test
+    fun testViewportZoomClamping() {
+        val controller = EditorController()
+        assertEquals(1f, controller.state.viewport.zoom)
+
+        // Zoom In
+        controller.zoomIn(0.5f)
+        assertEquals(1.5f, controller.state.viewport.zoom)
+
+        // Upper clamp at 3.0f
+        controller.setZoom(5.0f)
+        assertEquals(3.0f, controller.state.viewport.zoom)
+
+        // Lower clamp at 0.25f
+        controller.setZoom(0.1f)
+        assertEquals(0.25f, controller.state.viewport.zoom)
+
+        // Zoom out smoothly
+        controller.setZoom(1.0f)
+        controller.zoomOut(0.2f)
+        assertEquals(0.8f, controller.state.viewport.zoom, 0.001f)
+
+        // Reset
+        controller.resetZoom()
+        assertEquals(1f, controller.state.viewport.zoom)
+        assertEquals(CanvasPosition.Zero, controller.state.viewport.panOffset)
+    }
+
+    @Test
+    fun testViewportPanAndDragGuard() {
+        val controller = EditorController()
+        assertEquals(CanvasPosition.Zero, controller.state.viewport.panOffset)
+
+        // Pan accumulates delta
+        controller.pan(50f, 100f)
+        assertEquals(CanvasPosition(50f, 100f), controller.state.viewport.panOffset)
+
+        controller.pan(-20f, 30f)
+        assertEquals(CanvasPosition(30f, 130f), controller.state.viewport.panOffset)
+
+        // Reset pan
+        controller.resetPan()
+        assertEquals(CanvasPosition.Zero, controller.state.viewport.panOffset)
+
+        // When a node drag is active, pan does not execute
+        val button = CanvasNode(
+            type = ComponentType.BUTTON,
+            name = "Btn",
+            position = CanvasPosition(10f, 10f),
+            size = CanvasSize(100f, 40f)
+        )
+        controller.replaceProject(controller.state.project.withNode(button))
+        controller.startDrag(button.id)
+        assertNotNull(controller.state.drag)
+
+        // Attempting to pan canvas while dragging component is blocked
+        controller.pan(50f, 50f)
+        assertEquals(CanvasPosition.Zero, controller.state.viewport.panOffset)
+
+        controller.endDrag()
+        assertNull(controller.state.drag)
+        controller.pan(50f, 50f)
+        assertEquals(CanvasPosition(50f, 50f), controller.state.viewport.panOffset)
+    }
+
+    @Test
+    fun testFitToScreenCalculatesProportionalScale() {
+        val tabletProfile = DeviceProfile.presets.first { it.displayName == "Pixel Tablet" } // 1280 x 800
+        val controller = EditorController()
+        controller.setDeviceProfile(tabletProfile)
+
+        // Available viewport is 800 x 600 (smaller than the 1280x800 tablet)
+        controller.fitToScreen(availableWidth = 800f, availableHeight = 600f)
+
+        val zoom = controller.state.viewport.zoom
+        // Tablet width + margin = 1280 + 48 = 1328; 800 / 1328 ≈ 0.602
+        // Tablet height + margin = 800 + 96 = 896; 600 / 896 ≈ 0.669
+        // Min scale ≈ 0.602
+        assertTrue(zoom < 1.0f, "Tablet should scale down to fit smaller window")
+        assertTrue(zoom in 0.55f..0.65f, "Expected zoom around 0.60, was $zoom")
+        assertEquals(CanvasPosition.Zero, controller.state.viewport.panOffset)
+
+        // Now test small phone on large 1920 x 1080 display - should NOT scale above 100%
+        val phoneProfile = DeviceProfile.presets.first { it.displayName == "Pixel 8" } // 412 x 915
+        controller.setDeviceProfile(phoneProfile)
+        controller.fitToScreen(availableWidth = 1920f, availableHeight = 1080f)
+        assertEquals(1.0f, controller.state.viewport.zoom, "Small device in large screen should cap at 1.0 (100%)")
+    }
+
+    @Test
+    fun testViewportOperationsDoNotPolluteUndoHistory() {
+        val controller = EditorController()
+        assertFalse(controller.canUndo)
+
+        // Viewport transformations
+        controller.setZoom(1.5f)
+        controller.pan(100f, 200f)
+        controller.fitToScreen(800f, 600f)
+        controller.resetZoom()
+
+        // None of these should touch undo/redo
+        assertFalse(controller.canUndo)
+        assertFalse(controller.canRedo)
+    }
 }

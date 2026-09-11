@@ -106,6 +106,26 @@ fun App(repository: ProjectRepository) {
                                 }
                                 return@onKeyEvent true
                             }
+                            event.key == Key.Equals || event.key == Key.Plus -> {
+                                controller.zoomIn()
+                                statusMessage = "Zoom: ${(controller.state.viewport.zoom * 100).toInt()}%"
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.Minus -> {
+                                controller.zoomOut()
+                                statusMessage = "Zoom: ${(controller.state.viewport.zoom * 100).toInt()}%"
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.Zero -> {
+                                controller.fitToScreen()
+                                statusMessage = "Fit to Screen"
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.One -> {
+                                controller.resetZoom()
+                                statusMessage = "Zoom: 100%"
+                                return@onKeyEvent true
+                            }
                         }
                     }
 

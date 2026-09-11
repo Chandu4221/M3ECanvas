@@ -12,7 +12,7 @@ import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
  * Supports command undo/redo history and clipboard operations.
  */
 class EditorController(
-    initialProject: M3EProject
+    initialProject: M3EProject = newProject()
 ) {
 
     private val history = HistoryStack<M3EProject>()
@@ -497,10 +497,67 @@ class EditorController(
             project = project,
             selectedNodeIds = emptySet(),
             drag = null,
+            viewport = ViewportState(),
             canUndo = false,
             canRedo = false
         )
     }
+
+    //region Viewport Operations
+
+    fun setZoom(zoom: Float) {
+        val clamped = zoom.coerceIn(0.25f, 3.0f)
+        state = state.copy(viewport = state.viewport.copy(zoom = clamped))
+    }
+
+    fun zoomIn(step: Float = 0.15f) {
+        setZoom(state.viewport.zoom + step)
+    }
+
+    fun zoomOut(step: Float = 0.15f) {
+        setZoom(state.viewport.zoom - step)
+    }
+
+    fun resetZoom() {
+        state = state.copy(viewport = state.viewport.copy(zoom = 1f, panOffset = CanvasPosition.Zero))
+    }
+
+    var canvasViewportSize by mutableStateOf(CanvasSize(800f, 600f))
+        internal set
+
+    fun updateCanvasViewportSize(width: Float, height: Float) {
+        if (canvasViewportSize.width != width || canvasViewportSize.height != height) {
+            canvasViewportSize = CanvasSize(width, height)
+        }
+    }
+
+    fun pan(deltaX: Float, deltaY: Float) {
+        if (state.drag != null) return
+        val current = state.viewport.panOffset
+        val updated = CanvasPosition(x = current.x + deltaX, y = current.y + deltaY)
+        state = state.copy(viewport = state.viewport.copy(panOffset = updated))
+    }
+
+    fun resetPan() {
+        state = state.copy(viewport = state.viewport.copy(panOffset = CanvasPosition.Zero))
+    }
+
+    fun fitToScreen(availableWidth: Float = canvasViewportSize.width, availableHeight: Float = canvasViewportSize.height) {
+        if (availableWidth <= 0f || availableHeight <= 0f) return
+        val deviceWidth = state.project.deviceProfile.size.width + 48f
+        val deviceHeight = state.project.deviceProfile.size.height + 96f
+        val scaleX = availableWidth / deviceWidth
+        val scaleY = availableHeight / deviceHeight
+        val optimalScale = minOf(scaleX, scaleY).coerceIn(0.25f, 1.0f)
+        state = state.copy(
+            viewport = ViewportState(
+                zoom = optimalScale,
+                panOffset = CanvasPosition.Zero
+            )
+        )
+    }
+
+    //endregion
 
     //endregion
 

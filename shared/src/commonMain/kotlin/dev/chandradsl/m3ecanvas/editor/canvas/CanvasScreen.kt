@@ -14,91 +14,286 @@ import androidx.compose.runtime.*
 import dev.chandradsl.m3ecanvas.domain.model.DeviceCategory
 import dev.chandradsl.m3ecanvas.domain.model.DeviceProfile
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
+import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
 import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CanvasScreen(controller: EditorController) {
     val state = controller.state
     val deviceProfile = state.project.deviceProfile
+    val viewport = state.viewport
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE2E4E8)),
-        contentAlignment = Alignment.Center
+            .clipToBounds()
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(16.dp)
-        ) {
-            // Device Information Header Badge (Click to select Project & display Project properties)
-            DeviceHeaderBadge(
-                currentProfile = deviceProfile,
-                isSelected = state.selectedNodeIds.isEmpty(),
-                onClick = { controller.clearSelection() }
-            )
+        val availableWidth = maxWidth.value
+        val availableHeight = maxHeight.value
 
-            // Outer Device Hardware Frame with Bezel & Drop Shadow
-            Surface(
-                modifier = Modifier
-                    .size(
-                        width = (deviceProfile.size.width + 16f).dp,
-                        height = (deviceProfile.size.height + 16f).dp
-                    )
-                    .shadow(
-                        elevation = 20.dp,
-                        shape = RoundedCornerShape(36.dp),
-                        spotColor = Color.Black.copy(alpha = 0.35f)
-                    ),
-                shape = RoundedCornerShape(36.dp),
-                color = Color(0xFF1C1D22),
-                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF383A42))
-            ) {
-                // Inner Screen Display
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(all = 8.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.surface)
-                        .focusable()
-                ) {
-                    MaterialTheme(
-                        typography = Typography()
-                    ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            // Simulated Android Status Bar
-                            SimulatedStatusBar()
+        LaunchedEffect(availableWidth, availableHeight) {
+            controller.updateCanvasViewportSize(availableWidth, availableHeight)
+        }
 
-                            // Screen Content Area
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                            ) {
-                                state.project.nodes.forEach { node ->
-                                    CanvasNodePlacement(node = node, controller = controller)
+        // Auto-fit to screen on device profile change if it exceeds available bounds
+        LaunchedEffect(deviceProfile) {
+            val deviceWidth = deviceProfile.size.width + 48f
+            val deviceHeight = deviceProfile.size.height + 96f
+            if (deviceWidth > availableWidth || deviceHeight > availableHeight) {
+                controller.fitToScreen(availableWidth, availableHeight)
+            }
+        }
+
+        val dotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+        val backgroundColor = Color(0xFFE2E4E8)
+
+        // Outer Interactive Canvas Viewport (Background + Pan Drag + Scroll Zoom/Pan)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(color = backgroundColor)
+                    val dotSpacing = 24.dp.toPx()
+                    val dotRadius = 1.25.dp.toPx()
+                    val offsetX = (viewport.panOffset.x % dotSpacing + dotSpacing) % dotSpacing
+                    val offsetY = (viewport.panOffset.y % dotSpacing + dotSpacing) % dotSpacing
+
+                    var x = offsetX
+                    while (x < size.width) {
+                        var y = offsetY
+                        while (y < size.height) {
+                            drawCircle(
+                                color = dotColor,
+                                radius = dotRadius,
+                                center = Offset(x, y)
+                            )
+                            y += dotSpacing
+                        }
+                        x += dotSpacing
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures { _, dragAmount ->
+                        controller.pan(dragAmount.x, dragAmount.y)
+                    }
+                }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Scroll) {
+                                val change = event.changes.firstOrNull() ?: continue
+                                val scrollDelta = change.scrollDelta
+                                val isCtrl = event.keyboardModifiers.isCtrlPressed || event.keyboardModifiers.isMetaPressed
+                                if (isCtrl) {
+                                    if (scrollDelta.y < 0f) {
+                                        controller.zoomIn(0.10f)
+                                    } else if (scrollDelta.y > 0f) {
+                                        controller.zoomOut(0.10f)
+                                    }
+                                } else {
+                                    controller.pan(-scrollDelta.x * 24f, -scrollDelta.y * 24f)
                                 }
                             }
-
-                            // Simulated Android Gesture Navigation Bar
-                            SimulatedNavigationBar()
                         }
                     }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            // Transformed Device Chassis Column (Scaled and Translated via graphicsLayer)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = viewport.zoom
+                        scaleY = viewport.zoom
+                        translationX = viewport.panOffset.x
+                        translationY = viewport.panOffset.y
+                    }
+                    .padding(16.dp)
+            ) {
+                // Device Information Header Badge (Click to select Project & display Project properties)
+                DeviceHeaderBadge(
+                    currentProfile = deviceProfile,
+                    isSelected = state.selectedNodeIds.isEmpty(),
+                    onClick = { controller.clearSelection() }
+                )
+
+                // Outer Device Hardware Frame with Bezel & Drop Shadow
+                Surface(
+                    modifier = Modifier
+                        .size(
+                            width = (deviceProfile.size.width + 16f).dp,
+                            height = (deviceProfile.size.height + 16f).dp
+                        )
+                        .shadow(
+                            elevation = 20.dp,
+                            shape = RoundedCornerShape(36.dp),
+                            spotColor = Color.Black.copy(alpha = 0.35f)
+                        ),
+                    shape = RoundedCornerShape(36.dp),
+                    color = Color(0xFF1C1D22),
+                    border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF383A42))
+                ) {
+                    // Inner Screen Display
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(all = 8.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .focusable()
+                    ) {
+                        MaterialTheme(
+                            typography = Typography()
+                        ) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                // Simulated Android Status Bar
+                                SimulatedStatusBar()
+
+                                // Screen Content Area
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                ) {
+                                    state.project.nodes.forEach { node ->
+                                        CanvasNodePlacement(node = node, controller = controller)
+                                    }
+                                }
+
+                                // Simulated Android Gesture Navigation Bar
+                                SimulatedNavigationBar()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Floating Viewport Controls Toolbar
+        ViewportControlBar(
+            zoom = viewport.zoom,
+            panOffset = viewport.panOffset,
+            onZoomIn = { controller.zoomIn() },
+            onZoomOut = { controller.zoomOut() },
+            onResetZoom = { controller.resetZoom() },
+            onFitToScreen = { controller.fitToScreen(availableWidth, availableHeight) },
+            onResetPan = { controller.resetPan() },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun ViewportControlBar(
+    zoom: Float,
+    panOffset: CanvasPosition,
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit,
+    onResetZoom: () -> Unit,
+    onFitToScreen: () -> Unit,
+    onResetPan: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.shadow(elevation = 6.dp, shape = RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            // Zoom Out
+            IconButton(
+                onClick = onZoomOut,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Remove,
+                    contentDescription = "Zoom Out",
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Current Zoom Level (Click to Reset to 100%)
+            TextButton(
+                onClick = onResetZoom,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "${(zoom * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+
+            // Zoom In
+            IconButton(
+                onClick = onZoomIn,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = "Zoom In",
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            VerticalDivider(
+                modifier = Modifier
+                    .height(20.dp)
+                    .padding(horizontal = 2.dp)
+            )
+
+            // Fit to Screen
+            IconButton(
+                onClick = onFitToScreen,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FitScreen,
+                    contentDescription = "Fit to Screen",
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Reset Pan button (visible when canvas is panned away from center)
+            if (panOffset.x != 0f || panOffset.y != 0f) {
+                IconButton(
+                    onClick = onResetPan,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CenterFocusStrong,
+                        contentDescription = "Center Viewport",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
