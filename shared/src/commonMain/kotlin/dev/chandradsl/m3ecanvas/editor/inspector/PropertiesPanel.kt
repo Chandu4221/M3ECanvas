@@ -34,12 +34,29 @@ fun PropertiesPanel(
             .padding(all = 16.dp),
         verticalArrangement = Arrangement.spacedBy(space = 12.dp)
     ) {
-        Text(
-            text = "Properties",
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Properties",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Bold
+                )
             )
-        )
+            if (selected != null) {
+                TextButton(
+                    onClick = { controller.clearSelection() },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "Project",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            }
+        }
         HorizontalDivider()
         if (selected == null) {
             ProjectSection(controller = controller)

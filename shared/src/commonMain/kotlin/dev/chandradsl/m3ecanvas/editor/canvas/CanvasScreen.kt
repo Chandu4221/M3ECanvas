@@ -2,6 +2,7 @@ package dev.chandradsl.m3ecanvas.editor.canvas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -37,7 +38,13 @@ fun CanvasScreen(controller: EditorController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE2E4E8)),
+            .background(Color(0xFFE2E4E8))
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) {
+                controller.clearSelection()
+            },
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -45,10 +52,11 @@ fun CanvasScreen(controller: EditorController) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(16.dp)
         ) {
-            // Device Information Header Badge & Switcher
+            // Device Information Header Badge (Click to select Project & display Project properties)
             DeviceHeaderBadge(
                 currentProfile = deviceProfile,
-                onSelectProfile = { controller.setDeviceProfile(it) }
+                isSelected = state.selectedNodeIds.isEmpty(),
+                onClick = { controller.clearSelection() }
             )
 
             // Outer Device Hardware Frame with Bezel & Drop Shadow
@@ -107,96 +115,44 @@ fun CanvasScreen(controller: EditorController) {
 @Composable
 private fun DeviceHeaderBadge(
     currentProfile: DeviceProfile,
-    onSelectProfile: (DeviceProfile) -> Unit
+    isSelected: Boolean,
+    onClick: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        Surface(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        },
+        contentColor = if (isSelected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = getDeviceCategoryIcon(currentProfile.category),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "${currentProfile.displayName} • ${currentProfile.size.width.toInt()} × ${currentProfile.size.height.toInt()} dp",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-                )
-                Icon(
-                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = "Switch Device",
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.widthIn(min = 280.dp)
-        ) {
-            Text(
-                text = "Switch Device Preset",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            Icon(
+                imageVector = getDeviceCategoryIcon(currentProfile.category),
+                contentDescription = "Project Settings",
+                modifier = Modifier.size(16.dp),
+                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
-            HorizontalDivider(modifier = Modifier.padding(bottom = 4.dp))
-            DeviceProfile.presets.forEach { profile ->
-                val isSelected = profile.id == currentProfile.id
-                DropdownMenuItem(
-                    leadingIcon = {
-                        Icon(
-                            imageVector = getDeviceCategoryIcon(profile.category),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    text = {
-                        Column {
-                            Text(
-                                text = profile.displayName,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                ),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "${profile.category.displayName} • ${profile.size.width.toInt()} × ${profile.size.height.toInt()} dp",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    },
-                    trailingIcon = if (isSelected) {
-                        {
-                            Icon(
-                                imageVector = Icons.Outlined.Check,
-                                contentDescription = "Active device",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else null,
-                    onClick = {
-                        onSelectProfile(profile)
-                        expanded = false
-                    }
+            Text(
+                text = "${currentProfile.displayName} • ${currentProfile.size.width.toInt()} × ${currentProfile.size.height.toInt()} dp",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                 )
-            }
+            )
         }
     }
 }
