@@ -20,7 +20,7 @@ data class M3EProject(
     val id: String = Uuid.random().toString(),
     val name: String,
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
-    val deviceProfile: DeviceProfile,
+    val deviceProfile: DeviceProfile = DeviceProfile.default,
     val nodes: List<CanvasNode> = emptyList(),
     val themeId: String = DEFAULT_THEME_ID,
     val createdAt: Long = 0L,

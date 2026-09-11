@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package dev.chandradsl.m3ecanvas.editor.canvas
 
 import androidx.compose.foundation.*
@@ -10,12 +12,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -118,22 +117,49 @@ fun CanvasNodeRenderer(
         }
 
         ComponentType.SCAFFOLD -> RenderScaffold(node = node, controller = controller)
-        ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node)
-        ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node)
+
+        // Action
+        ComponentType.BUTTON -> RenderButton(node = node)
+        ComponentType.ICON_BUTTON -> RenderIconButton(node = node)
         ComponentType.FAB -> RenderFab(node = node)
         ComponentType.EXTENDED_FAB -> RenderExtendedFab(node = node)
-        ComponentType.BUTTON -> RenderButton(node = node)
+        ComponentType.SEGMENTED_BUTTON -> RenderSegmentedButton(node = node)
+        ComponentType.SPLIT_BUTTON -> RenderSplitButton(node = node)
+        ComponentType.BUTTON_GROUP -> RenderButtonGroup(node = node)
+
+        // Containment
         ComponentType.CARD -> RenderCard(node = node)
-        ComponentType.ICON_BUTTON -> RenderIconButton(node = node)
+        ComponentType.LISTS -> RenderListItem(node = node)
+        ComponentType.SHEETS -> RenderBottomSheet(node = node)
+        ComponentType.DIALOG -> RenderDialog(node = node)
+
+        // Communication
+        ComponentType.SNACKBAR -> RenderSnackbar(node = node)
+        ComponentType.BADGE -> RenderBadge(node = node)
+        ComponentType.TOOLTIP -> RenderTooltip(node = node)
+        ComponentType.PROGRESS_INDICATOR -> RenderProgressIndicator(node = node)
+        ComponentType.LOADING_INDICATOR -> RenderLoadingIndicator(node = node)
+
+        // Navigation
+        ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node)
+        ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node)
+        ComponentType.NAVIGATION_RAIL -> RenderNavigationRail(node = node)
+        ComponentType.NAVIGATION_DRAWER -> RenderNavigationDrawer(node = node)
+        ComponentType.TABS -> RenderTabs(node = node)
+        ComponentType.SEARCH -> RenderSearch(node = node)
+
+        // Selection
+        ComponentType.CHECKBOX -> RenderCheckbox(node = node)
+        ComponentType.RADIO_BUTTON -> RenderRadioButton(node = node)
+        ComponentType.SWITCH -> RenderSwitch(node = node)
+        ComponentType.SLIDER -> RenderSlider(node = node)
         ComponentType.CHIPS -> RenderChip(node = node)
+        ComponentType.DATE_PICKER -> RenderDatePicker(node = node)
+        ComponentType.TIME_PICKER -> RenderTimePicker(node = node)
+        ComponentType.MENUS -> RenderMenu(node = node)
 
-        ComponentType.TEXT_FIELD -> TextField(
-            value = node.textOrDefault(default = ""),
-            onValueChange = {},
-            modifier = node.modifiers.toModifier().fillMaxSize()
-        )
-
-        else -> NodePlaceholder(node = node)
+        // Text input
+        ComponentType.TEXT_FIELD -> RenderTextField(node = node)
     }
 }
 
@@ -375,6 +401,577 @@ internal fun Modifier.selectOnPress(
         awaitEachGesture {
             awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
             controller.selectNode(nodeId = nodeId)
+        }
+    }
+}
+
+@Composable
+private fun RenderTextField(node: CanvasNode) {
+    val text = node.textOrDefault(default = "")
+    OutlinedTextField(
+        value = text,
+        onValueChange = {},
+        label = { Text(node.name) },
+        placeholder = { Text("Enter text...") },
+        modifier = node.modifiers.toModifier().fillMaxSize()
+    )
+}
+
+@Composable
+private fun RenderSegmentedButton(node: CanvasNode) {
+    val options = listOf("Day", "Week", "Month")
+    SingleChoiceSegmentedButtonRow(
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        options.forEachIndexed { index, label ->
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                onClick = {},
+                selected = index == 0
+            ) {
+                Text(text = label)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderSplitButton(node: CanvasNode) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    ) {
+        FilledTonalButton(
+            onClick = {},
+            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 4.dp)
+        ) {
+            Text(text = node.textOrDefault(default = "Action"))
+        }
+        Spacer(modifier = Modifier.width(2.dp))
+        FilledTonalButton(
+            onClick = {},
+            shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp)
+        ) {
+            Icon(imageVector = Icons.Outlined.ArrowDropDown, contentDescription = "More")
+        }
+    }
+}
+
+@Composable
+private fun RenderButtonGroup(node: CanvasNode) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    ) {
+        Button(onClick = {}) { Text("Primary") }
+        FilledTonalButton(onClick = {}) { Text("Tonal") }
+        OutlinedButton(onClick = {}) { Text("Outlined") }
+    }
+}
+
+@Composable
+private fun RenderListItem(node: CanvasNode) {
+    ListItem(
+        headlineContent = { Text(text = node.textOrDefault(default = "Headline text")) },
+        supportingContent = { Text(text = "Secondary supporting description") },
+        leadingContent = {
+            Icon(
+                imageVector = Icons.Outlined.Star,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        trailingContent = {
+            Text(
+                text = "10:30",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        ),
+        modifier = node.modifiers.toModifier().fillMaxWidth().clip(RoundedCornerShape(8.dp))
+    )
+}
+
+@Composable
+private fun RenderBottomSheet(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 2.dp,
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 32.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = node.textOrDefault(default = "Bottom Sheet Title"),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Expressive bottom sheet preview anchored to the viewport.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                Text("Action Button")
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderDialog(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            Text(
+                text = node.textOrDefault(default = "Dialog Title"),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Dialogs inform users about a task and can contain critical information.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = {}) { Text("Cancel") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = {}) { Text("Confirm") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderSnackbar(node: CanvasNode) {
+    Snackbar(
+        action = {
+            TextButton(onClick = {}) {
+                Text("Action", color = MaterialTheme.colorScheme.inversePrimary)
+            }
+        },
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        Text(text = node.textOrDefault(default = "Material 3 Snackbar notification."))
+    }
+}
+
+@Composable
+private fun RenderBadge(node: CanvasNode) {
+    BadgedBox(
+        badge = {
+            Badge { Text(text = "3") }
+        },
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Notifications,
+            contentDescription = "Notifications",
+            tint = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun RenderTooltip(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.inverseSurface,
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.inverseOnSurface,
+                modifier = Modifier.size(16.dp).padding(end = 4.dp)
+            )
+            Text(
+                text = node.textOrDefault(default = "Helpful tooltip label"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.inverseOnSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun RenderProgressIndicator(node: CanvasNode) {
+    LinearProgressIndicator(
+        progress = { 0.7f },
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    )
+}
+
+@Composable
+private fun RenderLoadingIndicator(node: CanvasNode) {
+    CircularProgressIndicator(
+        modifier = node.modifiers.toModifier().size(40.dp)
+    )
+}
+
+@Composable
+private fun RenderNavigationRail(node: CanvasNode) {
+    NavigationRail(
+        modifier = node.modifiers.toModifier().fillMaxHeight().width(80.dp)
+    ) {
+        NavigationRailItem(
+            selected = true,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
+            label = { Text("Home") }
+        )
+        NavigationRailItem(
+            selected = false,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search") },
+            label = { Text("Search") }
+        )
+        NavigationRailItem(
+            selected = false,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings") },
+            label = { Text("Settings") }
+        )
+    }
+}
+
+@Composable
+private fun RenderNavigationDrawer(node: CanvasNode) {
+    ModalDrawerSheet(
+        modifier = node.modifiers.toModifier().fillMaxHeight().width(300.dp)
+    ) {
+        Text(
+            text = node.textOrDefault(default = "Navigation Menu"),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(16.dp)
+        )
+        HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+        NavigationDrawerItem(
+            label = { Text("Inbox") },
+            selected = true,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.Inbox, contentDescription = null) },
+            badge = { Text("12") },
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+        NavigationDrawerItem(
+            label = { Text("Outbox") },
+            selected = false,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.AutoMirrored.Outlined.Send, contentDescription = null) },
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+        NavigationDrawerItem(
+            label = { Text("Favorites") },
+            selected = false,
+            onClick = {},
+            icon = { Icon(imageVector = Icons.Outlined.FavoriteBorder, contentDescription = null) },
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+    }
+}
+
+@Composable
+private fun RenderTabs(node: CanvasNode) {
+    PrimaryTabRow(
+        selectedTabIndex = 0,
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        Tab(
+            selected = true,
+            onClick = {},
+            text = { Text("Overview") },
+            icon = { Icon(imageVector = Icons.Outlined.Dashboard, contentDescription = null) }
+        )
+        Tab(
+            selected = false,
+            onClick = {},
+            text = { Text("Analytics") },
+            icon = { Icon(imageVector = Icons.Outlined.Analytics, contentDescription = null) }
+        )
+        Tab(
+            selected = false,
+            onClick = {},
+            text = { Text("Settings") },
+            icon = { Icon(imageVector = Icons.Outlined.Tune, contentDescription = null) }
+        )
+    }
+}
+
+@Composable
+private fun RenderSearch(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = node.modifiers.toModifier().fillMaxWidth().height(56.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = "Search",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = node.textOrDefault(default = "Search components..."),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Outlined.Mic,
+                contentDescription = "Voice",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun RenderCheckbox(node: CanvasNode) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    ) {
+        Checkbox(checked = true, onCheckedChange = {})
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = node.textOrDefault(default = "Checkbox Option"),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun RenderRadioButton(node: CanvasNode) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    ) {
+        RadioButton(selected = true, onClick = {})
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = node.textOrDefault(default = "Radio Option"),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun RenderSwitch(node: CanvasNode) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        Text(
+            text = node.textOrDefault(default = "Enable feature"),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Switch(checked = true, onCheckedChange = {})
+    }
+}
+
+@Composable
+private fun RenderSlider(node: CanvasNode) {
+    Slider(
+        value = 0.6f,
+        onValueChange = {},
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    )
+}
+
+@Composable
+private fun RenderDatePicker(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "Select Date",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Mon, Sep 15",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
+                    Text(
+                        text = day,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                listOf("14", "15", "16", "17", "18", "19", "20").forEach { date ->
+                    val isSelected = date == "15"
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .then(
+                                if (isSelected) Modifier.background(MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+                                else Modifier
+                            )
+                    ) {
+                        Text(
+                            text = date,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderTimePicker(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(20.dp)
+        ) {
+            Text(
+                text = "Select Time",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.Start)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(text = "10", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+                Text(text = ":", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(text = "30", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier.size(width = 44.dp, height = 26.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "AM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.size(width = 44.dp, height = 26.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "PM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderMenu(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    ) {
+        Column(modifier = Modifier.width(IntrinsicSize.Max).padding(vertical = 4.dp)) {
+            DropdownMenuItem(
+                text = { Text("Edit") },
+                onClick = {},
+                leadingIcon = { Icon(imageVector = Icons.Outlined.Edit, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text("Duplicate") },
+                onClick = {},
+                leadingIcon = { Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = null) }
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Delete") },
+                onClick = {},
+                leadingIcon = { Icon(imageVector = Icons.Outlined.Delete, contentDescription = null) }
+            )
         }
     }
 }

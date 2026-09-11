@@ -327,4 +327,37 @@ class SharedCommonTest {
         assertEquals(2, colAfterUndo.children.size)
         assertNull(controller.state.project.findNode(pasted.id))
     }
+
+    @Test
+    fun testAllComponentTypesEmitValidCodeWithoutPlaceholders() {
+        assertEquals(37, ComponentType.entries.size)
+        for (type in ComponentType.entries) {
+            val node = CanvasNode(
+                type = type,
+                name = type.displayName,
+                position = CanvasPosition.Zero,
+                size = EditorController.defaultSizeFor(type)
+            )
+            val project = M3EProject(
+                name = "Test_${type.name}",
+                nodes = listOf(node)
+            )
+            val code = ComposeCodeGenerator.generateFile(project)
+            assertTrue(code.contains("@Composable"), "Missing @Composable for ${type.name}")
+            assertFalse(
+                code.contains("// Placeholder for"),
+                "Found placeholder comment for ${type.name} in generated code:\n$code"
+            )
+        }
+    }
+
+    @Test
+    fun testAllComponentTypesHaveNonZeroDefaultSize() {
+        assertEquals(37, ComponentType.entries.size)
+        for (type in ComponentType.entries) {
+            val size = EditorController.defaultSizeFor(type)
+            assertTrue(size.width > 0f, "Width must be > 0 for ${type.name}")
+            assertTrue(size.height > 0f, "Height must be > 0 for ${type.name}")
+        }
+    }
 }

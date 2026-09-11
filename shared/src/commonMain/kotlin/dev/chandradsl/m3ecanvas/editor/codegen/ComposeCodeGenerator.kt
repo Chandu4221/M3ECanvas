@@ -27,6 +27,7 @@ object ComposeCodeGenerator {
             appendLine("import androidx.compose.foundation.verticalScroll")
             appendLine("import androidx.compose.foundation.horizontalScroll")
             appendLine("import androidx.compose.material.icons.Icons")
+            appendLine("import androidx.compose.material.icons.automirrored.outlined.*")
             appendLine("import androidx.compose.material.icons.filled.*")
             appendLine("import androidx.compose.material.icons.outlined.*")
             appendLine("import androidx.compose.material3.*")
@@ -337,11 +338,356 @@ object ComposeCodeGenerator {
                 appendLine("${indent})")
             }
 
-            else -> buildString {
-                val mod = buildModifierString(node, isRootFloating, extraModifier)
-                appendLine("${indent}// Placeholder for ${node.type.displayName}")
-                appendLine("${indent}Box(modifier = $mod) {")
-                appendLine("${indent}    Text(\"${node.type.displayName}\")")
+            ComponentType.SEGMENTED_BUTTON -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}var selectedIndex by remember { mutableStateOf(0) }")
+                appendLine("${indent}val options = listOf(\"Day\", \"Week\", \"Month\")")
+                appendLine("${indent}SingleChoiceSegmentedButtonRow(modifier = $mod) {")
+                appendLine("${indent}    options.forEachIndexed { index, label ->")
+                appendLine("${indent}        SegmentedButton(")
+                appendLine("${indent}            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),")
+                appendLine("${indent}            onClick = { selectedIndex = index },")
+                appendLine("${indent}            selected = index == selectedIndex")
+                appendLine("${indent}        ) {")
+                appendLine("${indent}            Text(label)")
+                appendLine("${indent}        }")
+                appendLine("${indent}    }")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.SPLIT_BUTTON -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Action"
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}Row(modifier = $mod, verticalAlignment = Alignment.CenterVertically) {")
+                appendLine("${indent}    FilledTonalButton(")
+                appendLine("${indent}        onClick = { /* TODO */ },")
+                appendLine("${indent}        shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 4.dp)")
+                appendLine("${indent}    ) {")
+                appendLine("${indent}        Text(\"$text\")")
+                appendLine("${indent}    }")
+                appendLine("${indent}    Spacer(modifier = Modifier.width(2.dp))")
+                appendLine("${indent}    FilledTonalButton(")
+                appendLine("${indent}        onClick = { /* TODO */ },")
+                appendLine("${indent}        shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp),")
+                appendLine("${indent}        contentPadding = PaddingValues(horizontal = 8.dp)")
+                appendLine("${indent}    ) {")
+                appendLine("${indent}        Icon(Icons.Outlined.ArrowDropDown, contentDescription = \"More\")")
+                appendLine("${indent}    }")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.BUTTON_GROUP -> buildString {
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}Row(")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    horizontalArrangement = Arrangement.spacedBy(8.dp),")
+                appendLine("${indent}    verticalAlignment = Alignment.CenterVertically")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Button(onClick = { /* TODO */ }) { Text(\"Primary\") }")
+                appendLine("${indent}    FilledTonalButton(onClick = { /* TODO */ }) { Text(\"Tonal\") }")
+                appendLine("${indent}    OutlinedButton(onClick = { /* TODO */ }) { Text(\"Cancel\") }")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.LISTS -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "List Item Headline"
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}ListItem(")
+                appendLine("${indent}    headlineContent = { Text(\"$text\") },")
+                appendLine("${indent}    supportingContent = { Text(\"Supporting secondary description\") },")
+                appendLine("${indent}    leadingContent = { Icon(Icons.Outlined.Star, contentDescription = null) },")
+                appendLine("${indent}    trailingContent = { Text(\"10:30\", style = MaterialTheme.typography.labelSmall) },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.SHEETS -> buildString {
+                val title = (node.property("text") as? ComponentProperty.Text)?.value ?: "Modal Bottom Sheet"
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}Surface(")
+                appendLine("${indent}    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),")
+                appendLine("${indent}    color = MaterialTheme.colorScheme.surfaceContainerLow,")
+                appendLine("${indent}    tonalElevation = 2.dp,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Column(modifier = Modifier.padding(16.dp)) {")
+                appendLine("${indent}        Text(\"$title\", style = MaterialTheme.typography.titleMedium)")
+                appendLine("${indent}        Spacer(modifier = Modifier.height(8.dp))")
+                appendLine("${indent}        Text(\"Supplementary modal bottom sheet content.\", style = MaterialTheme.typography.bodyMedium)")
+                appendLine("${indent}        Spacer(modifier = Modifier.height(16.dp))")
+                appendLine("${indent}        Button(onClick = { /* TODO */ }, modifier = Modifier.fillMaxWidth()) {")
+                appendLine("${indent}            Text(\"Confirm\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}    }")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.DIALOG -> buildString {
+                val title = (node.property("text") as? ComponentProperty.Text)?.value ?: "Dialog Title"
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}AlertDialog(")
+                appendLine("${indent}    onDismissRequest = { /* TODO */ },")
+                appendLine("${indent}    icon = { Icon(Icons.Outlined.Info, contentDescription = null) },")
+                appendLine("${indent}    title = { Text(\"$title\") },")
+                appendLine("${indent}    text = { Text(\"Dialogs inform users about a task and can contain critical information.\") },")
+                appendLine("${indent}    confirmButton = {")
+                appendLine("${indent}        Button(onClick = { /* TODO */ }) { Text(\"Confirm\") }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    dismissButton = {")
+                appendLine("${indent}        TextButton(onClick = { /* TODO */ }) { Text(\"Cancel\") }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.SNACKBAR -> buildString {
+                val message = (node.property("text") as? ComponentProperty.Text)?.value ?: "Snackbar notification alert."
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}Snackbar(")
+                appendLine("${indent}    action = {")
+                appendLine("${indent}        TextButton(onClick = { /* TODO */ }) {")
+                appendLine("${indent}            Text(\"Dismiss\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Text(\"$message\")")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.BADGE -> buildString {
+                val count = (node.property("text") as? ComponentProperty.Text)?.value ?: "3"
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}BadgedBox(")
+                appendLine("${indent}    badge = { Badge { Text(\"$count\") } },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Icon(Icons.Outlined.Notifications, contentDescription = \"Notifications\")")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.TOOLTIP -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Helpful tooltip label"
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}Surface(")
+                appendLine("${indent}    shape = RoundedCornerShape(4.dp),")
+                appendLine("${indent}    color = MaterialTheme.colorScheme.inverseSurface,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Text(")
+                appendLine("${indent}        text = \"$text\",")
+                appendLine("${indent}        style = MaterialTheme.typography.labelSmall,")
+                appendLine("${indent}        color = MaterialTheme.colorScheme.inverseOnSurface,")
+                appendLine("${indent}        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)")
+                appendLine("${indent}    )")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.PROGRESS_INDICATOR -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}LinearProgressIndicator(")
+                appendLine("${indent}    progress = { 0.7f },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.LOADING_INDICATOR -> buildString {
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}CircularProgressIndicator(")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.NAVIGATION_RAIL -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxHeight()")
+                appendLine("${indent}var selectedItem by remember { mutableStateOf(0) }")
+                appendLine("${indent}NavigationRail(modifier = $mod) {")
+                appendLine("${indent}    NavigationRailItem(")
+                appendLine("${indent}        selected = selectedItem == 0,")
+                appendLine("${indent}        onClick = { selectedItem = 0 },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.Home, contentDescription = \"Home\") },")
+                appendLine("${indent}        label = { Text(\"Home\") }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    NavigationRailItem(")
+                appendLine("${indent}        selected = selectedItem == 1,")
+                appendLine("${indent}        onClick = { selectedItem = 1 },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.Search, contentDescription = \"Search\") },")
+                appendLine("${indent}        label = { Text(\"Search\") }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    NavigationRailItem(")
+                appendLine("${indent}        selected = selectedItem == 2,")
+                appendLine("${indent}        onClick = { selectedItem = 2 },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.Settings, contentDescription = \"Settings\") },")
+                appendLine("${indent}        label = { Text(\"Settings\") }")
+                appendLine("${indent}    )")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.NAVIGATION_DRAWER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxHeight()")
+                appendLine("${indent}var selectedItem by remember { mutableStateOf(0) }")
+                appendLine("${indent}ModalDrawerSheet(modifier = $mod) {")
+                appendLine("${indent}    Text(\"${node.name}\", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)")
+                appendLine("${indent}    HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))")
+                appendLine("${indent}    NavigationDrawerItem(")
+                appendLine("${indent}        label = { Text(\"Inbox\") },")
+                appendLine("${indent}        selected = selectedItem == 0,")
+                appendLine("${indent}        onClick = { selectedItem = 0 },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.Inbox, contentDescription = null) },")
+                appendLine("${indent}        badge = { Text(\"12\") }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    NavigationDrawerItem(")
+                appendLine("${indent}        label = { Text(\"Outbox\") },")
+                appendLine("${indent}        selected = selectedItem == 1,")
+                appendLine("${indent}        onClick = { selectedItem = 1 },")
+                appendLine("${indent}        icon = { Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null) }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    NavigationDrawerItem(")
+                appendLine("${indent}        label = { Text(\"Favorites\") },")
+                appendLine("${indent}        selected = selectedItem == 2,")
+                appendLine("${indent}        onClick = { selectedItem = 2 },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.FavoriteBorder, contentDescription = null) }")
+                appendLine("${indent}    )")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.TABS -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}var selectedTab by remember { mutableStateOf(0) }")
+                appendLine("${indent}PrimaryTabRow(selectedTabIndex = selectedTab, modifier = $mod) {")
+                appendLine("${indent}    Tab(")
+                appendLine("${indent}        selected = selectedTab == 0,")
+                appendLine("${indent}        onClick = { selectedTab = 0 },")
+                appendLine("${indent}        text = { Text(\"Overview\") },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.Dashboard, contentDescription = null) }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    Tab(")
+                appendLine("${indent}        selected = selectedTab == 1,")
+                appendLine("${indent}        onClick = { selectedTab = 1 },")
+                appendLine("${indent}        text = { Text(\"Analytics\") },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.Analytics, contentDescription = null) }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    Tab(")
+                appendLine("${indent}        selected = selectedTab == 2,")
+                appendLine("${indent}        onClick = { selectedTab = 2 },")
+                appendLine("${indent}        text = { Text(\"Settings\") },")
+                appendLine("${indent}        icon = { Icon(Icons.Outlined.Tune, contentDescription = null) }")
+                appendLine("${indent}    )")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.SEARCH -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}var searchQuery by remember { mutableStateOf(\"\") }")
+                appendLine("${indent}SearchBar(")
+                appendLine("${indent}    inputField = {")
+                appendLine("${indent}        SearchBarDefaults.InputField(")
+                appendLine("${indent}            query = searchQuery,")
+                appendLine("${indent}            onQueryChange = { searchQuery = it },")
+                appendLine("${indent}            onSearch = { /* TODO */ },")
+                appendLine("${indent}            expanded = false,")
+                appendLine("${indent}            onExpandedChange = {},")
+                appendLine("${indent}            placeholder = { Text(\"Search components...\") },")
+                appendLine("${indent}            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = \"Search\") },")
+                appendLine("${indent}            trailingIcon = { Icon(Icons.Outlined.Mic, contentDescription = \"Voice\") }")
+                appendLine("${indent}        )")
+                appendLine("${indent}    },")
+                appendLine("${indent}    expanded = false,")
+                appendLine("${indent}    onExpandedChange = {},")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    // Suggestions list")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.CHECKBOX -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Checkbox Option"
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}var checked by remember { mutableStateOf(true) }")
+                appendLine("${indent}Row(modifier = $mod, verticalAlignment = Alignment.CenterVertically) {")
+                appendLine("${indent}    Checkbox(checked = checked, onCheckedChange = { checked = it })")
+                appendLine("${indent}    Spacer(modifier = Modifier.width(8.dp))")
+                appendLine("${indent}    Text(\"$text\")")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.RADIO_BUTTON -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Radio Option"
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}var selected by remember { mutableStateOf(true) }")
+                appendLine("${indent}Row(modifier = $mod, verticalAlignment = Alignment.CenterVertically) {")
+                appendLine("${indent}    RadioButton(selected = selected, onClick = { selected = !selected })")
+                appendLine("${indent}    Spacer(modifier = Modifier.width(8.dp))")
+                appendLine("${indent}    Text(\"$text\")")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.SWITCH -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Enable feature"
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}var checked by remember { mutableStateOf(true) }")
+                appendLine("${indent}Row(")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    verticalAlignment = Alignment.CenterVertically,")
+                appendLine("${indent}    horizontalArrangement = Arrangement.SpaceBetween")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Text(\"$text\")")
+                appendLine("${indent}    Switch(checked = checked, onCheckedChange = { checked = it })")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.SLIDER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}var sliderPosition by remember { mutableStateOf(0.6f) }")
+                appendLine("${indent}Slider(")
+                appendLine("${indent}    value = sliderPosition,")
+                appendLine("${indent}    onValueChange = { sliderPosition = it },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.DATE_PICKER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}val datePickerState = rememberDatePickerState()")
+                appendLine("${indent}DatePicker(")
+                appendLine("${indent}    state = datePickerState,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.TIME_PICKER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}val timePickerState = rememberTimePickerState(initialHour = 10, initialMinute = 30)")
+                appendLine("${indent}TimePicker(")
+                appendLine("${indent}    state = timePickerState,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.MENUS -> buildString {
+                val mod = buildModifierString(node, isRootFloating)
+                appendLine("${indent}var menuExpanded by remember { mutableStateOf(true) }")
+                appendLine("${indent}DropdownMenu(")
+                appendLine("${indent}    expanded = menuExpanded,")
+                appendLine("${indent}    onDismissRequest = { menuExpanded = false },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    DropdownMenuItem(")
+                appendLine("${indent}        text = { Text(\"Edit\") },")
+                appendLine("${indent}        onClick = { /* TODO */ },")
+                appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    DropdownMenuItem(")
+                appendLine("${indent}        text = { Text(\"Duplicate\") },")
+                appendLine("${indent}        onClick = { /* TODO */ },")
+                appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) }")
+                appendLine("${indent}    )")
+                appendLine("${indent}    HorizontalDivider()")
+                appendLine("${indent}    DropdownMenuItem(")
+                appendLine("${indent}        text = { Text(\"Delete\") },")
+                appendLine("${indent}        onClick = { /* TODO */ },")
+                appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) }")
+                appendLine("${indent}    )")
                 appendLine("${indent}}")
             }
         }
