@@ -13,6 +13,7 @@ class SharedCommonTest {
     fun testSlotRoleCanonicalMapping() {
         assertEquals(SlotRole.TOP_BAR, ComponentType.TOP_APP_BAR.canonicalSlot())
         assertEquals(SlotRole.BOTTOM_BAR, ComponentType.NAVIGATION_BAR.canonicalSlot())
+        assertEquals(SlotRole.BOTTOM_BAR, ComponentType.BOTTOM_APP_BAR.canonicalSlot())
         assertEquals(SlotRole.BOTTOM_BAR, ComponentType.NAVIGATION_RAIL.canonicalSlot())
         assertEquals(SlotRole.FAB, ComponentType.FAB.canonicalSlot())
         assertEquals(SlotRole.FAB, ComponentType.EXTENDED_FAB.canonicalSlot())
@@ -330,7 +331,7 @@ class SharedCommonTest {
 
     @Test
     fun testAllComponentTypesEmitValidCodeWithoutPlaceholders() {
-        assertEquals(37, ComponentType.entries.size)
+        assertEquals(49, ComponentType.entries.size)
         for (type in ComponentType.entries) {
             val node = CanvasNode(
                 type = type,
@@ -353,7 +354,7 @@ class SharedCommonTest {
 
     @Test
     fun testAllComponentTypesHaveNonZeroDefaultSize() {
-        assertEquals(37, ComponentType.entries.size)
+        assertEquals(49, ComponentType.entries.size)
         for (type in ComponentType.entries) {
             val size = EditorController.defaultSizeFor(type)
             assertTrue(size.width > 0f, "Width must be > 0 for ${type.name}")
@@ -363,7 +364,7 @@ class SharedCommonTest {
 
     @Test
     fun testEveryComponentTypeIsDeletableFromProject() {
-        assertEquals(37, ComponentType.entries.size)
+        assertEquals(49, ComponentType.entries.size)
         for (type in ComponentType.entries) {
             val project = EditorController.newProject(name = "DeleteTest_${type.name}", withDefaultScaffold = false)
             val controller = EditorController(initialProject = project)
@@ -388,6 +389,39 @@ class SharedCommonTest {
                 "Selection was not cleared after deleting ${type.name}"
             )
         }
+    }
+
+    @Test
+    fun testNewComponentPropertiesAndVariants() {
+        var node = CanvasNode(
+            type = ComponentType.TEXT,
+            name = "Text",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(100f, 30f)
+        )
+        node = node.withProperty(ComponentProperty.Text(key = "text", value = "Custom Text"))
+            .withProperty(ComponentProperty.Text(key = "typography", value = "headlineMedium"))
+            .withProperty(ComponentProperty.Icon(key = "icon", iconName = "Search"))
+            .withProperty(ComponentProperty.BooleanFlag(key = "checked", value = true))
+            .withProperty(ComponentProperty.Numeric(key = "value", value = 0.75f))
+            .withProperty(ComponentProperty.Variant(key = "variant", value = MaterialVariant.Surface.CIRCLE))
+
+        assertEquals("Custom Text", node.textProperty("text"))
+        assertEquals("headlineMedium", node.textProperty("typography"))
+        assertEquals("Search", node.iconProperty("icon"))
+        assertTrue(node.booleanProperty("checked"))
+        assertEquals(0.75f, node.numericProperty("value"))
+
+        // Test serialization of new variants
+        val tfVariant = MaterialVariant.TextField.OUTLINED
+        val tfSerial = tfVariant.toSerialString()
+        assertEquals("TextField.OUTLINED", tfSerial)
+        assertEquals(tfVariant, materialVariantFromSerialString(tfSerial))
+
+        val surfVariant = MaterialVariant.Surface.CIRCLE
+        val surfSerial = surfVariant.toSerialString()
+        assertEquals("Surface.CIRCLE", surfSerial)
+        assertEquals(surfVariant, materialVariantFromSerialString(surfSerial))
     }
 
     @Test

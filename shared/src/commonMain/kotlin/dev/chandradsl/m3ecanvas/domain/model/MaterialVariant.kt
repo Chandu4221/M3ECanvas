@@ -54,6 +54,17 @@ sealed interface MaterialVariant {
         INPUT(displayName = "Input"),
         SUGGESTION(displayName = "Suggestion")
     }
+
+    enum class TextField(override val displayName: String) : MaterialVariant {
+        OUTLINED(displayName = "Outlined"),
+        FILLED(displayName = "Filled")
+    }
+
+    enum class Surface(override val displayName: String) : MaterialVariant {
+        ROUNDED(displayName = "Rounded"),
+        RECTANGLE(displayName = "Rectangle"),
+        CIRCLE(displayName = "Circle")
+    }
 }
 
 /** Stable wire format: "Family.NAME", e.g. "Button.OUTLINED". */
@@ -64,6 +75,8 @@ fun MaterialVariant.toSerialString(): String {
         is MaterialVariant.FloatingActionButton -> "FloatingActionButton.$name"
         is MaterialVariant.IconButton -> "IconButton.$name"
         is MaterialVariant.Chip -> "Chip.$name"
+        is MaterialVariant.TextField -> "TextField.$name"
+        is MaterialVariant.Surface -> "Surface.$name"
     }
 }
 
@@ -79,6 +92,8 @@ fun materialVariantFromSerialString(value: String): MaterialVariant {
         "FloatingActionButton" -> MaterialVariant.FloatingActionButton.valueOf(value = parts[1])
         "IconButton" -> MaterialVariant.IconButton.valueOf(value = parts[1])
         "Chip" -> MaterialVariant.Chip.valueOf(value = parts[1])
+        "TextField" -> MaterialVariant.TextField.valueOf(value = parts[1])
+        "Surface" -> MaterialVariant.Surface.valueOf(value = parts[1])
         else -> throw SerializationException(message = "Unknown MaterialVariant family: ${parts[0]}")
     }
 }

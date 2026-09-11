@@ -72,6 +72,26 @@ data class CanvasNode(
         return copy(properties = updated)
     }
 
+    /** Convenience helper for string/text properties. */
+    fun textProperty(key: String, default: String = ""): String {
+        return (property(key = key) as? ComponentProperty.Text)?.value ?: default
+    }
+
+    /** Convenience helper for boolean properties. */
+    fun booleanProperty(key: String, default: Boolean = false): Boolean {
+        return (property(key = key) as? ComponentProperty.BooleanFlag)?.value ?: default
+    }
+
+    /** Convenience helper for numeric properties. */
+    fun numericProperty(key: String, default: Float = 0f): Float {
+        return (property(key = key) as? ComponentProperty.Numeric)?.value ?: default
+    }
+
+    /** Convenience helper for icon properties. */
+    fun iconProperty(key: String, default: String = "Favorite"): String {
+        return (property(key = key) as? ComponentProperty.Icon)?.iconName ?: default
+    }
+
     //endregion
 
     //region Transform

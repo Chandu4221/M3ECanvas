@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.canvas.AVAILABLE_MATERIAL_ICONS
+import dev.chandradsl.m3ecanvas.editor.canvas.resolveMaterialIcon
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 /**
@@ -105,6 +107,29 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
+    }
+
+    if (node.type == ComponentType.TEXT) {
+        TypographyDropdown(node = node, controller = controller)
+    }
+
+    if (node.type == ComponentType.ICON || node.type == ComponentType.ICON_BUTTON || node.type == ComponentType.FAB || node.type == ComponentType.EXTENDED_FAB) {
+        IconDropdown(node = node, controller = controller)
+    }
+
+    if (node.type == ComponentType.CHECKBOX) {
+        BooleanPropertySwitch(label = "Checked", key = "checked", node = node, controller = controller, default = true)
+    } else if (node.type == ComponentType.RADIO_BUTTON) {
+        BooleanPropertySwitch(label = "Selected", key = "selected", node = node, controller = controller, default = true)
+    } else if (node.type == ComponentType.SWITCH) {
+        BooleanPropertySwitch(label = "Checked", key = "checked", node = node, controller = controller, default = true)
+    }
+
+    if (node.type == ComponentType.SLIDER) {
+        FloatSliderRow(label = "Slider Value", key = "value", node = node, controller = controller, default = 0.6f)
+    } else if (node.type == ComponentType.RANGE_SLIDER) {
+        FloatSliderRow(label = "Range Start", key = "startValue", node = node, controller = controller, default = 0.2f)
+        FloatSliderRow(label = "Range End", key = "endValue", node = node, controller = controller, default = 0.8f)
     }
 
     val variants = variantsFor(type = node.type)
@@ -352,6 +377,14 @@ private fun supportsText(node: CanvasNode): Boolean {
     return node.type == ComponentType.BUTTON ||
             node.type == ComponentType.TEXT_FIELD ||
             node.type == ComponentType.EXTENDED_FAB ||
+            node.type == ComponentType.TEXT ||
+            node.type == ComponentType.CHIPS ||
+            node.type == ComponentType.BADGE ||
+            node.type == ComponentType.TOOLTIP ||
+            node.type == ComponentType.SNACKBAR ||
+            node.type == ComponentType.CHECKBOX ||
+            node.type == ComponentType.RADIO_BUTTON ||
+            node.type == ComponentType.SWITCH ||
             node.property(key = "text") != null
 }
 
@@ -362,6 +395,168 @@ private fun variantsFor(type: ComponentType): List<MaterialVariant> {
         ComponentType.FAB -> MaterialVariant.FloatingActionButton.entries
         ComponentType.CARD -> MaterialVariant.Card.entries
         ComponentType.CHIPS -> MaterialVariant.Chip.entries
+        ComponentType.TEXT_FIELD -> MaterialVariant.TextField.entries
+        ComponentType.SURFACE -> MaterialVariant.Surface.entries
         else -> emptyList()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TypographyDropdown(node: CanvasNode, controller: EditorController) {
+    var expanded by remember { mutableStateOf(false) }
+    val current = (node.property(key = "typography") as? ComponentProperty.Text)?.value ?: "bodyLarge"
+    val typographyOptions = listOf(
+        "displayLarge", "displayMedium", "displaySmall",
+        "headlineLarge", "headlineMedium", "headlineSmall",
+        "titleLarge", "titleMedium", "titleSmall",
+        "bodyLarge", "bodyMedium", "bodySmall",
+        "labelLarge", "labelMedium", "labelSmall"
+    )
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value = current,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(text = "Typography") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            typographyOptions.forEach { styleName ->
+                DropdownMenuItem(
+                    text = { Text(text = styleName) },
+                    onClick = {
+                        controller.updateNodeProperty(
+                            nodeId = node.id,
+                            property = ComponentProperty.Text(key = "typography", value = styleName)
+                        )
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IconDropdown(node: CanvasNode, controller: EditorController) {
+    var expanded by remember { mutableStateOf(false) }
+    val current = node.iconProperty(key = "icon", default = "Favorite")
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value = current,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(text = "Material Icon") },
+            leadingIcon = {
+                Icon(
+                    imageVector = resolveMaterialIcon(iconName = current),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            AVAILABLE_MATERIAL_ICONS.forEach { iconName ->
+                DropdownMenuItem(
+                    leadingIcon = {
+                        Icon(
+                            imageVector = resolveMaterialIcon(iconName = iconName),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    text = { Text(text = iconName) },
+                    onClick = {
+                        controller.updateNodeProperty(
+                            nodeId = node.id,
+                            property = ComponentProperty.Icon(key = "icon", iconName = iconName)
+                        )
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BooleanPropertySwitch(
+    label: String,
+    key: String,
+    node: CanvasNode,
+    controller: EditorController,
+    default: Boolean = true
+) {
+    val current = node.booleanProperty(key = key, default = default)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Switch(
+            checked = current,
+            onCheckedChange = {
+                controller.updateNodeProperty(
+                    nodeId = node.id,
+                    property = ComponentProperty.BooleanFlag(key = key, value = it)
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun FloatSliderRow(
+    label: String,
+    key: String,
+    node: CanvasNode,
+    controller: EditorController,
+    default: Float = 0.5f,
+    range: ClosedFloatingPointRange<Float> = 0f..1f
+) {
+    val current = node.numericProperty(key = key, default = default).coerceIn(range.start, range.endInclusive)
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = label, style = MaterialTheme.typography.bodyMedium)
+            Text(text = "${(current * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+        }
+        Slider(
+            value = current,
+            onValueChange = {
+                controller.updateNodeProperty(
+                    nodeId = node.id,
+                    property = ComponentProperty.Numeric(key = key, value = it)
+                )
+            },
+            valueRange = range
+        )
     }
 }

@@ -29,6 +29,7 @@ fun ComponentType.icon(): ImageVector {
         ComponentType.LISTS -> Icons.AutoMirrored.Outlined.List
         ComponentType.SHEETS -> Icons.Outlined.ViewArray
         ComponentType.DIALOG -> Icons.Outlined.ChatBubbleOutline
+        ComponentType.SURFACE -> Icons.Outlined.Layers
 
         // Communication
         ComponentType.SNACKBAR -> Icons.AutoMirrored.Outlined.Message
@@ -39,6 +40,7 @@ fun ComponentType.icon(): ImageVector {
 
         // Navigation
         ComponentType.NAVIGATION_BAR -> Icons.Outlined.Navigation
+        ComponentType.BOTTOM_APP_BAR -> Icons.Outlined.CallToAction
         ComponentType.NAVIGATION_RAIL -> Icons.AutoMirrored.Outlined.ViewSidebar
         ComponentType.NAVIGATION_DRAWER -> Icons.Outlined.Menu
         ComponentType.TOP_APP_BAR -> Icons.Outlined.WebAsset
@@ -50,6 +52,7 @@ fun ComponentType.icon(): ImageVector {
         ComponentType.RADIO_BUTTON -> Icons.Outlined.RadioButtonUnchecked
         ComponentType.SWITCH -> Icons.Outlined.ToggleOn
         ComponentType.SLIDER -> Icons.Outlined.Tune
+        ComponentType.RANGE_SLIDER -> Icons.Outlined.LinearScale
         ComponentType.CHIPS -> Icons.AutoMirrored.Outlined.Label
         ComponentType.DATE_PICKER -> Icons.Outlined.CalendarMonth
         ComponentType.TIME_PICKER -> Icons.Outlined.Schedule
@@ -58,6 +61,15 @@ fun ComponentType.icon(): ImageVector {
         // Text input
         ComponentType.TEXT_FIELD -> Icons.Outlined.TextFields
 
+        // Typography
+        ComponentType.TEXT -> Icons.Outlined.FormatSize
+
+        // Graphics
+        ComponentType.ICON -> Icons.Outlined.EmojiEmotions
+        ComponentType.IMAGE -> Icons.Outlined.Image
+        ComponentType.HORIZONTAL_DIVIDER -> Icons.Outlined.HorizontalRule
+        ComponentType.VERTICAL_DIVIDER -> Icons.Outlined.MoreVert
+
         // Layout
         ComponentType.SCAFFOLD -> Icons.Outlined.Dashboard
         ComponentType.COLUMN -> Icons.Outlined.ViewColumn
@@ -65,5 +77,9 @@ fun ComponentType.icon(): ImageVector {
         ComponentType.BOX -> Icons.Outlined.CropSquare
         ComponentType.LAZY_COLUMN -> Icons.AutoMirrored.Outlined.ListAlt
         ComponentType.LAZY_ROW -> Icons.Outlined.ViewCarousel
+        ComponentType.LAZY_VERTICAL_GRID -> Icons.Outlined.GridOn
+        ComponentType.FLOW_ROW -> Icons.AutoMirrored.Outlined.WrapText
+        ComponentType.FLOW_COLUMN -> Icons.Outlined.TableRows
+        ComponentType.SPACER -> Icons.Outlined.SpaceBar
     }
 }

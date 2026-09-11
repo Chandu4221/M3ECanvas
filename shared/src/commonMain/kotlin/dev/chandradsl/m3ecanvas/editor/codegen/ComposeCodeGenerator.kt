@@ -18,14 +18,18 @@ object ComposeCodeGenerator {
             appendLine()
             appendLine("import androidx.compose.foundation.background")
             appendLine("import androidx.compose.foundation.border")
+            appendLine("import androidx.compose.foundation.horizontalScroll")
             appendLine("import androidx.compose.foundation.layout.*")
             appendLine("import androidx.compose.foundation.lazy.LazyColumn")
             appendLine("import androidx.compose.foundation.lazy.LazyRow")
+            appendLine("import androidx.compose.foundation.lazy.grid.GridCells")
+            appendLine("import androidx.compose.foundation.lazy.grid.LazyVerticalGrid")
+            appendLine("import androidx.compose.foundation.lazy.grid.items")
             appendLine("import androidx.compose.foundation.lazy.items")
             appendLine("import androidx.compose.foundation.rememberScrollState")
+            appendLine("import androidx.compose.foundation.shape.CircleShape")
             appendLine("import androidx.compose.foundation.shape.RoundedCornerShape")
             appendLine("import androidx.compose.foundation.verticalScroll")
-            appendLine("import androidx.compose.foundation.horizontalScroll")
             appendLine("import androidx.compose.material.icons.Icons")
             appendLine("import androidx.compose.material.icons.automirrored.outlined.*")
             appendLine("import androidx.compose.material.icons.filled.*")
@@ -39,10 +43,11 @@ object ComposeCodeGenerator {
             appendLine("import androidx.compose.ui.draw.rotate")
             appendLine("import androidx.compose.ui.draw.scale")
             appendLine("import androidx.compose.ui.graphics.Color")
+            appendLine("import androidx.compose.ui.graphics.RectangleShape")
             appendLine("import androidx.compose.ui.text.font.FontWeight")
             appendLine("import androidx.compose.ui.unit.dp")
             appendLine()
-            appendLine("@OptIn(ExperimentalMaterial3Api::class)")
+            appendLine("@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)")
             appendLine("@Composable")
             appendLine("fun ${functionName}(modifier: Modifier = Modifier) {")
             if (project.nodes.isEmpty()) {
@@ -276,21 +281,25 @@ object ComposeCodeGenerator {
             }
 
             ComponentType.FAB -> buildString {
+                val iconName = node.iconProperty("icon", default = "Add")
+                val iconExpr = resolveIconCodeExpression(iconName)
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}FloatingActionButton(")
                 appendLine("${indent}    onClick = { /* TODO: FAB Action */ },")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
-                appendLine("${indent}    Icon(Icons.Filled.Add, contentDescription = \"Add\")")
+                appendLine("${indent}    Icon($iconExpr, contentDescription = \"$iconName\")")
                 appendLine("${indent}}")
             }
 
             ComponentType.EXTENDED_FAB -> buildString {
                 val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Create"
+                val iconName = node.iconProperty("icon", default = "Add")
+                val iconExpr = resolveIconCodeExpression(iconName)
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}ExtendedFloatingActionButton(")
                 appendLine("${indent}    onClick = { /* TODO: Action */ },")
-                appendLine("${indent}    icon = { Icon(Icons.Filled.Add, contentDescription = null) },")
+                appendLine("${indent}    icon = { Icon($iconExpr, contentDescription = null) },")
                 appendLine("${indent}    text = { Text(text = \"$text\") },")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
@@ -299,6 +308,8 @@ object ComposeCodeGenerator {
             ComponentType.ICON_BUTTON -> buildString {
                 val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.IconButton
                     ?: MaterialVariant.IconButton.STANDARD
+                val iconName = node.iconProperty("icon", default = "Add")
+                val iconExpr = resolveIconCodeExpression(iconName)
                 val composableName = when (variant) {
                     MaterialVariant.IconButton.STANDARD -> "IconButton"
                     MaterialVariant.IconButton.FILLED -> "FilledIconButton"
@@ -310,7 +321,7 @@ object ComposeCodeGenerator {
                 appendLine("${indent}    onClick = { /* TODO */ },")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
-                appendLine("${indent}    Icon(Icons.Filled.Add, contentDescription = null)")
+                appendLine("${indent}    Icon($iconExpr, contentDescription = null)")
                 appendLine("${indent}}")
             }
 
@@ -329,8 +340,11 @@ object ComposeCodeGenerator {
 
             ComponentType.TEXT_FIELD -> buildString {
                 val text = (node.property("text") as? ComponentProperty.Text)?.value ?: ""
+                val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.TextField
+                    ?: MaterialVariant.TextField.OUTLINED
+                val composable = if (variant == MaterialVariant.TextField.OUTLINED) "OutlinedTextField" else "TextField"
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
-                appendLine("${indent}OutlinedTextField(")
+                appendLine("${indent}$composable(")
                 appendLine("${indent}    value = \"$text\",")
                 appendLine("${indent}    onValueChange = { /* TODO: Update state */ },")
                 appendLine("${indent}    label = { Text(\"${node.name}\") },")
@@ -602,8 +616,9 @@ object ComposeCodeGenerator {
 
             ComponentType.CHECKBOX -> buildString {
                 val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Checkbox Option"
+                val checked = node.booleanProperty("checked", default = true)
                 val mod = buildModifierString(node, isRootFloating)
-                appendLine("${indent}var checked by remember { mutableStateOf(true) }")
+                appendLine("${indent}var checked by remember { mutableStateOf($checked) }")
                 appendLine("${indent}Row(modifier = $mod, verticalAlignment = Alignment.CenterVertically) {")
                 appendLine("${indent}    Checkbox(checked = checked, onCheckedChange = { checked = it })")
                 appendLine("${indent}    Spacer(modifier = Modifier.width(8.dp))")
@@ -613,8 +628,9 @@ object ComposeCodeGenerator {
 
             ComponentType.RADIO_BUTTON -> buildString {
                 val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Radio Option"
+                val selected = node.booleanProperty("selected", default = true)
                 val mod = buildModifierString(node, isRootFloating)
-                appendLine("${indent}var selected by remember { mutableStateOf(true) }")
+                appendLine("${indent}var selected by remember { mutableStateOf($selected) }")
                 appendLine("${indent}Row(modifier = $mod, verticalAlignment = Alignment.CenterVertically) {")
                 appendLine("${indent}    RadioButton(selected = selected, onClick = { selected = !selected })")
                 appendLine("${indent}    Spacer(modifier = Modifier.width(8.dp))")
@@ -624,8 +640,9 @@ object ComposeCodeGenerator {
 
             ComponentType.SWITCH -> buildString {
                 val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Enable feature"
+                val checked = node.booleanProperty("checked", default = true)
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
-                appendLine("${indent}var checked by remember { mutableStateOf(true) }")
+                appendLine("${indent}var checked by remember { mutableStateOf($checked) }")
                 appendLine("${indent}Row(")
                 appendLine("${indent}    modifier = $mod,")
                 appendLine("${indent}    verticalAlignment = Alignment.CenterVertically,")
@@ -637,11 +654,24 @@ object ComposeCodeGenerator {
             }
 
             ComponentType.SLIDER -> buildString {
+                val value = node.numericProperty("value", default = 0.6f)
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
-                appendLine("${indent}var sliderPosition by remember { mutableStateOf(0.6f) }")
+                appendLine("${indent}var sliderPosition by remember { mutableStateOf(${value}f) }")
                 appendLine("${indent}Slider(")
                 appendLine("${indent}    value = sliderPosition,")
                 appendLine("${indent}    onValueChange = { sliderPosition = it },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.RANGE_SLIDER -> buildString {
+                val start = node.numericProperty("startValue", default = 0.2f)
+                val end = node.numericProperty("endValue", default = 0.8f)
+                val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
+                appendLine("${indent}var rangeSliderPosition by remember { mutableStateOf(${start}f..${end}f) }")
+                appendLine("${indent}RangeSlider(")
+                appendLine("${indent}    value = rangeSliderPosition,")
+                appendLine("${indent}    onValueChange = { rangeSliderPosition = it },")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
             }
@@ -688,6 +718,158 @@ object ComposeCodeGenerator {
                 appendLine("${indent}        onClick = { /* TODO */ },")
                 appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) }")
                 appendLine("${indent}    )")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.BOTTOM_APP_BAR -> buildString {
+                val mod = buildModifierString(node, isRootFloating = false, "fillMaxWidth()")
+                appendLine("${indent}BottomAppBar(")
+                appendLine("${indent}    actions = {")
+                appendLine("${indent}        IconButton(onClick = { /* TODO */ }) {")
+                appendLine("${indent}            Icon(Icons.Outlined.Menu, contentDescription = \"Menu\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}        IconButton(onClick = { /* TODO */ }) {")
+                appendLine("${indent}            Icon(Icons.Outlined.Search, contentDescription = \"Search\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}        IconButton(onClick = { /* TODO */ }) {")
+                appendLine("${indent}            Icon(Icons.Outlined.FavoriteBorder, contentDescription = \"Favorite\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    floatingActionButton = {")
+                appendLine("${indent}        FloatingActionButton(")
+                appendLine("${indent}            onClick = { /* TODO */ },")
+                appendLine("${indent}            elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation()")
+                appendLine("${indent}        ) {")
+                appendLine("${indent}            Icon(Icons.Filled.Add, contentDescription = \"Add\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.TEXT -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: node.name
+                val typography = (node.property("typography") as? ComponentProperty.Text)?.value ?: "bodyLarge"
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}Text(")
+                appendLine("${indent}    text = \"$text\",")
+                appendLine("${indent}    style = MaterialTheme.typography.$typography,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.ICON -> buildString {
+                val iconName = node.iconProperty("icon", default = "Favorite")
+                val iconExpr = resolveIconCodeExpression(iconName)
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}Icon(")
+                appendLine("${indent}    imageVector = $iconExpr,")
+                appendLine("${indent}    contentDescription = \"$iconName\",")
+                appendLine("${indent}    tint = MaterialTheme.colorScheme.primary,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
+            }
+
+            ComponentType.IMAGE -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}Surface(")
+                appendLine("${indent}    shape = RoundedCornerShape(8.dp),")
+                appendLine("${indent}    color = MaterialTheme.colorScheme.surfaceVariant,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {")
+                appendLine("${indent}        Icon(Icons.Outlined.Image, contentDescription = \"Image\", tint = MaterialTheme.colorScheme.onSurfaceVariant)")
+                appendLine("${indent}    }")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.HORIZONTAL_DIVIDER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}HorizontalDivider(modifier = $mod)")
+            }
+
+            ComponentType.VERTICAL_DIVIDER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}VerticalDivider(modifier = $mod)")
+            }
+
+            ComponentType.SPACER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}Spacer(modifier = $mod)")
+            }
+
+            ComponentType.SURFACE -> buildString {
+                val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Surface
+                    ?: MaterialVariant.Surface.ROUNDED
+                val shapeCode = when (variant) {
+                    MaterialVariant.Surface.ROUNDED -> "RoundedCornerShape(12.dp)"
+                    MaterialVariant.Surface.RECTANGLE -> "RectangleShape"
+                    MaterialVariant.Surface.CIRCLE -> "CircleShape"
+                }
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}Surface(")
+                appendLine("${indent}    shape = $shapeCode,")
+                appendLine("${indent}    color = MaterialTheme.colorScheme.surfaceContainer,")
+                appendLine("${indent}    tonalElevation = 1.dp,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                if (node.children.isEmpty()) {
+                    appendLine("${indent}    Box(modifier = Modifier.fillMaxSize())")
+                } else {
+                    appendLine("${indent}    Box(modifier = Modifier.fillMaxSize()) {")
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent        "))
+                    }
+                    appendLine("${indent}    }")
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.LAZY_VERTICAL_GRID -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val vArrangement = resolveArrangementString(node.layoutConfig, isVertical = true)
+                val hArrangement = resolveArrangementString(node.layoutConfig, isVertical = false)
+                appendLine("${indent}LazyVerticalGrid(")
+                appendLine("${indent}    columns = GridCells.Fixed(2),")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    verticalArrangement = $vArrangement,")
+                appendLine("${indent}    horizontalArrangement = $hArrangement")
+                appendLine("${indent}) {")
+                node.children.forEach { child ->
+                    appendLine("${indent}    item {")
+                    append(generateNodeCode(child, indent = "$indent        "))
+                    appendLine("${indent}    }")
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.FLOW_ROW -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val hArrangement = resolveArrangementString(node.layoutConfig, isVertical = false)
+                val vArrangement = resolveArrangementString(node.layoutConfig, isVertical = true)
+                appendLine("${indent}FlowRow(")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    horizontalArrangement = $hArrangement,")
+                appendLine("${indent}    verticalArrangement = $vArrangement")
+                appendLine("${indent}) {")
+                node.children.forEach { child ->
+                    append(generateNodeCode(child, indent = "$indent    "))
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.FLOW_COLUMN -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val vArrangement = resolveArrangementString(node.layoutConfig, isVertical = true)
+                val hArrangement = resolveArrangementString(node.layoutConfig, isVertical = false)
+                appendLine("${indent}FlowColumn(")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    verticalArrangement = $vArrangement,")
+                appendLine("${indent}    horizontalArrangement = $hArrangement")
+                appendLine("${indent}) {")
+                node.children.forEach { child ->
+                    append(generateNodeCode(child, indent = "$indent    "))
+                }
                 appendLine("${indent}}")
             }
         }
@@ -762,5 +944,36 @@ object ComposeCodeGenerator {
     private fun sanitizeName(raw: String): String {
         val clean = raw.replace(Regex("[^A-Za-z0-9]"), "")
         return if (clean.isEmpty()) "M3EScreen" else "${clean.replaceFirstChar { it.uppercase() }}Screen"
+    }
+
+    private fun resolveIconCodeExpression(iconName: String): String {
+        return when (iconName.trim().lowercase()) {
+            "favorite" -> "Icons.Outlined.Favorite"
+            "favoriteborder" -> "Icons.Outlined.FavoriteBorder"
+            "home" -> "Icons.Outlined.Home"
+            "search" -> "Icons.Outlined.Search"
+            "settings" -> "Icons.Outlined.Settings"
+            "add" -> "Icons.Outlined.Add"
+            "close" -> "Icons.Outlined.Close"
+            "star" -> "Icons.Outlined.Star"
+            "notifications" -> "Icons.Outlined.Notifications"
+            "share" -> "Icons.Outlined.Share"
+            "delete" -> "Icons.Outlined.Delete"
+            "edit" -> "Icons.Outlined.Edit"
+            "info" -> "Icons.Outlined.Info"
+            "menu" -> "Icons.Outlined.Menu"
+            "check" -> "Icons.Outlined.Check"
+            "arrowback", "arrow_back" -> "Icons.AutoMirrored.Outlined.ArrowBack"
+            "person" -> "Icons.Outlined.Person"
+            "refresh" -> "Icons.Outlined.Refresh"
+            "lock" -> "Icons.Outlined.Lock"
+            "email", "mail" -> "Icons.Outlined.Email"
+            "phone" -> "Icons.Outlined.Phone"
+            "send" -> "Icons.AutoMirrored.Outlined.Send"
+            "thumbup", "thumb_up" -> "Icons.Outlined.ThumbUp"
+            "playarrow", "play_arrow" -> "Icons.Outlined.PlayArrow"
+            "warning" -> "Icons.Outlined.Warning"
+            else -> "Icons.Outlined.Favorite"
+        }
     }
 }

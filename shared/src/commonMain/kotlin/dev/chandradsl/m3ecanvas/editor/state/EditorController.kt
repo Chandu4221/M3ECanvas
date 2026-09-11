@@ -534,10 +534,24 @@ class EditorController(
                 ComponentType.MENUS -> CanvasSize(width = 180f, height = 140f)
 
                 ComponentType.TEXT_FIELD -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 56f)
+                ComponentType.TEXT -> CanvasSize(width = 120f, height = 24f)
+                ComponentType.ICON -> CanvasSize(width = 24f, height = 24f)
+                ComponentType.IMAGE -> CanvasSize(width = 120f, height = 120f)
+                ComponentType.HORIZONTAL_DIVIDER -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 1f)
+                ComponentType.VERTICAL_DIVIDER -> CanvasSize(width = 1f, height = 48f)
+                ComponentType.SPACER -> CanvasSize(width = 16f, height = 16f)
+
+                ComponentType.BOTTOM_APP_BAR -> CanvasSize(width = deviceWidth, height = 80f)
+                ComponentType.RANGE_SLIDER -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(200f), height = 48f)
+                ComponentType.SURFACE -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 160f)
+
                 ComponentType.COLUMN,
-                ComponentType.LAZY_COLUMN -> CanvasSize(width = deviceWidth, height = (deviceHeight - 160f).coerceAtLeast(200f))
+                ComponentType.LAZY_COLUMN,
+                ComponentType.LAZY_VERTICAL_GRID,
+                ComponentType.FLOW_COLUMN -> CanvasSize(width = deviceWidth, height = (deviceHeight - 160f).coerceAtLeast(200f))
                 ComponentType.ROW,
-                ComponentType.LAZY_ROW -> CanvasSize(width = deviceWidth, height = 120f)
+                ComponentType.LAZY_ROW,
+                ComponentType.FLOW_ROW -> CanvasSize(width = deviceWidth, height = 120f)
                 ComponentType.BOX -> CanvasSize(width = deviceWidth, height = 300f)
             }
         }

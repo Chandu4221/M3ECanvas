@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package dev.chandradsl.m3ecanvas.editor.canvas
 
@@ -8,6 +8,9 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
@@ -119,6 +122,11 @@ fun CanvasNodeRenderer(
             }
         }
 
+        ComponentType.LAZY_VERTICAL_GRID -> RenderLazyVerticalGrid(node = node, controller = controller)
+        ComponentType.FLOW_ROW -> RenderFlowRow(node = node, controller = controller)
+        ComponentType.FLOW_COLUMN -> RenderFlowColumn(node = node, controller = controller)
+        ComponentType.SPACER -> RenderSpacer(node = node)
+        ComponentType.SURFACE -> RenderSurface(node = node, controller = controller)
         ComponentType.SCAFFOLD -> RenderScaffold(node = node, controller = controller)
 
         // Action
@@ -146,6 +154,7 @@ fun CanvasNodeRenderer(
         // Navigation
         ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node)
         ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node)
+        ComponentType.BOTTOM_APP_BAR -> RenderBottomAppBar(node = node)
         ComponentType.NAVIGATION_RAIL -> RenderNavigationRail(node = node)
         ComponentType.NAVIGATION_DRAWER -> RenderNavigationDrawer(node = node)
         ComponentType.TABS -> RenderTabs(node = node)
@@ -156,6 +165,7 @@ fun CanvasNodeRenderer(
         ComponentType.RADIO_BUTTON -> RenderRadioButton(node = node)
         ComponentType.SWITCH -> RenderSwitch(node = node)
         ComponentType.SLIDER -> RenderSlider(node = node)
+        ComponentType.RANGE_SLIDER -> RenderRangeSlider(node = node)
         ComponentType.CHIPS -> RenderChip(node = node)
         ComponentType.DATE_PICKER -> RenderDatePicker(node = node)
         ComponentType.TIME_PICKER -> RenderTimePicker(node = node)
@@ -163,6 +173,15 @@ fun CanvasNodeRenderer(
 
         // Text input
         ComponentType.TEXT_FIELD -> RenderTextField(node = node)
+
+        // Typography
+        ComponentType.TEXT -> RenderText(node = node)
+
+        // Graphics
+        ComponentType.ICON -> RenderIcon(node = node)
+        ComponentType.IMAGE -> RenderImage(node = node)
+        ComponentType.HORIZONTAL_DIVIDER -> RenderHorizontalDivider(node = node)
+        ComponentType.VERTICAL_DIVIDER -> RenderVerticalDivider(node = node)
     }
 }
 
@@ -200,9 +219,10 @@ private fun RenderCard(node: CanvasNode) {
 private fun RenderIconButton(node: CanvasNode) {
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.IconButton
         ?: MaterialVariant.IconButton.STANDARD
+    val iconName = node.iconProperty(key = "icon", default = "Add")
     val onClick = {}
     val modifier = node.modifiers.toModifier().fillMaxSize()
-    val icon = @Composable { Icon(imageVector = Icons.Filled.Add, contentDescription = null) }
+    val icon = @Composable { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) }
 
     when (variant) {
         MaterialVariant.IconButton.STANDARD -> IconButton(onClick = onClick, modifier = modifier, content = icon)
@@ -336,20 +356,22 @@ private fun RenderNavigationBar(node: CanvasNode) {
 
 @Composable
 private fun RenderFab(node: CanvasNode) {
+    val iconName = node.iconProperty(key = "icon", default = "Add")
     FloatingActionButton(
         onClick = {},
         modifier = node.modifiers.toModifier()
     ) {
-        Icon(imageVector = Icons.Filled.Add, contentDescription = "Add")
+        Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = "Add")
     }
 }
 
 @Composable
 private fun RenderExtendedFab(node: CanvasNode) {
     val text = node.textOrDefault(default = "Action")
+    val iconName = node.iconProperty(key = "icon", default = "Add")
     ExtendedFloatingActionButton(
         onClick = {},
-        icon = { Icon(imageVector = Icons.Filled.Add, contentDescription = null) },
+        icon = { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) },
         text = { Text(text = text) },
         modifier = node.modifiers.toModifier()
     )
@@ -364,7 +386,7 @@ private fun SlotContainer(
     Box(
         modifier = Modifier
             .then(
-                if (child.type == ComponentType.TOP_APP_BAR || child.type == ComponentType.NAVIGATION_BAR) {
+                if (child.type == ComponentType.TOP_APP_BAR || child.type == ComponentType.NAVIGATION_BAR || child.type == ComponentType.BOTTOM_APP_BAR) {
                     Modifier.fillMaxWidth()
                 } else {
                     Modifier.wrapContentSize()
@@ -474,14 +496,28 @@ internal fun Modifier.selectOnPress(
 @Composable
 private fun RenderTextField(node: CanvasNode) {
     val text = node.textOrDefault(default = "")
-    OutlinedTextField(
-        value = text,
-        onValueChange = {},
-        label = { Text(node.name) },
-        placeholder = { Text("Enter text...") },
-        readOnly = true,
-        modifier = node.modifiers.toModifier().fillMaxSize()
-    )
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.TextField
+        ?: MaterialVariant.TextField.OUTLINED
+    val modifier = node.modifiers.toModifier().fillMaxSize()
+
+    when (variant) {
+        MaterialVariant.TextField.OUTLINED -> OutlinedTextField(
+            value = text,
+            onValueChange = {},
+            label = { Text(node.name) },
+            placeholder = { Text("Enter text...") },
+            readOnly = true,
+            modifier = modifier
+        )
+        MaterialVariant.TextField.FILLED -> TextField(
+            value = text,
+            onValueChange = {},
+            label = { Text(node.name) },
+            placeholder = { Text("Enter text...") },
+            readOnly = true,
+            modifier = modifier
+        )
+    }
 }
 
 @Composable
@@ -835,11 +871,12 @@ private fun RenderSearch(node: CanvasNode) {
 
 @Composable
 private fun RenderCheckbox(node: CanvasNode) {
+    val checked = node.booleanProperty(key = "checked", default = true)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = node.modifiers.toModifier().wrapContentSize()
     ) {
-        Checkbox(checked = true, onCheckedChange = {})
+        Checkbox(checked = checked, onCheckedChange = {})
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = node.textOrDefault(default = "Checkbox Option"),
@@ -850,11 +887,12 @@ private fun RenderCheckbox(node: CanvasNode) {
 
 @Composable
 private fun RenderRadioButton(node: CanvasNode) {
+    val selected = node.booleanProperty(key = "selected", default = true)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = node.modifiers.toModifier().wrapContentSize()
     ) {
-        RadioButton(selected = true, onClick = {})
+        RadioButton(selected = selected, onClick = {})
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = node.textOrDefault(default = "Radio Option"),
@@ -865,6 +903,7 @@ private fun RenderRadioButton(node: CanvasNode) {
 
 @Composable
 private fun RenderSwitch(node: CanvasNode) {
+    val checked = node.booleanProperty(key = "checked", default = true)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -875,14 +914,15 @@ private fun RenderSwitch(node: CanvasNode) {
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(modifier = Modifier.width(16.dp))
-        Switch(checked = true, onCheckedChange = {})
+        Switch(checked = checked, onCheckedChange = {})
     }
 }
 
 @Composable
 private fun RenderSlider(node: CanvasNode) {
+    val value = node.numericProperty(key = "value", default = 0.6f).coerceIn(0f, 1f)
     Slider(
-        value = 0.6f,
+        value = value,
         onValueChange = {},
         modifier = node.modifiers.toModifier().fillMaxWidth()
     )
@@ -1040,6 +1080,228 @@ private fun RenderMenu(node: CanvasNode) {
                 leadingIcon = { Icon(imageVector = Icons.Outlined.Delete, contentDescription = null) }
             )
         }
+    }
+}
+
+@Composable
+private fun RenderText(node: CanvasNode) {
+    val text = (node.property("text") as? ComponentProperty.Text)?.value ?: node.name
+    val styleName = (node.property("typography") as? ComponentProperty.Text)?.value ?: "bodyLarge"
+    Text(
+        text = text,
+        style = resolveTypographyStyle(name = styleName),
+        modifier = node.modifiers.toModifier()
+    )
+}
+
+@Composable
+private fun RenderIcon(node: CanvasNode) {
+    val iconName = node.iconProperty("icon", default = "Favorite")
+    Icon(
+        imageVector = resolveMaterialIcon(iconName = iconName),
+        contentDescription = iconName,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = node.modifiers.toModifier().fillMaxSize()
+    )
+}
+
+@Composable
+private fun RenderImage(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = node.modifiers.toModifier().fillMaxSize()
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Image,
+                    contentDescription = "Image placeholder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = node.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderHorizontalDivider(node: CanvasNode) {
+    HorizontalDivider(
+        modifier = node.modifiers.toModifier().fillMaxWidth(),
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
+}
+
+@Composable
+private fun RenderVerticalDivider(node: CanvasNode) {
+    VerticalDivider(
+        modifier = node.modifiers.toModifier().fillMaxHeight(),
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
+}
+
+@Composable
+private fun RenderSpacer(node: CanvasNode) {
+    Spacer(modifier = node.modifiers.toModifier().fillMaxSize())
+}
+
+@Composable
+private fun RenderSurface(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Surface
+        ?: MaterialVariant.Surface.ROUNDED
+    val shape = when (variant) {
+        MaterialVariant.Surface.ROUNDED -> RoundedCornerShape(12.dp)
+        MaterialVariant.Surface.RECTANGLE -> RectangleShape
+        MaterialVariant.Surface.CIRCLE -> CircleShape
+    }
+
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 1.dp,
+        modifier = node.modifiers.toModifier().fillMaxSize()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(all = node.layoutConfig.padding.dp)
+        ) {
+            node.children.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderBottomAppBar(node: CanvasNode) {
+    BottomAppBar(
+        actions = {
+            IconButton(onClick = {}) {
+                Icon(imageVector = Icons.Outlined.Menu, contentDescription = "Menu")
+            }
+            IconButton(onClick = {}) {
+                Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search")
+            }
+            IconButton(onClick = {}) {
+                Icon(imageVector = Icons.Outlined.FavoriteBorder, contentDescription = "Favorite")
+            }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {},
+                elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation()
+            ) {
+                Icon(imageVector = Icons.Filled.Add, contentDescription = "Add")
+            }
+        },
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    )
+}
+
+@Composable
+private fun RenderRangeSlider(node: CanvasNode) {
+    val start = node.numericProperty("startValue", default = 0.2f).coerceIn(0f, 1f)
+    val end = node.numericProperty("endValue", default = 0.8f).coerceIn(0f, 1f)
+    val range = if (start <= end) start..end else end..start
+    RangeSlider(
+        value = range,
+        onValueChange = {},
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    )
+}
+
+@Composable
+private fun RenderLazyVerticalGrid(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = node.modifiers.toModifier()
+            .fillMaxSize()
+            .padding(all = node.layoutConfig.padding.dp),
+        verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig),
+        horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
+    ) {
+        items(items = node.children, key = { child -> child.id }) { child ->
+            ContainerChild(child = child, controller = controller)
+        }
+    }
+}
+
+@Composable
+private fun RenderFlowRow(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    FlowRow(
+        modifier = node.modifiers.toModifier()
+            .fillMaxSize()
+            .padding(all = node.layoutConfig.padding.dp),
+        horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig),
+        verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
+    ) {
+        node.children.forEach { child ->
+            ContainerChild(child = child, controller = controller)
+        }
+    }
+}
+
+@Composable
+private fun RenderFlowColumn(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    FlowColumn(
+        modifier = node.modifiers.toModifier()
+            .fillMaxSize()
+            .padding(all = node.layoutConfig.padding.dp),
+        horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig),
+        verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
+    ) {
+        node.children.forEach { child ->
+            ContainerChild(child = child, controller = controller)
+        }
+    }
+}
+
+@Composable
+private fun resolveTypographyStyle(name: String): androidx.compose.ui.text.TextStyle {
+    val typography = MaterialTheme.typography
+    return when (name.lowercase()) {
+        "displaylarge" -> typography.displayLarge
+        "displaymedium" -> typography.displayMedium
+        "displaysmall" -> typography.displaySmall
+        "headlinelarge" -> typography.headlineLarge
+        "headlinemedium" -> typography.headlineMedium
+        "headlinesmall" -> typography.headlineSmall
+        "titlelarge" -> typography.titleLarge
+        "titlemedium" -> typography.titleMedium
+        "titlesmall" -> typography.titleSmall
+        "bodylarge" -> typography.bodyLarge
+        "bodymedium" -> typography.bodyMedium
+        "bodysmall" -> typography.bodySmall
+        "labellarge" -> typography.labelLarge
+        "labelmedium" -> typography.labelMedium
+        "labelsmall" -> typography.labelSmall
+        else -> typography.bodyLarge
     }
 }
 
