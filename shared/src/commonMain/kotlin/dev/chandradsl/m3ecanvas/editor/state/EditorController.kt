@@ -53,9 +53,11 @@ class EditorController(
 
     fun undo() {
         val previous = history.undo(state.project) ?: return
-        val validSelections = state.selectedNodeIds.filter { previous.findNode(it) != null }.toSet()
+        val currentDevice = state.project.deviceProfile
+        val restoredProject = adaptProjectToDevice(previous, currentDevice)
+        val validSelections = state.selectedNodeIds.filter { restoredProject.findNode(it) != null }.toSet()
         state = state.copy(
-            project = previous,
+            project = restoredProject,
             selectedNodeIds = validSelections,
             canUndo = history.canUndo,
             canRedo = history.canRedo
@@ -64,9 +66,11 @@ class EditorController(
 
     fun redo() {
         val next = history.redo(state.project) ?: return
-        val validSelections = state.selectedNodeIds.filter { next.findNode(it) != null }.toSet()
+        val currentDevice = state.project.deviceProfile
+        val restoredProject = adaptProjectToDevice(next, currentDevice)
+        val validSelections = state.selectedNodeIds.filter { restoredProject.findNode(it) != null }.toSet()
         state = state.copy(
-            project = next,
+            project = restoredProject,
             selectedNodeIds = validSelections,
             canUndo = history.canUndo,
             canRedo = history.canRedo
@@ -457,24 +461,31 @@ class EditorController(
 
     //region Device
 
+    private fun adaptProjectToDevice(project: M3EProject, profile: DeviceProfile): M3EProject {
+        val updatedNodes = project.nodes.map { node ->
+            if (node.type == ComponentType.SCAFFOLD) {
+                val updatedChildren = node.children.map { child ->
+                    if (child.slot == SlotRole.CONTENT) {
+                        child.copy(size = CanvasSize(width = profile.size.width, height = (profile.size.height - 144f).coerceAtLeast(0f)))
+                    } else {
+                        child
+                    }
+                }
+                node.copy(size = profile.size, children = updatedChildren)
+            } else {
+                node
+            }
+        }
+        return project.copy(deviceProfile = profile, nodes = updatedNodes)
+    }
+
     fun setDeviceProfile(profile: DeviceProfile) {
         if (state.project.deviceProfile != profile) {
-            pushState()
-            val updatedNodes = state.project.nodes.map { node ->
-                if (node.type == ComponentType.SCAFFOLD) {
-                    val updatedChildren = node.children.map { child ->
-                        if (child.slot == SlotRole.CONTENT) {
-                            child.copy(size = CanvasSize(width = profile.size.width, height = (profile.size.height - 144f).coerceAtLeast(0f)))
-                        } else {
-                            child
-                        }
-                    }
-                    node.copy(size = profile.size, children = updatedChildren)
-                } else {
-                    node
-                }
-            }
-            updateProject(newProject = state.project.copy(deviceProfile = profile, nodes = updatedNodes))
+            // Device profile change is viewport / preview configuration, NOT an undoable edit
+            val adaptedProject = adaptProjectToDevice(state.project, profile)
+            history.map { snapshot -> adaptProjectToDevice(snapshot, profile) }
+            preDragProject = preDragProject?.let { adaptProjectToDevice(it, profile) }
+            state = state.copy(project = adaptedProject)
         }
     }
 

@@ -721,14 +721,16 @@ class SharedCommonTest {
     }
 
     @Test
-    fun testSetDeviceProfileUpdatesRootScaffoldAndSupportsUndo() {
+    fun testSetDeviceProfileDoesNotAffectUndoRedoHistory() {
         val initialProject = EditorController.newProject(name = "DeviceSwitchTest", withDefaultScaffold = true)
         val controller = EditorController(initialProject = initialProject)
 
         val defaultProfile = controller.state.project.deviceProfile
         val rootScaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
         assertEquals(defaultProfile.size, rootScaffold.size)
+        assertFalse(controller.canUndo)
 
+        // 1. Switch device profile: changes viewport and root scaffold, but does NOT push to undo history
         val tabletProfile = DeviceProfile.presets.first { it.category == DeviceCategory.TABLET }
         controller.setDeviceProfile(tabletProfile)
 
@@ -741,11 +743,34 @@ class SharedCommonTest {
         assertEquals(tabletProfile.size.width, updatedContent.size.width)
         assertEquals(tabletProfile.size.height - 144f, updatedContent.size.height)
 
-        assertTrue(controller.canUndo)
-        controller.undo()
+        // Changing device is viewport configuration, NOT an undoable action
+        assertFalse(controller.canUndo)
+        assertFalse(controller.canRedo)
 
-        assertEquals(defaultProfile, controller.state.project.deviceProfile)
-        val revertedScaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
-        assertEquals(defaultProfile.size, revertedScaffold.size)
+        // 2. Perform an actual canvas edit (add a Button)
+        controller.addNode(type = ComponentType.BUTTON, position = CanvasPosition(10f, 10f))
+        assertTrue(controller.canUndo)
+        val addedButton = controller.state.project.nodes.first { it.type == ComponentType.BUTTON }
+
+        // 3. Switch device again while undo history is active
+        val foldProfile = DeviceProfile.presets.first { it.category == DeviceCategory.FOLDABLE }
+        controller.setDeviceProfile(foldProfile)
+
+        assertEquals(foldProfile, controller.state.project.deviceProfile)
+        // Undo is STILL available for the Button addition, not erased by device switch
+        assertTrue(controller.canUndo)
+
+        // 4. Undo the button addition: Button is removed, but active device profile stays Fold!
+        controller.undo()
+        assertEquals(foldProfile, controller.state.project.deviceProfile)
+        val foldScaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        assertEquals(foldProfile.size, foldScaffold.size)
+        assertNull(controller.state.project.findNode(addedButton.id))
+        assertTrue(controller.canRedo)
+
+        // 5. Redo the button addition: Button is restored, and active device profile still stays Fold!
+        controller.redo()
+        assertEquals(foldProfile, controller.state.project.deviceProfile)
+        assertNotNull(controller.state.project.findNode(addedButton.id))
     }
 }

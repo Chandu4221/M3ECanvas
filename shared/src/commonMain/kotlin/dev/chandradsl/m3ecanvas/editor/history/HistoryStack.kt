@@ -68,4 +68,18 @@ class HistoryStack<T>(
         undoStack.clear()
         redoStack.clear()
     }
+
+    /**
+     * Transforms all states currently held in both undo and redo stacks in-place.
+     * Useful for updating environmental or viewport settings without modifying the history structure.
+     */
+    fun map(transform: (T) -> T) {
+        val newUndo = undoStack.map(transform)
+        undoStack.clear()
+        undoStack.addAll(newUndo)
+
+        val newRedo = redoStack.map(transform)
+        redoStack.clear()
+        redoStack.addAll(newRedo)
+    }
 }
