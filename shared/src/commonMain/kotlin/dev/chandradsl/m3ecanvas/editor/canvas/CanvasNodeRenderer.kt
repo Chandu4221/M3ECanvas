@@ -432,17 +432,9 @@ private fun SlotContainer(
             )
             .focusRequester(focusRequester)
             .focusable()
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.removeNode(nodeId = child.id)
-                    true
-                } else {
-                    false
-                }
-            }
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.removeNode(nodeId = child.id)
+                if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.deleteSelected()
                     true
                 } else {
                     false
@@ -502,17 +494,9 @@ private fun ContainerChild(
             )
             .focusRequester(focusRequester)
             .focusable()
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.removeNode(nodeId = child.id)
-                    true
-                } else {
-                    false
-                }
-            }
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.removeNode(nodeId = child.id)
+                if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.deleteSelected()
                     true
                 } else {
                     false

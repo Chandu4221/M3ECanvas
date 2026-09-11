@@ -242,17 +242,9 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
             )
             .focusRequester(focusRequester)
             .focusable()
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.removeNode(nodeId = node.id)
-                    true
-                } else {
-                    false
-                }
-            }
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.removeNode(nodeId = node.id)
+                if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    controller.deleteSelected()
                     true
                 } else {
                     false

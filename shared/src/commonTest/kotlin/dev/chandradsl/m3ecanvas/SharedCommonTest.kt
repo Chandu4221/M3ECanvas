@@ -492,6 +492,49 @@ class SharedCommonTest {
     }
 
     @Test
+    fun testDeleteSelectedWhenChildIsSelectedOnlyDeletesChildNotParentScaffold() {
+        val project = EditorController.newProject(name = "ChildDeleteTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+
+        // Add Extended FAB to Scaffold
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.EXTENDED_FAB)
+        val scaffoldWithFab = controller.state.project.findNode(scaffold.id)!!
+        val fab = scaffoldWithFab.childInSlot(SlotRole.FAB)
+        assertNotNull(fab, "Extended FAB should be slotted in Scaffold")
+
+        // 1. Select the child (Extended FAB)
+        controller.selectNode(fab.id)
+        assertEquals(setOf(fab.id), controller.state.selectedNodeIds)
+
+        // 2. Trigger deleteSelected
+        controller.deleteSelected()
+
+        // 3. Verify Scaffold is still present and intact
+        val scaffoldAfterFabDelete = controller.state.project.findNode(scaffold.id)
+        assertNotNull(scaffoldAfterFabDelete, "Scaffold must NOT be deleted when child is selected")
+        assertNull(scaffoldAfterFabDelete.childInSlot(SlotRole.FAB), "Extended FAB should be deleted")
+        assertNotNull(scaffoldAfterFabDelete.childInSlot(SlotRole.TOP_BAR), "TopAppBar must remain intact")
+        assertNotNull(scaffoldAfterFabDelete.childInSlot(SlotRole.CONTENT), "Content Column must remain intact")
+
+        // 4. Test nested container child deletion (Column -> Button)
+        val contentCol = scaffoldAfterFabDelete.children.first { it.slot == SlotRole.CONTENT }
+        controller.addChildToContainer(containerId = contentCol.id, type = ComponentType.BUTTON)
+        val updatedCol = controller.state.project.findNode(contentCol.id)!!
+        val button = updatedCol.children.first { it.type == ComponentType.BUTTON }
+        assertNotNull(button)
+
+        controller.selectNode(button.id)
+        controller.deleteSelected()
+
+        val scaffoldAfterButtonDelete = controller.state.project.findNode(scaffold.id)!!
+        val colAfterButtonDelete = controller.state.project.findNode(contentCol.id)!!
+        assertNotNull(scaffoldAfterButtonDelete, "Scaffold must remain intact")
+        assertNotNull(colAfterButtonDelete, "Content column must remain intact")
+        assertTrue(colAfterButtonDelete.children.none { it.id == button.id }, "Only button should be deleted")
+    }
+
+    @Test
     fun testAll21ModifiersCreationAndSerialization() {
         assertEquals(21, ModifierKind.entries.size)
 
