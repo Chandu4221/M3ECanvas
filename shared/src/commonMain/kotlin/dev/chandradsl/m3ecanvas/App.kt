@@ -3,6 +3,7 @@ package dev.chandradsl.m3ecanvas
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.*
@@ -17,6 +18,7 @@ import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
 import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.domain.model.SlotRole
 import dev.chandradsl.m3ecanvas.editor.canvas.CanvasScreen
+import dev.chandradsl.m3ecanvas.editor.codegen.CodeExportPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.LayersPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.PropertiesPanel
 import dev.chandradsl.m3ecanvas.editor.palette.ComponentPalette
@@ -32,6 +34,7 @@ fun App(repository: ProjectRepository) {
     }
     val focusRequester = remember { FocusRequester() }
     var statusMessage by remember { mutableStateOf(value = "") }
+    var showCodeExport by remember { mutableStateOf(value = false) }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -89,7 +92,9 @@ fun App(repository: ProjectRepository) {
                         statusMessage = "No saved project found"
                     }
                 },
-                statusMessage = statusMessage
+                statusMessage = statusMessage,
+                showCodeExport = showCodeExport,
+                onToggleCodeExport = { showCodeExport = !showCodeExport }
             )
             HorizontalDivider()
             Row(modifier = Modifier.weight(weight = 1f)) {
@@ -133,6 +138,16 @@ fun App(repository: ProjectRepository) {
                 Box(modifier = Modifier.weight(weight = 1f)) {
                     CanvasScreen(controller = controller)
                 }
+                if (showCodeExport) {
+                    VerticalDivider()
+                    Box(modifier = Modifier.width(440.dp)) {
+                        CodeExportPanel(
+                            project = controller.state.project,
+                            onClose = { showCodeExport = false }
+                        )
+                    }
+                }
+                VerticalDivider()
                 Column(modifier = Modifier.width(width = 280.dp)) {
                     LayersPanel(
                         controller = controller,
@@ -153,7 +168,9 @@ fun App(repository: ProjectRepository) {
 private fun TopBar(
     onSave: () -> Unit,
     onLoad: () -> Unit,
-    statusMessage: String
+    statusMessage: String,
+    showCodeExport: Boolean,
+    onToggleCodeExport: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -174,6 +191,19 @@ private fun TopBar(
                 modifier = Modifier.padding(end = 12.dp)
             )
         }
+        FilledTonalButton(
+            onClick = onToggleCodeExport,
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = if (showCodeExport) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Icon(imageVector = Icons.Outlined.Code, contentDescription = "Export Code & AI")
+            Text(
+                text = if (showCodeExport) "Hide Code" else "Export Code & AI",
+                modifier = Modifier.padding(start = 6.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         TextButton(onClick = onLoad) {
             Icon(imageVector = Icons.Outlined.FolderOpen, contentDescription = "Load")
             Text(text = "Load", modifier = Modifier.padding(start = 6.dp))

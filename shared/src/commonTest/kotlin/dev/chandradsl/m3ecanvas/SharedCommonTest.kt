@@ -1,6 +1,8 @@
 package dev.chandradsl.m3ecanvas
 
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.codegen.AIPromptGenerator
+import dev.chandradsl.m3ecanvas.editor.codegen.ComposeCodeGenerator
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import kotlin.test.*
@@ -132,5 +134,55 @@ class SharedCommonTest {
         assertNotNull(decodedScaffold.childInSlot(SlotRole.TOP_BAR))
         assertNotNull(decodedScaffold.childInSlot(SlotRole.FAB))
         assertNotNull(decodedScaffold.childInSlot(SlotRole.CONTENT))
+    }
+
+    @Test
+    fun testComposeCodeGeneratorEmitsValidScaffoldCode() {
+        val project = EditorController.newProject(name = "Dashboard", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+
+        // Add a bottom navigation bar
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.NAVIGATION_BAR)
+
+        // Add a button with TONAL variant inside the content column
+        val contentCol = scaffold.children.first { it.slot == SlotRole.CONTENT }
+        controller.addChildToContainer(containerId = contentCol.id, type = ComponentType.BUTTON)
+        val buttonNode = controller.state.project.findNode(contentCol.id)!!.children.first { it.type == ComponentType.BUTTON }
+        controller.updateNodeProperty(
+            nodeId = buttonNode.id,
+            property = ComponentProperty.Variant(key = "variant", value = MaterialVariant.Button.TONAL)
+        )
+        controller.addModifier(
+            nodeId = buttonNode.id,
+            spec = ModifierSpec.Clip(cornerRadius = 16f)
+        )
+
+        val code = ComposeCodeGenerator.generateFile(controller.state.project)
+
+        assertTrue(code.contains("@Composable"))
+        assertTrue(code.contains("fun DashboardScreen("))
+        assertTrue(code.contains("Scaffold("))
+        assertTrue(code.contains("topBar = {"))
+        assertTrue(code.contains("TopAppBar("))
+        assertTrue(code.contains("bottomBar = {"))
+        assertTrue(code.contains("NavigationBar("))
+        assertTrue(code.contains("FilledTonalButton("))
+        assertTrue(code.contains("clip(RoundedCornerShape(16.dp))"))
+        assertTrue(code.contains("innerPadding ->"))
+    }
+
+    @Test
+    fun testAIPromptGeneratorIncludesArchitectureAndSpecs() {
+        val project = EditorController.newProject(name = "Analytics", withDefaultScaffold = true)
+        val prompt = AIPromptGenerator.generate(project)
+
+        assertTrue(prompt.contains("# Material 3 Expressive Screen Specification: Analytics"))
+        assertTrue(prompt.contains("Target Device Specifications"))
+        assertTrue(prompt.contains("Pixel 8"))
+        assertTrue(prompt.contains("412dp × 915dp"))
+        assertTrue(prompt.contains("[Slot: Top App Bar]"))
+        assertTrue(prompt.contains("Implementation Instructions for AI"))
+        assertTrue(prompt.contains("State Hoisting"))
     }
 }
