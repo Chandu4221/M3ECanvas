@@ -277,42 +277,78 @@ private fun RenderScaffold(
 ) {
     val topBarChild = node.childInSlot(SlotRole.TOP_BAR)
     val bottomBarChild = node.childInSlot(SlotRole.BOTTOM_BAR)
+    val railChild = node.childInSlot(SlotRole.RAIL)
+    val drawerChild = node.childInSlot(SlotRole.DRAWER)
     val fabChild = node.childInSlot(SlotRole.FAB)
     val snackbarChild = node.childInSlot(SlotRole.SNACKBAR)
     val contentChildren = node.children.filter { it.slot == null || it.slot == SlotRole.CONTENT }
 
-    Scaffold(
-        modifier = node.modifiers.toModifier().fillMaxSize(),
-        topBar = {
-            if (topBarChild != null) {
-                SlotContainer(child = topBarChild, controller = controller)
+    val scaffoldContent: @Composable () -> Unit = {
+        Scaffold(
+            modifier = node.modifiers.toModifier().fillMaxSize(),
+            topBar = {
+                if (topBarChild != null) {
+                    SlotContainer(child = topBarChild, controller = controller)
+                }
+            },
+            bottomBar = {
+                if (bottomBarChild != null) {
+                    SlotContainer(child = bottomBarChild, controller = controller)
+                }
+            },
+            snackbarHost = {
+                if (snackbarChild != null) {
+                    SlotContainer(child = snackbarChild, controller = controller)
+                }
+            },
+            floatingActionButton = {
+                if (fabChild != null) {
+                    SlotContainer(child = fabChild, controller = controller)
+                }
             }
-        },
-        bottomBar = {
-            if (bottomBarChild != null) {
-                SlotContainer(child = bottomBarChild, controller = controller)
-            }
-        },
-        snackbarHost = {
-            if (snackbarChild != null) {
-                SlotContainer(child = snackbarChild, controller = controller)
-            }
-        },
-        floatingActionButton = {
-            if (fabChild != null) {
-                SlotContainer(child = fabChild, controller = controller)
+        ) { innerPadding ->
+            if (railChild != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    SlotContainer(child = railChild, controller = controller)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        contentChildren.forEach { child ->
+                            ContainerChild(child = child, controller = controller)
+                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    contentChildren.forEach { child ->
+                        ContainerChild(child = child, controller = controller)
+                    }
+                }
             }
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            contentChildren.forEach { child ->
-                ContainerChild(child = child, controller = controller)
-            }
-        }
+    }
+
+    if (drawerChild != null) {
+        ModalNavigationDrawer(
+            drawerContent = {
+                ModalDrawerSheet {
+                    SlotContainer(child = drawerChild, controller = controller)
+                }
+            },
+            content = scaffoldContent
+        )
+    } else {
+        scaffoldContent()
     }
 }
 
@@ -380,8 +416,22 @@ private fun RenderNavigationBar(node: CanvasNode) {
 @Composable
 private fun RenderFab(node: CanvasNode) {
     val iconName = node.iconProperty(key = "icon", default = "Add")
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.FloatingActionButton
+        ?: MaterialVariant.FloatingActionButton.SECONDARY
+    val containerColor = when (variant) {
+        MaterialVariant.FloatingActionButton.SURFACE -> MaterialTheme.colorScheme.surfaceContainerHigh
+        MaterialVariant.FloatingActionButton.SECONDARY -> MaterialTheme.colorScheme.secondaryContainer
+        MaterialVariant.FloatingActionButton.TERTIARY -> MaterialTheme.colorScheme.tertiaryContainer
+    }
+    val contentColor = when (variant) {
+        MaterialVariant.FloatingActionButton.SURFACE -> MaterialTheme.colorScheme.primary
+        MaterialVariant.FloatingActionButton.SECONDARY -> MaterialTheme.colorScheme.onSecondaryContainer
+        MaterialVariant.FloatingActionButton.TERTIARY -> MaterialTheme.colorScheme.onTertiaryContainer
+    }
     FloatingActionButton(
         onClick = {},
+        containerColor = containerColor,
+        contentColor = contentColor,
         modifier = node.modifiers.toModifier()
     ) {
         Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = "Add")
@@ -392,8 +442,22 @@ private fun RenderFab(node: CanvasNode) {
 private fun RenderExtendedFab(node: CanvasNode) {
     val text = node.textOrDefault(default = "Action")
     val iconName = node.iconProperty(key = "icon", default = "Add")
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.FloatingActionButton
+        ?: MaterialVariant.FloatingActionButton.SECONDARY
+    val containerColor = when (variant) {
+        MaterialVariant.FloatingActionButton.SURFACE -> MaterialTheme.colorScheme.surfaceContainerHigh
+        MaterialVariant.FloatingActionButton.SECONDARY -> MaterialTheme.colorScheme.secondaryContainer
+        MaterialVariant.FloatingActionButton.TERTIARY -> MaterialTheme.colorScheme.tertiaryContainer
+    }
+    val contentColor = when (variant) {
+        MaterialVariant.FloatingActionButton.SURFACE -> MaterialTheme.colorScheme.primary
+        MaterialVariant.FloatingActionButton.SECONDARY -> MaterialTheme.colorScheme.onSecondaryContainer
+        MaterialVariant.FloatingActionButton.TERTIARY -> MaterialTheme.colorScheme.onTertiaryContainer
+    }
     ExtendedFloatingActionButton(
         onClick = {},
+        containerColor = containerColor,
+        contentColor = contentColor,
         icon = { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) },
         text = { Text(text = text) },
         modifier = node.modifiers.toModifier()
@@ -1342,21 +1406,6 @@ private fun resolveTypographyStyle(name: String): androidx.compose.ui.text.TextS
     }
 }
 
-@Composable
-private fun NodePlaceholder(node: CanvasNode) {
-    Box(
-        modifier = node.modifiers.toModifier()
-            .fillMaxSize()
-            .background(Color(0xFFDDDDDD)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = node.type.displayName,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF555555)
-        )
-    }
-}
 
 /**
  * Folds the stored modifier chain into a real Compose [Modifier],
@@ -1431,30 +1480,30 @@ private fun CanvasNode.textOrDefault(default: String): String {
 }
 
 private fun resolveVerticalArrangement(config: LayoutConfig): Arrangement.Vertical {
-    if (config.spacing > 0f) {
-        return Arrangement.spacedBy(space = config.spacing.dp)
-    }
+    if (config.spacing > 0f) return Arrangement.spacedBy(space = config.spacing.dp)
     return when (config.arrangement) {
         LayoutArrangement.START -> Arrangement.Top
-        LayoutArrangement.CENTER -> Arrangement.Center
         LayoutArrangement.END -> Arrangement.Bottom
-        LayoutArrangement.SPACE_BETWEEN -> Arrangement.SpaceBetween
-        LayoutArrangement.SPACE_AROUND -> Arrangement.SpaceAround
-        LayoutArrangement.SPACE_EVENLY -> Arrangement.SpaceEvenly
+        else -> resolveSharedArrangement(config.arrangement)
     }
 }
 
 private fun resolveHorizontalArrangement(config: LayoutConfig): Arrangement.Horizontal {
-    if (config.spacing > 0f) {
-        return Arrangement.spacedBy(space = config.spacing.dp)
-    }
+    if (config.spacing > 0f) return Arrangement.spacedBy(space = config.spacing.dp)
     return when (config.arrangement) {
         LayoutArrangement.START -> Arrangement.Start
-        LayoutArrangement.CENTER -> Arrangement.Center
         LayoutArrangement.END -> Arrangement.End
+        else -> resolveSharedArrangement(config.arrangement)
+    }
+}
+
+private fun resolveSharedArrangement(arrangement: LayoutArrangement): Arrangement.HorizontalOrVertical {
+    return when (arrangement) {
+        LayoutArrangement.CENTER -> Arrangement.Center
         LayoutArrangement.SPACE_BETWEEN -> Arrangement.SpaceBetween
         LayoutArrangement.SPACE_AROUND -> Arrangement.SpaceAround
         LayoutArrangement.SPACE_EVENLY -> Arrangement.SpaceEvenly
+        else -> Arrangement.Center
     }
 }
 

@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
 enum class SlotRole(val displayName: String) {
     TOP_BAR(displayName = "Top App Bar"),
     BOTTOM_BAR(displayName = "Bottom Bar"),
+    RAIL(displayName = "Navigation Rail"),
+    DRAWER(displayName = "Navigation Drawer"),
     FAB(displayName = "Floating Action Button"),
     SNACKBAR(displayName = "Snackbar"),
     CONTENT(displayName = "Content")

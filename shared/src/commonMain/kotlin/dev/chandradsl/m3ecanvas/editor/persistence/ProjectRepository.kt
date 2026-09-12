@@ -3,6 +3,12 @@ package dev.chandradsl.m3ecanvas.editor.persistence
 import dev.chandradsl.m3ecanvas.domain.model.M3EProject
 import kotlinx.serialization.json.Json
 
+sealed interface LoadResult {
+    data class Success(val project: M3EProject) : LoadResult
+    data object NotFound : LoadResult
+    data class Corrupted(val reason: String, val cause: Throwable? = null) : LoadResult
+}
+
 /**
  * Storage abstraction for [M3EProject]. Common code depends only on this
  * interface; each platform supplies an implementation.
@@ -10,10 +16,10 @@ import kotlinx.serialization.json.Json
 interface ProjectRepository {
 
     /** Persists [project], replacing any previous save. */
-    fun save(project: M3EProject)
+    suspend fun save(project: M3EProject)
 
-    /** Returns the last saved project, or null if none exists or it is unreadable. */
-    fun load(): M3EProject?
+    /** Returns the result of loading the saved project. */
+    suspend fun load(): LoadResult
 }
 
 /**

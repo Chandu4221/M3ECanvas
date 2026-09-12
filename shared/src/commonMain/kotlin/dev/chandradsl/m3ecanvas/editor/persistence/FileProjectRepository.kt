@@ -1,6 +1,8 @@
 package dev.chandradsl.m3ecanvas.editor.persistence
 
 import dev.chandradsl.m3ecanvas.domain.model.M3EProject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -11,17 +13,19 @@ class FileProjectRepository(
     private val file: File = defaultFile()
 ) : ProjectRepository {
 
-    override fun save(project: M3EProject) {
+    override suspend fun save(project: M3EProject): Unit = withContext(Dispatchers.IO) {
         file.parentFile?.mkdirs()
         file.writeText(text = M3EJson.encodeToString(value = project))
     }
 
-    override fun load(): M3EProject? {
-        if (!file.exists()) return null
-        return try {
-            M3EJson.decodeFromString<M3EProject>(string = file.readText())
-        } catch (_: Exception) {
-            null
+    override suspend fun load(): LoadResult = withContext(Dispatchers.IO) {
+        if (!file.exists()) return@withContext LoadResult.NotFound
+        try {
+            val text = file.readText()
+            val project = M3EJson.decodeFromString<M3EProject>(string = text)
+            LoadResult.Success(project = project)
+        } catch (e: Throwable) {
+            LoadResult.Corrupted(reason = e.message ?: "Failed to read or parse project file", cause = e)
         }
     }
 

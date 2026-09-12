@@ -118,13 +118,25 @@ class EditorController(
                 }
             }
             // 2. If selected node has a parent container, insert as sibling
-            selected != null && findParentInProject(selected.id) != null -> {
-                val parent = findParentInProject(selected.id)!!
-                val index = parent.children.indexOfFirst { it.id == selected.id }
-                val updatedChildren = parent.children.toMutableList().apply {
-                    if (index >= 0) add(index + 1, clone) else add(clone)
+            selected != null -> {
+                val parent = findParentInProject(selected.id)
+                if (parent != null) {
+                    val index = parent.children.indexOfFirst { it.id == selected.id }
+                    val updatedChildren = parent.children.toMutableList().apply {
+                        if (index >= 0) add(index + 1, clone) else add(clone)
+                    }
+                    state.project.updateNode(parent.copy(children = updatedChildren))
+                } else if (state.project.nodes.any { it.type == ComponentType.SCAFFOLD }) {
+                    val scaffold = state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+                    val content = scaffold.children.firstOrNull { it.slot == SlotRole.CONTENT && it.isContainer }
+                    if (content != null) {
+                        state.project.updateNode(content.withChild(clone))
+                    } else {
+                        state.project.updateNode(scaffold.withChild(clone))
+                    }
+                } else {
+                    state.project.withNode(clone)
                 }
-                state.project.updateNode(parent.copy(children = updatedChildren))
             }
             // 3. If root has a Scaffold with Content container, paste into content
             state.project.nodes.any { it.type == ComponentType.SCAFFOLD } -> {

@@ -235,4 +235,24 @@ data class CanvasNode(
     }
 
     //endregion
+
+    //region Sizing Resolution
+
+    /** Whether this node defines a fillMaxWidth or fillMaxSize modifier. */
+    fun hasFillMaxWidth(): Boolean =
+        modifiers.any { it is ModifierSpec.FillMaxWidth || it is ModifierSpec.FillMaxSize }
+
+    /** Whether this node defines a fillMaxHeight or fillMaxSize modifier. */
+    fun hasFillMaxHeight(): Boolean =
+        modifiers.any { it is ModifierSpec.FillMaxHeight || it is ModifierSpec.FillMaxSize }
+
+    /** Whether this node defines explicit width modifiers. */
+    fun hasExplicitWidth(): Boolean =
+        hasFillMaxWidth() || modifiers.any { it is ModifierSpec.Width || it is ModifierSpec.Size }
+
+    /** Whether this node defines explicit height modifiers. */
+    fun hasExplicitHeight(): Boolean =
+        hasFillMaxHeight() || modifiers.any { it is ModifierSpec.Height || it is ModifierSpec.Size }
+
+    //endregion
 }

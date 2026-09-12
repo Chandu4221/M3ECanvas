@@ -26,7 +26,8 @@ class SharedCommonTest {
         assertEquals(SlotRole.TOP_BAR, ComponentType.TOP_APP_BAR.canonicalSlot())
         assertEquals(SlotRole.BOTTOM_BAR, ComponentType.NAVIGATION_BAR.canonicalSlot())
         assertEquals(SlotRole.BOTTOM_BAR, ComponentType.BOTTOM_APP_BAR.canonicalSlot())
-        assertEquals(SlotRole.BOTTOM_BAR, ComponentType.NAVIGATION_RAIL.canonicalSlot())
+        assertEquals(SlotRole.RAIL, ComponentType.NAVIGATION_RAIL.canonicalSlot())
+        assertEquals(SlotRole.DRAWER, ComponentType.NAVIGATION_DRAWER.canonicalSlot())
         assertEquals(SlotRole.FAB, ComponentType.FAB.canonicalSlot())
         assertEquals(SlotRole.FAB, ComponentType.EXTENDED_FAB.canonicalSlot())
         assertEquals(SlotRole.SNACKBAR, ComponentType.SNACKBAR.canonicalSlot())
@@ -889,5 +890,122 @@ class SharedCommonTest {
         // None of these should touch undo/redo
         assertFalse(controller.canUndo)
         assertFalse(controller.canRedo)
+    }
+
+    @Test
+    fun testFabVariantRenderingAndCodegen() {
+        val project = EditorController.newProject(name = "FabTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.FAB)
+        val fab = controller.state.project.findNode(scaffold.id)!!.childInSlot(SlotRole.FAB)!!
+
+        // SURFACE variant
+        controller.updateNodeProperty(
+            nodeId = fab.id,
+            property = ComponentProperty.Variant(key = "variant", value = MaterialVariant.FloatingActionButton.SURFACE)
+        )
+        var code = ComposeCodeGenerator.generateFile(controller.state.project)
+        assertTrue(code.contains("surfaceContainerHigh"), "Surface variant should emit surfaceContainerHigh")
+        assertTrue(code.contains("primary"), "Surface variant should emit primary contentColor")
+
+        // SECONDARY variant
+        controller.updateNodeProperty(
+            nodeId = fab.id,
+            property = ComponentProperty.Variant(key = "variant", value = MaterialVariant.FloatingActionButton.SECONDARY)
+        )
+        code = ComposeCodeGenerator.generateFile(controller.state.project)
+        assertTrue(code.contains("secondaryContainer"), "Secondary variant should emit secondaryContainer")
+        assertTrue(code.contains("onSecondaryContainer"), "Secondary variant should emit onSecondaryContainer")
+
+        // TERTIARY variant
+        controller.updateNodeProperty(
+            nodeId = fab.id,
+            property = ComponentProperty.Variant(key = "variant", value = MaterialVariant.FloatingActionButton.TERTIARY)
+        )
+        code = ComposeCodeGenerator.generateFile(controller.state.project)
+        assertTrue(code.contains("tertiaryContainer"), "Tertiary variant should emit tertiaryContainer")
+        assertTrue(code.contains("onTertiaryContainer"), "Tertiary variant should emit onTertiaryContainer")
+    }
+
+    @Test
+    fun testScaffoldNavigationRailAndDrawerSlots() {
+        val project = EditorController.newProject(name = "NavTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+
+        // Test Rail slot
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.NAVIGATION_RAIL)
+        val updatedScaffold = controller.state.project.findNode(scaffold.id)!!
+        val railNode = updatedScaffold.childInSlot(SlotRole.RAIL)
+        assertNotNull(railNode, "Navigation Rail should snap to SlotRole.RAIL")
+        assertEquals(SlotRole.RAIL, railNode.slot)
+
+        // Test Drawer slot
+        controller.addChildToContainer(containerId = scaffold.id, type = ComponentType.NAVIGATION_DRAWER)
+        val scaffoldWithDrawer = controller.state.project.findNode(scaffold.id)!!
+        val drawerNode = scaffoldWithDrawer.childInSlot(SlotRole.DRAWER)
+        assertNotNull(drawerNode, "Navigation Drawer should snap to SlotRole.DRAWER")
+        assertEquals(SlotRole.DRAWER, drawerNode.slot)
+
+        // Test code generation emits Row + NavigationRail and ModalNavigationDrawer
+        val code = ComposeCodeGenerator.generateFile(controller.state.project)
+        assertTrue(code.contains("ModalNavigationDrawer("), "Should emit ModalNavigationDrawer when DRAWER slot exists")
+        assertTrue(code.contains("NavigationRail("), "Should emit NavigationRail when RAIL slot exists")
+        assertTrue(code.contains("Row(modifier = Modifier.fillMaxSize().padding(innerPadding))"), "Should place Rail and content in a Row with innerPadding")
+    }
+
+    @Test
+    fun testPasteSiblingSafeWithoutNullAssertion() {
+        val project = EditorController.newProject(name = "PasteTest", withDefaultScaffold = false)
+        val controller = EditorController(initialProject = project)
+
+        // Create a column with a button
+        controller.addNode(type = ComponentType.COLUMN, position = CanvasPosition(20f, 20f))
+        val column = controller.state.project.nodes.first { it.type == ComponentType.COLUMN }
+        controller.addChildToContainer(containerId = column.id, type = ComponentType.BUTTON)
+
+        val button = controller.state.project.findNode(column.id)!!.children.first { it.type == ComponentType.BUTTON }
+        controller.selectNode(button.id)
+        controller.copySelected()
+        controller.paste()
+
+        val updatedColumn = controller.state.project.findNode(column.id)!!
+        assertEquals(2, updatedColumn.children.size, "Pasting sibling should insert into parent container safely")
+    }
+
+    @Test
+    fun testTopLevelNodeSizingConsistency() {
+        val node = CanvasNode(
+            type = ComponentType.CARD,
+            name = "FullWidthCard",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(300f, 200f),
+            modifiers = listOf(ModifierSpec.FillMaxWidth(), ModifierSpec.FillMaxHeight())
+        )
+
+        assertTrue(node.hasFillMaxWidth())
+        assertTrue(node.hasFillMaxHeight())
+        assertTrue(node.hasExplicitWidth())
+        assertTrue(node.hasExplicitHeight())
+
+        val bareNode = CanvasNode(
+            type = ComponentType.BUTTON,
+            name = "BareButton",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(100f, 40f)
+        )
+        assertFalse(bareNode.hasExplicitWidth())
+        assertFalse(bareNode.hasExplicitHeight())
+
+        val project = M3EProject(
+            name = "SizingTest",
+            nodes = listOf(node)
+        )
+        val code = ComposeCodeGenerator.generateFile(project)
+        assertTrue(code.contains("fillMaxWidth()"), "Should include fillMaxWidth")
+        assertTrue(code.contains("fillMaxHeight()"), "Should include fillMaxHeight")
+        assertFalse(code.contains("size(width = 300.dp"), "Should not generate fixed width when fillMaxWidth is present")
     }
 }

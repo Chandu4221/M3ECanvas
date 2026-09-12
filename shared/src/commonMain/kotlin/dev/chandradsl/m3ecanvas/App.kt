@@ -33,21 +33,43 @@ import dev.chandradsl.m3ecanvas.editor.persistence.ProjectRepository
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import dev.chandradsl.m3ecanvas.editor.theme.EditorTheme
 
+import dev.chandradsl.m3ecanvas.editor.persistence.LoadResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
 @Composable
 fun App(repository: ProjectRepository) {
     val controller = remember {
         EditorController(
-            initialProject = repository.load() ?: EditorController.newProject()
+            initialProject = EditorController.newProject()
         )
     }
+    val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
     var statusMessage by remember { mutableStateOf(value = "") }
     var showCodeExport by remember { mutableStateOf(value = false) }
+    var isOperating by remember { mutableStateOf(value = false) }
+    var errorMessage by remember { mutableStateOf<String?>(value = null) }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+        isOperating = true
+        when (val result = repository.load()) {
+            is LoadResult.Success -> {
+                controller.replaceProject(project = result.project)
+                statusMessage = "Loaded saved project"
+            }
+            is LoadResult.NotFound -> {
+                // Keep default new project
+            }
+            is LoadResult.Corrupted -> {
+                errorMessage = "Failed to load project: ${result.reason}"
+                statusMessage = "Project file corrupted"
+            }
+        }
+        isOperating = false
     }
 
     EditorTheme {
@@ -176,18 +198,41 @@ fun App(repository: ProjectRepository) {
                     statusMessage = "Deleted"
                 },
                 onSave = {
-                    repository.save(project = controller.state.project)
-                    statusMessage = "Saved"
-                },
-                onLoad = {
-                    val loaded = repository.load()
-                    if (loaded != null) {
-                        controller.replaceProject(project = loaded)
-                        statusMessage = "Loaded"
-                    } else {
-                        statusMessage = "No saved project found"
+                    coroutineScope.launch {
+                        isOperating = true
+                        statusMessage = "Saving..."
+                        try {
+                            repository.save(project = controller.state.project)
+                            statusMessage = "Saved"
+                        } catch (e: Throwable) {
+                            statusMessage = "Save failed"
+                            errorMessage = "Failed to save project: ${e.message}"
+                        } finally {
+                            isOperating = false
+                        }
                     }
                 },
+                onLoad = {
+                    coroutineScope.launch {
+                        isOperating = true
+                        statusMessage = "Loading..."
+                        when (val result = repository.load()) {
+                            is LoadResult.Success -> {
+                                controller.replaceProject(project = result.project)
+                                statusMessage = "Loaded"
+                            }
+                            is LoadResult.NotFound -> {
+                                statusMessage = "No saved project found"
+                            }
+                            is LoadResult.Corrupted -> {
+                                errorMessage = "Failed to load project: ${result.reason}"
+                                statusMessage = "Project file corrupted"
+                            }
+                        }
+                        isOperating = false
+                    }
+                },
+                isOperating = isOperating,
                 statusMessage = statusMessage,
                 showCodeExport = showCodeExport,
                 onToggleCodeExport = { showCodeExport = !showCodeExport }
@@ -257,6 +302,19 @@ fun App(repository: ProjectRepository) {
                 }
             }
         }
+
+        if (errorMessage != null) {
+            AlertDialog(
+                onDismissRequest = { errorMessage = null },
+                title = { Text(text = "Project Error") },
+                text = { Text(text = errorMessage ?: "") },
+                confirmButton = {
+                    TextButton(onClick = { errorMessage = null }) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -270,6 +328,7 @@ private fun TopBar(
     onDelete: () -> Unit,
     onSave: () -> Unit,
     onLoad: () -> Unit,
+    isOperating: Boolean = false,
     statusMessage: String,
     showCodeExport: Boolean,
     onToggleCodeExport: () -> Unit
@@ -313,6 +372,13 @@ private fun TopBar(
             )
         }
         Spacer(modifier = Modifier.weight(weight = 1f))
+        if (isOperating) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
         if (statusMessage.isNotEmpty()) {
             Text(
                 text = statusMessage,
@@ -334,11 +400,11 @@ private fun TopBar(
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        TextButton(onClick = onLoad) {
+        TextButton(onClick = onLoad, enabled = !isOperating) {
             Icon(imageVector = Icons.Outlined.FolderOpen, contentDescription = "Load")
             Text(text = "Load", modifier = Modifier.padding(start = 6.dp))
         }
-        TextButton(onClick = onSave) {
+        TextButton(onClick = onSave, enabled = !isOperating) {
             Icon(imageVector = Icons.Outlined.Save, contentDescription = "Save")
             Text(text = "Save", modifier = Modifier.padding(start = 6.dp))
         }

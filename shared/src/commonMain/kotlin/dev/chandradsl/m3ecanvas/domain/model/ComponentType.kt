@@ -102,7 +102,9 @@ enum class ComponentType(
     fun canonicalSlot(): SlotRole {
         return when (this) {
             TOP_APP_BAR -> SlotRole.TOP_BAR
-            NAVIGATION_BAR, BOTTOM_APP_BAR, NAVIGATION_RAIL, NAVIGATION_DRAWER -> SlotRole.BOTTOM_BAR
+            NAVIGATION_BAR, BOTTOM_APP_BAR -> SlotRole.BOTTOM_BAR
+            NAVIGATION_RAIL -> SlotRole.RAIL
+            NAVIGATION_DRAWER -> SlotRole.DRAWER
             FAB, EXTENDED_FAB -> SlotRole.FAB
             SNACKBAR -> SlotRole.SNACKBAR
             else -> SlotRole.CONTENT

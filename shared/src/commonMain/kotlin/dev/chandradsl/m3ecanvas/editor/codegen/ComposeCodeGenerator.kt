@@ -76,41 +76,84 @@ object ComposeCodeGenerator {
     private fun generateScaffoldCode(scaffold: CanvasNode, indent: String): String {
         val topBarChild = scaffold.childInSlot(SlotRole.TOP_BAR)
         val bottomBarChild = scaffold.childInSlot(SlotRole.BOTTOM_BAR)
+        val railChild = scaffold.childInSlot(SlotRole.RAIL)
+        val drawerChild = scaffold.childInSlot(SlotRole.DRAWER)
         val fabChild = scaffold.childInSlot(SlotRole.FAB)
+        val snackbarChild = scaffold.childInSlot(SlotRole.SNACKBAR)
         val contentChildren = scaffold.children.filter { it.slot == null || it.slot == SlotRole.CONTENT }
 
-        return buildString {
-            appendLine("${indent}Scaffold(")
-            appendLine("${indent}    modifier = Modifier.fillMaxSize(),")
+        val scaffoldIndent = if (drawerChild != null) "$indent    " else indent
+        val scaffoldString = buildString {
+            appendLine("${scaffoldIndent}Scaffold(")
+            appendLine("${scaffoldIndent}    modifier = Modifier.fillMaxSize(),")
             if (topBarChild != null) {
-                appendLine("${indent}    topBar = {")
-                append(generateNodeCode(topBarChild, indent = "$indent        "))
-                appendLine("${indent}    },")
+                appendLine("${scaffoldIndent}    topBar = {")
+                append(generateNodeCode(topBarChild, indent = "$scaffoldIndent        "))
+                appendLine("${scaffoldIndent}    },")
             }
             if (bottomBarChild != null) {
-                appendLine("${indent}    bottomBar = {")
-                append(generateNodeCode(bottomBarChild, indent = "$indent        "))
-                appendLine("${indent}    },")
+                appendLine("${scaffoldIndent}    bottomBar = {")
+                append(generateNodeCode(bottomBarChild, indent = "$scaffoldIndent        "))
+                appendLine("${scaffoldIndent}    },")
+            }
+            if (snackbarChild != null) {
+                appendLine("${scaffoldIndent}    snackbarHost = {")
+                append(generateNodeCode(snackbarChild, indent = "$scaffoldIndent        "))
+                appendLine("${scaffoldIndent}    },")
             }
             if (fabChild != null) {
-                appendLine("${indent}    floatingActionButton = {")
-                append(generateNodeCode(fabChild, indent = "$indent        "))
-                appendLine("${indent}    }")
+                appendLine("${scaffoldIndent}    floatingActionButton = {")
+                append(generateNodeCode(fabChild, indent = "$scaffoldIndent        "))
+                appendLine("${scaffoldIndent}    }")
             }
-            appendLine("${indent}) { innerPadding ->")
-            if (contentChildren.isEmpty()) {
-                appendLine("${indent}    Box(modifier = Modifier.fillMaxSize().padding(innerPadding))")
-            } else if (contentChildren.size == 1 && contentChildren.first().isContainer) {
-                val singleContainer = contentChildren.first()
-                append(generateNodeCode(singleContainer, indent = "$indent    ", extraModifier = "padding(innerPadding)"))
-            } else {
-                appendLine("${indent}    Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {")
-                contentChildren.forEach { child ->
-                    append(generateNodeCode(child, indent = "$indent        "))
+            appendLine("${scaffoldIndent}) { innerPadding ->")
+            if (railChild != null) {
+                appendLine("${scaffoldIndent}    Row(modifier = Modifier.fillMaxSize().padding(innerPadding)) {")
+                append(generateNodeCode(railChild, indent = "$scaffoldIndent        "))
+                if (contentChildren.isEmpty()) {
+                    appendLine("${scaffoldIndent}        Box(modifier = Modifier.weight(1f).fillMaxHeight())")
+                } else if (contentChildren.size == 1 && contentChildren.first().isContainer) {
+                    val singleContainer = contentChildren.first()
+                    append(generateNodeCode(singleContainer, indent = "$scaffoldIndent        ", extraModifier = "weight(1f).fillMaxHeight()"))
+                } else {
+                    appendLine("${scaffoldIndent}        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {")
+                    contentChildren.forEach { child ->
+                        append(generateNodeCode(child, indent = "$scaffoldIndent            "))
+                    }
+                    appendLine("${scaffoldIndent}        }")
                 }
-                appendLine("${indent}    }")
+                appendLine("${scaffoldIndent}    }")
+            } else {
+                if (contentChildren.isEmpty()) {
+                    appendLine("${scaffoldIndent}    Box(modifier = Modifier.fillMaxSize().padding(innerPadding))")
+                } else if (contentChildren.size == 1 && contentChildren.first().isContainer) {
+                    val singleContainer = contentChildren.first()
+                    append(generateNodeCode(singleContainer, indent = "$scaffoldIndent    ", extraModifier = "padding(innerPadding)"))
+                } else {
+                    appendLine("${scaffoldIndent}    Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {")
+                    contentChildren.forEach { child ->
+                        append(generateNodeCode(child, indent = "$scaffoldIndent        "))
+                    }
+                    appendLine("${scaffoldIndent}    }")
+                }
             }
-            appendLine("${indent}}")
+            appendLine("${scaffoldIndent}}")
+        }
+
+        return if (drawerChild != null) {
+            buildString {
+                appendLine("${indent}ModalNavigationDrawer(")
+                appendLine("${indent}    drawerContent = {")
+                appendLine("${indent}        ModalDrawerSheet {")
+                append(generateNodeCode(drawerChild, indent = "$indent            "))
+                appendLine("${indent}        }")
+                appendLine("${indent}    }")
+                appendLine("${indent}) {")
+                append(scaffoldString)
+                appendLine("${indent}}")
+            }
+        } else {
+            scaffoldString
         }
     }
 
@@ -297,8 +340,24 @@ object ComposeCodeGenerator {
                 val iconName = node.iconProperty("icon", default = "Add")
                 val iconExpr = resolveIconCodeExpression(iconName)
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.FloatingActionButton
                 appendLine("${indent}FloatingActionButton(")
                 appendLine("${indent}    onClick = { /* TODO: FAB Action */ },")
+                when (variant) {
+                    MaterialVariant.FloatingActionButton.SURFACE -> {
+                        appendLine("${indent}    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,")
+                        appendLine("${indent}    contentColor = MaterialTheme.colorScheme.primary,")
+                    }
+                    MaterialVariant.FloatingActionButton.SECONDARY -> {
+                        appendLine("${indent}    containerColor = MaterialTheme.colorScheme.secondaryContainer,")
+                        appendLine("${indent}    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,")
+                    }
+                    MaterialVariant.FloatingActionButton.TERTIARY -> {
+                        appendLine("${indent}    containerColor = MaterialTheme.colorScheme.tertiaryContainer,")
+                        appendLine("${indent}    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,")
+                    }
+                    null -> {}
+                }
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 appendLine("${indent}    Icon($iconExpr, contentDescription = \"$iconName\")")
@@ -310,8 +369,24 @@ object ComposeCodeGenerator {
                 val iconName = node.iconProperty("icon", default = "Add")
                 val iconExpr = resolveIconCodeExpression(iconName)
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.FloatingActionButton
                 appendLine("${indent}ExtendedFloatingActionButton(")
                 appendLine("${indent}    onClick = { /* TODO: Action */ },")
+                when (variant) {
+                    MaterialVariant.FloatingActionButton.SURFACE -> {
+                        appendLine("${indent}    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,")
+                        appendLine("${indent}    contentColor = MaterialTheme.colorScheme.primary,")
+                    }
+                    MaterialVariant.FloatingActionButton.SECONDARY -> {
+                        appendLine("${indent}    containerColor = MaterialTheme.colorScheme.secondaryContainer,")
+                        appendLine("${indent}    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,")
+                    }
+                    MaterialVariant.FloatingActionButton.TERTIARY -> {
+                        appendLine("${indent}    containerColor = MaterialTheme.colorScheme.tertiaryContainer,")
+                        appendLine("${indent}    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,")
+                    }
+                    null -> {}
+                }
                 appendLine("${indent}    icon = { Icon($iconExpr, contentDescription = null) },")
                 appendLine("${indent}    text = { Text(text = \"$text\") },")
                 appendLine("${indent}    modifier = $mod")
@@ -898,7 +973,16 @@ object ComposeCodeGenerator {
 
         if (isRootFloating) {
             parts.add("offset(x = ${node.position.x.toInt()}.dp, y = ${node.position.y.toInt()}.dp)")
-            parts.add("size(width = ${node.size.width.toInt()}.dp, height = ${node.size.height.toInt()}.dp)")
+            if (!node.hasExplicitWidth() && !node.hasExplicitHeight()) {
+                parts.add("size(width = ${node.size.width.toInt()}.dp, height = ${node.size.height.toInt()}.dp)")
+            } else {
+                if (!node.hasExplicitWidth()) {
+                    parts.add("width(${node.size.width.toInt()}.dp)")
+                }
+                if (!node.hasExplicitHeight()) {
+                    parts.add("height(${node.size.height.toInt()}.dp)")
+                }
+            }
         }
 
         if (extraModifier != null) {

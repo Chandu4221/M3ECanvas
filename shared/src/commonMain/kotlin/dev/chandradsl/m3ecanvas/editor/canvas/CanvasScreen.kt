@@ -450,9 +450,10 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
     val baseModifier = if (isScaffold) {
         Modifier.fillMaxSize()
     } else {
-        Modifier
-            .offset(x = node.position.x.dp, y = node.position.y.dp)
-            .size(width = node.size.width.dp, height = node.size.height.dp)
+        var mod = Modifier.offset(x = node.position.x.dp, y = node.position.y.dp)
+        mod = if (node.hasFillMaxWidth()) mod.fillMaxWidth() else mod.width(node.size.width.dp)
+        mod = if (node.hasFillMaxHeight()) mod.fillMaxHeight() else mod.height(node.size.height.dp)
+        mod
     }
 
     Box(
