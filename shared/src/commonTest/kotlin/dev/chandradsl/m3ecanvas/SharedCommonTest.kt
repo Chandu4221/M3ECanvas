@@ -5,6 +5,8 @@ import dev.chandradsl.m3ecanvas.editor.canvas.AVAILABLE_MATERIAL_ICONS
 import dev.chandradsl.m3ecanvas.editor.canvas.resolveMaterialIcon
 import dev.chandradsl.m3ecanvas.editor.codegen.AIPromptGenerator
 import dev.chandradsl.m3ecanvas.editor.codegen.ComposeCodeGenerator
+import dev.chandradsl.m3ecanvas.editor.component.ComponentDefinition
+import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import kotlin.test.*
@@ -1007,5 +1009,84 @@ class SharedCommonTest {
         assertTrue(code.contains("fillMaxWidth()"), "Should include fillMaxWidth")
         assertTrue(code.contains("fillMaxHeight()"), "Should include fillMaxHeight")
         assertFalse(code.contains("size(width = 300.dp"), "Should not generate fixed width when fillMaxWidth is present")
+    }
+
+    @Test
+    fun testComponentRegistryCompleteness() {
+        val allDefs = ComponentRegistry.default.all()
+        assertEquals(ComponentType.entries.size, allDefs.size, "Every ComponentType must have a ComponentDefinition")
+
+        ComponentType.entries.forEach { type ->
+            val def = ComponentRegistry.default.get(type)
+            assertNotNull(def, "ComponentDefinition missing for $type")
+            assertEquals(type, def.type)
+            assertTrue(def.displayName.isNotEmpty(), "Display name must not be empty for $type")
+            assertNotNull(def.icon(), "Icon must not be null for $type")
+
+            val size = def.defaultSize(412f, 915f)
+            assertTrue(size.width > 0f, "Default width must be positive for $type")
+            assertTrue(size.height > 0f, "Default height must be positive for $type")
+        }
+    }
+
+    @Test
+    fun testComponentRegistryVariantsMapping() {
+        assertEquals(MaterialVariant.Button.entries, ComponentRegistry.default.variantsFor(ComponentType.BUTTON))
+        assertEquals(MaterialVariant.IconButton.entries, ComponentRegistry.default.variantsFor(ComponentType.ICON_BUTTON))
+        assertEquals(MaterialVariant.FloatingActionButton.entries, ComponentRegistry.default.variantsFor(ComponentType.FAB))
+        assertEquals(MaterialVariant.FloatingActionButton.entries, ComponentRegistry.default.variantsFor(ComponentType.EXTENDED_FAB))
+        assertEquals(MaterialVariant.Card.entries, ComponentRegistry.default.variantsFor(ComponentType.CARD))
+        assertEquals(MaterialVariant.Chip.entries, ComponentRegistry.default.variantsFor(ComponentType.CHIPS))
+        assertEquals(MaterialVariant.TextField.entries, ComponentRegistry.default.variantsFor(ComponentType.TEXT_FIELD))
+        assertEquals(MaterialVariant.Surface.entries, ComponentRegistry.default.variantsFor(ComponentType.SURFACE))
+
+        // Non-variant component returns empty
+        assertEquals(emptyList(), ComponentRegistry.default.variantsFor(ComponentType.TEXT))
+    }
+
+    @Test
+    fun testCustomComponentRegistryInjection() {
+        val customDefs = ComponentRegistry.defaultDefinitions().toMutableMap()
+        customDefs[ComponentType.BUTTON] = ComponentDefinition(
+            type = ComponentType.BUTTON,
+            defaultSize = { _, _ -> CanvasSize(999f, 888f) }
+        )
+        val customRegistry = ComponentRegistry(definitions = customDefs)
+        val controller = EditorController(
+            initialProject = EditorController.newProject(withDefaultScaffold = false),
+            componentRegistry = customRegistry
+        )
+
+        val size = controller.defaultSizeFor(ComponentType.BUTTON)
+        assertEquals(CanvasSize(999f, 888f), size, "EditorController should use injected ComponentRegistry size")
+
+        controller.addNode(type = ComponentType.BUTTON, position = CanvasPosition(10f, 10f))
+        val addedButton = controller.state.project.nodes.first { it.type == ComponentType.BUTTON }
+        assertEquals(CanvasSize(999f, 888f), addedButton.size, "Added button node should take injected registry size")
+    }
+
+    @Test
+    fun testCustomCodeGeneratorInjectedIntoAIPromptGenerator() {
+        val customGenerator = object : ComposeCodeGenerator() {
+            override fun generateFile(project: M3EProject, functionName: String): String {
+                return "// Custom Generated Code for ${project.name}"
+            }
+        }
+        val promptGenerator = AIPromptGenerator(codeGenerator = customGenerator)
+        val project = M3EProject(name = "CustomPromptTest")
+        val prompt = promptGenerator.generate(project)
+
+        assertTrue(prompt.contains("// Custom Generated Code for CustomPromptTest"))
+        assertFalse(prompt.contains("Theme Preset"), "themeId should no longer appear in prompt output")
+    }
+
+    @Test
+    fun testProjectSerializationWithoutThemeId() {
+        val project = M3EProject(name = "NoThemeProject")
+        val json = M3EJson.encodeToString(project)
+
+        assertFalse(json.contains("\"themeId\""), "Serialized JSON must not contain dead themeId")
+        val decoded = M3EJson.decodeFromString<M3EProject>(json)
+        assertEquals("NoThemeProject", decoded.name)
     }
 }

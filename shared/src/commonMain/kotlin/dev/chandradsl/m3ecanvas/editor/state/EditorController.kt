@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
 
 /**
@@ -12,7 +13,8 @@ import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
  * Supports command undo/redo history and clipboard operations.
  */
 class EditorController(
-    initialProject: M3EProject = newProject()
+    initialProject: M3EProject = newProject(),
+    val componentRegistry: ComponentRegistry = ComponentRegistry.default
 ) {
 
     private val history = HistoryStack<M3EProject>()
@@ -577,7 +579,7 @@ class EditorController(
      * Default sizes per component, calculated relative to the active device screen.
      */
     fun defaultSizeFor(type: ComponentType): CanvasSize {
-        return defaultSizeFor(
+        return componentRegistry.defaultSizeFor(
             type = type,
             deviceWidth = state.project.deviceProfile.size.width,
             deviceHeight = state.project.deviceProfile.size.height
@@ -590,64 +592,7 @@ class EditorController(
             deviceWidth: Float = 412f,
             deviceHeight: Float = 915f
         ): CanvasSize {
-            return when (type) {
-                ComponentType.SCAFFOLD -> CanvasSize(width = deviceWidth, height = deviceHeight)
-                ComponentType.TOP_APP_BAR -> CanvasSize(width = deviceWidth, height = 64f)
-                ComponentType.NAVIGATION_BAR -> CanvasSize(width = deviceWidth, height = 80f)
-                ComponentType.NAVIGATION_RAIL -> CanvasSize(width = 80f, height = deviceHeight)
-                ComponentType.NAVIGATION_DRAWER -> CanvasSize(width = 300f, height = deviceHeight)
-                ComponentType.TABS -> CanvasSize(width = deviceWidth, height = 48f)
-                ComponentType.SEARCH -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 56f)
-
-                ComponentType.FAB -> CanvasSize(width = 56f, height = 56f)
-                ComponentType.EXTENDED_FAB -> CanvasSize(width = 140f, height = 56f)
-                ComponentType.BUTTON -> CanvasSize(width = 120f, height = 40f)
-                ComponentType.ICON_BUTTON -> CanvasSize(width = 48f, height = 48f)
-                ComponentType.SEGMENTED_BUTTON -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(220f), height = 48f)
-                ComponentType.SPLIT_BUTTON -> CanvasSize(width = 140f, height = 40f)
-                ComponentType.BUTTON_GROUP -> CanvasSize(width = 260f, height = 40f)
-
-                ComponentType.CARD -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 160f)
-                ComponentType.LISTS -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 72f)
-                ComponentType.SHEETS -> CanvasSize(width = deviceWidth, height = 220f)
-                ComponentType.DIALOG -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(260f), height = 200f)
-
-                ComponentType.SNACKBAR -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 48f)
-                ComponentType.BADGE -> CanvasSize(width = 48f, height = 48f)
-                ComponentType.TOOLTIP -> CanvasSize(width = 160f, height = 36f)
-                ComponentType.PROGRESS_INDICATOR -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(200f), height = 8f)
-                ComponentType.LOADING_INDICATOR -> CanvasSize(width = 48f, height = 48f)
-
-                ComponentType.CHECKBOX -> CanvasSize(width = 180f, height = 40f)
-                ComponentType.RADIO_BUTTON -> CanvasSize(width = 180f, height = 40f)
-                ComponentType.SWITCH -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(180f), height = 44f)
-                ComponentType.SLIDER -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(200f), height = 48f)
-                ComponentType.CHIPS -> CanvasSize(width = 100f, height = 36f)
-                ComponentType.DATE_PICKER -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(280f), height = 320f)
-                ComponentType.TIME_PICKER -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(260f), height = 180f)
-                ComponentType.MENUS -> CanvasSize(width = 180f, height = 140f)
-
-                ComponentType.TEXT_FIELD -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 56f)
-                ComponentType.TEXT -> CanvasSize(width = 120f, height = 24f)
-                ComponentType.ICON -> CanvasSize(width = 24f, height = 24f)
-                ComponentType.IMAGE -> CanvasSize(width = 120f, height = 120f)
-                ComponentType.HORIZONTAL_DIVIDER -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 1f)
-                ComponentType.VERTICAL_DIVIDER -> CanvasSize(width = 1f, height = 48f)
-                ComponentType.SPACER -> CanvasSize(width = 16f, height = 16f)
-
-                ComponentType.BOTTOM_APP_BAR -> CanvasSize(width = deviceWidth, height = 80f)
-                ComponentType.RANGE_SLIDER -> CanvasSize(width = (deviceWidth - 48f).coerceAtLeast(200f), height = 48f)
-                ComponentType.SURFACE -> CanvasSize(width = (deviceWidth - 32f).coerceAtLeast(200f), height = 160f)
-
-                ComponentType.COLUMN,
-                ComponentType.LAZY_COLUMN,
-                ComponentType.LAZY_VERTICAL_GRID,
-                ComponentType.FLOW_COLUMN -> CanvasSize(width = deviceWidth, height = (deviceHeight - 160f).coerceAtLeast(200f))
-                ComponentType.ROW,
-                ComponentType.LAZY_ROW,
-                ComponentType.FLOW_ROW -> CanvasSize(width = deviceWidth, height = 120f)
-                ComponentType.BOX -> CanvasSize(width = deviceWidth, height = 300f)
-            }
+            return ComponentRegistry.default.defaultSizeFor(type, deviceWidth, deviceHeight)
         }
         fun newProject(name: String = "Untitled", withDefaultScaffold: Boolean = true): M3EProject {
             val device = DeviceProfile.default

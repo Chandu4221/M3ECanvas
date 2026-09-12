@@ -7,7 +7,9 @@ import dev.chandradsl.m3ecanvas.domain.model.*
  * (Cursor, Claude Code, Gemini CLI) to build complete working features around
  * the visual M3E Canvas screen.
  */
-object AIPromptGenerator {
+open class AIPromptGenerator(
+    private val codeGenerator: ComposeCodeGenerator = ComposeCodeGenerator.default
+) {
 
     fun generate(project: M3EProject): String {
         return buildString {
@@ -18,7 +20,6 @@ object AIPromptGenerator {
             appendLine("## Target Device Specifications")
             appendLine("- **Device Profile**: ${project.deviceProfile.displayName} (${project.deviceProfile.category.displayName})")
             appendLine("- **Viewport Resolution**: ${project.deviceProfile.size.width.toInt()}dp × ${project.deviceProfile.size.height.toInt()}dp")
-            appendLine("- **Theme Preset**: ${project.themeId}")
             appendLine()
             appendLine("## UI Hierarchy & Structural Slots")
             appendLine()
@@ -32,7 +33,7 @@ object AIPromptGenerator {
             appendLine()
             appendLine("## Generated Compose Scaffold & Layout Code")
             appendLine("```kotlin")
-            append(ComposeCodeGenerator.generateFile(project))
+            append(codeGenerator.generateFile(project))
             appendLine("```")
             appendLine()
             appendLine("## Implementation Instructions for AI")
@@ -74,5 +75,11 @@ object AIPromptGenerator {
             is ComponentProperty.Variant -> prop.value.displayName
             is ComponentProperty.Icon -> prop.iconName
         }
+    }
+
+    companion object {
+        val default: AIPromptGenerator by lazy { AIPromptGenerator() }
+
+        fun generate(project: M3EProject): String = default.generate(project)
     }
 }

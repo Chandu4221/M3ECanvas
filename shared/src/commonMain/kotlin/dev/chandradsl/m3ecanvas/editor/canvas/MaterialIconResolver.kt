@@ -9,39 +9,45 @@ import androidx.compose.ui.graphics.vector.ImageVector
 /**
  * Standard list of Material icons offered in the properties panel and canvas components.
  */
-object MaterialIconResolver {
-    val AVAILABLE_MATERIAL_ICONS = listOf(
-        "Favorite",
-        "Home",
-        "Search",
-        "Settings",
-        "Add",
-        "Close",
-        "Star",
-        "Notifications",
-        "Share",
-        "Delete",
-        "Edit",
-        "Info",
-        "Menu",
-        "Check",
-        "ArrowBack",
-        "Person",
-        "Refresh",
-        "Lock",
-        "Email",
-        "Phone",
-        "Send",
-        "ThumbUp",
-        "PlayArrow",
-        "Warning"
-    )
+val DEFAULT_AVAILABLE_MATERIAL_ICONS = listOf(
+    "Favorite",
+    "Home",
+    "Search",
+    "Settings",
+    "Add",
+    "Close",
+    "Star",
+    "Notifications",
+    "Share",
+    "Delete",
+    "Edit",
+    "Info",
+    "Menu",
+    "Check",
+    "ArrowBack",
+    "Person",
+    "Refresh",
+    "Lock",
+    "Email",
+    "Phone",
+    "Send",
+    "ThumbUp",
+    "PlayArrow",
+    "Warning"
+)
 
+/**
+ * Standard list of Material icons offered in the properties panel and canvas components.
+ * Can be instantiated and mocked/extended for testing.
+ */
+open class MaterialIconResolver(
+    val availableIcons: List<String> = DEFAULT_AVAILABLE_MATERIAL_ICONS
+) {
     /**
      * Maps a string icon name to its [ImageVector] representation using only Material font icons.
      * Catches any classloading or linkage errors gracefully.
      */
-    fun resolve(iconName: String): ImageVector {
+    open fun resolve(iconName: String): ImageVector {
         return try {
             when (iconName.trim().lowercase()) {
                 "favorite" -> Icons.Outlined.Favorite
@@ -74,6 +80,13 @@ object MaterialIconResolver {
         } catch (_: Throwable) {
             Icons.Outlined.Favorite
         }
+    }
+
+    companion object {
+        val default: MaterialIconResolver by lazy { MaterialIconResolver() }
+        val AVAILABLE_MATERIAL_ICONS = DEFAULT_AVAILABLE_MATERIAL_ICONS
+
+        fun resolve(iconName: String): ImageVector = default.resolve(iconName)
     }
 }
 

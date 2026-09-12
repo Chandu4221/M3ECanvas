@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.editor.canvas.AVAILABLE_MATERIAL_ICONS
 import dev.chandradsl.m3ecanvas.editor.canvas.resolveMaterialIcon
+import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 /**
@@ -521,16 +522,7 @@ private fun supportsText(node: CanvasNode): Boolean {
 }
 
 private fun variantsFor(type: ComponentType): List<MaterialVariant> {
-    return when (type) {
-        ComponentType.BUTTON -> MaterialVariant.Button.entries
-        ComponentType.ICON_BUTTON -> MaterialVariant.IconButton.entries
-        ComponentType.FAB -> MaterialVariant.FloatingActionButton.entries
-        ComponentType.CARD -> MaterialVariant.Card.entries
-        ComponentType.CHIPS -> MaterialVariant.Chip.entries
-        ComponentType.TEXT_FIELD -> MaterialVariant.TextField.entries
-        ComponentType.SURFACE -> MaterialVariant.Surface.entries
-        else -> emptyList()
-    }
+    return ComponentRegistry.default.variantsFor(type)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

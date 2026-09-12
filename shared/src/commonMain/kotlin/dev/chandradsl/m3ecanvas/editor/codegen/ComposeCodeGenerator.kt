@@ -1,18 +1,21 @@
 package dev.chandradsl.m3ecanvas.editor.codegen
 
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 
 /**
  * Deterministic compiler that translates an [M3EProject] AST into
  * clean, idiomatic, compile-ready Jetpack Compose / Compose Multiplatform code.
  */
-object ComposeCodeGenerator {
+open class ComposeCodeGenerator(
+    val registry: ComponentRegistry = ComponentRegistry.default
+) {
 
     /**
      * Generates a complete Kotlin file including imports, screen Composable,
      * and previews.
      */
-    fun generateFile(project: M3EProject, functionName: String = sanitizeName(project.name)): String {
+    open fun generateFile(project: M3EProject, functionName: String = sanitizeName(project.name)): String {
         val body = buildString {
             appendLine("package com.example.app.ui.screens")
             appendLine()
@@ -157,7 +160,7 @@ object ComposeCodeGenerator {
         }
     }
 
-    fun generateNodeCode(
+    open fun generateNodeCode(
         node: CanvasNode,
         indent: String,
         isRootFloating: Boolean = false,
@@ -1133,11 +1136,6 @@ object ComposeCodeGenerator {
         }
     }
 
-    private fun sanitizeName(raw: String): String {
-        val clean = raw.replace(Regex("[^A-Za-z0-9]"), "")
-        return if (clean.isEmpty()) "M3EScreen" else "${clean.replaceFirstChar { it.uppercase() }}Screen"
-    }
-
     private fun resolveIconCodeExpression(iconName: String): String {
         return when (iconName.trim().lowercase()) {
             "favorite" -> "Icons.Outlined.Favorite"
@@ -1167,5 +1165,24 @@ object ComposeCodeGenerator {
             "warning" -> "Icons.Outlined.Warning"
             else -> "Icons.Outlined.Favorite"
         }
+    }
+
+    companion object {
+        fun sanitizeName(raw: String): String {
+            val clean = raw.replace(Regex("[^A-Za-z0-9]"), "")
+            return if (clean.isEmpty()) "M3EScreen" else "${clean.replaceFirstChar { it.uppercase() }}Screen"
+        }
+
+        val default: ComposeCodeGenerator by lazy { ComposeCodeGenerator() }
+
+        fun generateFile(project: M3EProject, functionName: String = sanitizeName(project.name)): String =
+            default.generateFile(project, functionName)
+
+        fun generateNodeCode(
+            node: CanvasNode,
+            indent: String,
+            isRootFloating: Boolean = false,
+            extraModifier: String? = null
+        ): String = default.generateNodeCode(node, indent, isRootFloating, extraModifier)
     }
 }

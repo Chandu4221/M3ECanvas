@@ -22,7 +22,6 @@ data class M3EProject(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val deviceProfile: DeviceProfile = DeviceProfile.default,
     val nodes: List<CanvasNode> = emptyList(),
-    val themeId: String = DEFAULT_THEME_ID,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 ) {
@@ -30,9 +29,6 @@ data class M3EProject(
     companion object {
         /** Bump this whenever the project file format changes, to support migration. */
         const val CURRENT_SCHEMA_VERSION = 1
-
-        /** Identifier for the baseline Material 3 theme used before custom theming. */
-        const val DEFAULT_THEME_ID = "m3_baseline"
     }
 
     /** Recursively finds a node by [nodeId] across all top-level trees. */

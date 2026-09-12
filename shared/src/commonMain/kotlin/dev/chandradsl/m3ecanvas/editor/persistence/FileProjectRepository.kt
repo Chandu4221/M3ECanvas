@@ -10,19 +10,20 @@ import java.io.File
  * pretty-printed JSON file at ~/.m3ecanvas/project.json.
  */
 class FileProjectRepository(
-    private val file: File = defaultFile()
+    private val file: File = defaultFile(),
+    val serializer: ProjectSerializer = ProjectSerializer.default
 ) : ProjectRepository {
 
     override suspend fun save(project: M3EProject): Unit = withContext(Dispatchers.IO) {
         file.parentFile?.mkdirs()
-        file.writeText(text = M3EJson.encodeToString(value = project))
+        file.writeText(text = serializer.encodeToString(project = project))
     }
 
     override suspend fun load(): LoadResult = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext LoadResult.NotFound
         try {
             val text = file.readText()
-            val project = M3EJson.decodeFromString<M3EProject>(string = text)
+            val project = serializer.decodeFromString(string = text)
             LoadResult.Success(project = project)
         } catch (e: Throwable) {
             LoadResult.Corrupted(reason = e.message ?: "Failed to read or parse project file", cause = e)
