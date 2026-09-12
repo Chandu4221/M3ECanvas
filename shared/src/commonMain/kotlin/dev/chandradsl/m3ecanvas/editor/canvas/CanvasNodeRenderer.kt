@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 
 package dev.chandradsl.m3ecanvas.editor.canvas
 
@@ -9,9 +9,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyHorizontalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +27,8 @@ import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -120,6 +129,19 @@ fun CanvasNodeRenderer(
             }
         }
 
+        ComponentType.BOX_WITH_CONSTRAINTS -> BoxWithConstraints(
+            modifier = node.modifiers.toModifier()
+                .fillMaxSize()
+                .padding(all = node.layoutConfig.padding.dp),
+            contentAlignment = resolveContentAlignment(config = node.layoutConfig)
+        ) {
+            node.children.forEach { child ->
+                val alignSpec = child.modifiers.filterIsInstance<ModifierSpec.Align>().firstOrNull()
+                val scopeModifier = if (alignSpec != null) Modifier.align(alignSpec.alignment.toBoxAlignment()) else Modifier
+                ContainerChild(child = child, controller = controller, modifier = scopeModifier)
+            }
+        }
+
         ComponentType.LAZY_COLUMN -> LazyColumn(
             modifier = node.modifiers.toModifier()
                 .fillMaxSize()
@@ -145,11 +167,17 @@ fun CanvasNodeRenderer(
         }
 
         ComponentType.LAZY_VERTICAL_GRID -> RenderLazyVerticalGrid(node = node, controller = controller)
+        ComponentType.LAZY_HORIZONTAL_GRID -> RenderLazyHorizontalGrid(node = node, controller = controller)
+        ComponentType.LAZY_VERTICAL_STAGGERED_GRID -> RenderLazyVerticalStaggeredGrid(node = node, controller = controller)
+        ComponentType.LAZY_HORIZONTAL_STAGGERED_GRID -> RenderLazyHorizontalStaggeredGrid(node = node, controller = controller)
+        ComponentType.HORIZONTAL_PAGER -> RenderHorizontalPager(node = node, controller = controller)
+        ComponentType.CAROUSEL -> RenderCarousel(node = node, controller = controller)
         ComponentType.FLOW_ROW -> RenderFlowRow(node = node, controller = controller)
         ComponentType.FLOW_COLUMN -> RenderFlowColumn(node = node, controller = controller)
         ComponentType.SPACER -> RenderSpacer(node = node)
         ComponentType.SURFACE -> RenderSurface(node = node, controller = controller)
         ComponentType.SCAFFOLD -> RenderScaffold(node = node, controller = controller)
+        ComponentType.BOTTOM_SHEET_SCAFFOLD -> RenderBottomSheetScaffold(node = node, controller = controller)
 
         // Action
         ComponentType.BUTTON -> RenderButton(node = node)
@@ -159,27 +187,36 @@ fun CanvasNodeRenderer(
         ComponentType.SEGMENTED_BUTTON -> RenderSegmentedButton(node = node)
         ComponentType.SPLIT_BUTTON -> RenderSplitButton(node = node)
         ComponentType.BUTTON_GROUP -> RenderButtonGroup(node = node)
+        ComponentType.TOGGLE_BUTTON -> RenderToggleButton(node = node)
 
         // Containment
         ComponentType.CARD -> RenderCard(node = node, controller = controller)
-        ComponentType.LISTS -> RenderListItem(node = node, controller = controller)
-        ComponentType.SHEETS -> RenderBottomSheet(node = node, controller = controller)
-        ComponentType.DIALOG -> RenderDialog(node = node, controller = controller)
+        ComponentType.ELEVATED_CARD -> RenderCard(node = node, controller = controller, forcedVariant = MaterialVariant.Card.ELEVATED)
+        ComponentType.OUTLINED_CARD -> RenderCard(node = node, controller = controller, forcedVariant = MaterialVariant.Card.OUTLINED)
+        ComponentType.LIST_ITEM -> RenderListItem(node = node, controller = controller)
+        ComponentType.MODAL_BOTTOM_SHEET -> RenderBottomSheet(node = node, controller = controller)
+        ComponentType.ALERT_DIALOG -> RenderDialog(node = node, controller = controller)
+        ComponentType.BASIC_ALERT_DIALOG -> RenderBasicDialog(node = node, controller = controller)
 
         // Communication
         ComponentType.SNACKBAR -> RenderSnackbar(node = node)
+        ComponentType.SNACKBAR_HOST -> RenderSnackbarHost(node = node)
         ComponentType.BADGE -> RenderBadge(node = node)
+        ComponentType.BADGED_BOX -> RenderBadgedBox(node = node, controller = controller)
         ComponentType.TOOLTIP -> RenderTooltip(node = node)
         ComponentType.PROGRESS_INDICATOR -> RenderProgressIndicator(node = node)
         ComponentType.LOADING_INDICATOR -> RenderLoadingIndicator(node = node)
 
         // Navigation
         ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node, controller = controller)
-        ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node)
+        ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node, controller = controller)
+        ComponentType.NAVIGATION_BAR_ITEM -> RenderNavigationBarItem(node = node)
         ComponentType.BOTTOM_APP_BAR -> RenderBottomAppBar(node = node)
-        ComponentType.NAVIGATION_RAIL -> RenderNavigationRail(node = node)
+        ComponentType.NAVIGATION_RAIL -> RenderNavigationRail(node = node, controller = controller)
+        ComponentType.NAVIGATION_RAIL_ITEM -> RenderNavigationRailItem(node = node)
         ComponentType.NAVIGATION_DRAWER -> RenderNavigationDrawer(node = node)
-        ComponentType.TABS -> RenderTabs(node = node)
+        ComponentType.TABS -> RenderTabs(node = node, controller = controller)
+        ComponentType.TAB -> RenderTab(node = node)
         ComponentType.SEARCH -> RenderSearch(node = node)
 
         // Selection
@@ -191,7 +228,8 @@ fun CanvasNodeRenderer(
         ComponentType.CHIPS -> RenderChip(node = node)
         ComponentType.DATE_PICKER -> RenderDatePicker(node = node)
         ComponentType.TIME_PICKER -> RenderTimePicker(node = node)
-        ComponentType.MENUS -> RenderMenu(node = node)
+        ComponentType.MENUS -> RenderMenu(node = node, controller = controller)
+        ComponentType.DROPDOWN_MENU_ITEM -> RenderDropdownMenuItem(node = node)
 
         // Text input
         ComponentType.TEXT_FIELD -> RenderTextField(node = node)
@@ -225,8 +263,13 @@ private fun RenderButton(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderCard(node: CanvasNode, controller: EditorController) {
-    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Card
+private fun RenderCard(
+    node: CanvasNode,
+    controller: EditorController,
+    forcedVariant: MaterialVariant.Card? = null
+) {
+    val variant = forcedVariant
+        ?: (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Card
         ?: MaterialVariant.Card.FILLED
     val modifier = node.modifiers.toModifier().fillMaxSize()
 
@@ -387,6 +430,64 @@ private fun RenderScaffold(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun RenderBottomSheetScaffold(node: CanvasNode, controller: EditorController) {
+    val topBarChild = node.childInSlot(SlotRole.TOP_BAR)
+    val sheetChild = node.childInSlot(SlotRole.SHEET_CONTENT)
+    val snackbarChild = node.childInSlot(SlotRole.SNACKBAR)
+    val contentChildren = node.childrenInSlot(SlotRole.CONTENT).ifEmpty {
+        node.children.filter { it.slot != SlotRole.TOP_BAR && it.slot != SlotRole.SHEET_CONTENT && it.slot != SlotRole.SNACKBAR }
+    }
+
+    BottomSheetScaffold(
+        scaffoldState = rememberBottomSheetScaffoldState(),
+        topBar = if (topBarChild != null) {
+            { SlotContainer(child = topBarChild, controller = controller) }
+        } else null,
+        snackbarHost = if (snackbarChild != null) {
+            { SlotContainer(child = snackbarChild, controller = controller) }
+        } else {
+            { SnackbarHost(hostState = remember { SnackbarHostState() }) }
+        },
+        sheetContent = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (sheetChild != null) {
+                    SlotContainer(child = sheetChild, controller = controller)
+                } else {
+                    Text(
+                        text = "Bottom Sheet Content",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Sheet content slot preview",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        sheetPeekHeight = 64.dp,
+        modifier = node.modifiers.toModifier().fillMaxSize()
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            contentChildren.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun RenderTopAppBar(node: CanvasNode, controller: EditorController) {
     val titleText = (node.property("title") as? ComponentProperty.Text)?.value
         ?: (node.property("text") as? ComponentProperty.Text)?.value
@@ -441,28 +542,60 @@ private fun RenderTopAppBar(node: CanvasNode, controller: EditorController) {
 }
 
 @Composable
-private fun RenderNavigationBar(node: CanvasNode) {
+private fun RenderNavigationBar(node: CanvasNode, controller: EditorController) {
     NavigationBar(
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
-        NavigationBarItem(
-            selected = true,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
-            label = { Text(text = "Home") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Explore") },
-            label = { Text(text = "Explore") }
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.Person, contentDescription = "Profile") },
-            label = { Text(text = "Profile") }
-        )
+        if (node.children.isNotEmpty()) {
+            node.children.forEach { child ->
+                if (child.type == ComponentType.NAVIGATION_BAR_ITEM) {
+                    RenderNavigationBarItem(node = child)
+                } else {
+                    ContainerChild(child = child, controller = controller)
+                }
+            }
+        } else {
+            NavigationBarItem(
+                selected = true,
+                onClick = {},
+                icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
+                label = { Text(text = "Home") }
+            )
+            NavigationBarItem(
+                selected = false,
+                onClick = {},
+                icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Explore") },
+                label = { Text(text = "Explore") }
+            )
+            NavigationBarItem(
+                selected = false,
+                onClick = {},
+                icon = { Icon(imageVector = Icons.Outlined.Person, contentDescription = "Profile") },
+                label = { Text(text = "Profile") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowScope.RenderNavigationBarItem(node: CanvasNode) {
+    val label = (node.property("label") as? ComponentProperty.Text)?.value
+        ?: (node.property("text") as? ComponentProperty.Text)?.value
+        ?: node.name
+    val iconName = node.iconProperty(key = "icon", default = "Home")
+    val selected = node.booleanProperty(key = "selected", default = true)
+    NavigationBarItem(
+        selected = selected,
+        onClick = {},
+        icon = { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = label) },
+        label = { Text(text = label) }
+    )
+}
+
+@Composable
+private fun RenderNavigationBarItem(node: CanvasNode) {
+    Row {
+        RenderNavigationBarItem(node = node)
     }
 }
 
@@ -471,6 +604,10 @@ private fun RenderFab(node: CanvasNode) {
     val iconName = node.iconProperty(key = "icon", default = "Add")
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.FloatingActionButton
         ?: MaterialVariant.FloatingActionButton.SECONDARY
+    val fabSize = ((node.property(key = "fabSize") as? ComponentProperty.Variant)?.value as? MaterialVariant.FabSize)
+        ?: ((node.property(key = "size") as? ComponentProperty.Variant)?.value as? MaterialVariant.FabSize)
+        ?: MaterialVariant.FabSize.MEDIUM
+
     val containerColor = when (variant) {
         MaterialVariant.FloatingActionButton.SURFACE -> MaterialTheme.colorScheme.surfaceContainerHigh
         MaterialVariant.FloatingActionButton.SECONDARY -> MaterialTheme.colorScheme.secondaryContainer
@@ -481,13 +618,32 @@ private fun RenderFab(node: CanvasNode) {
         MaterialVariant.FloatingActionButton.SECONDARY -> MaterialTheme.colorScheme.onSecondaryContainer
         MaterialVariant.FloatingActionButton.TERTIARY -> MaterialTheme.colorScheme.onTertiaryContainer
     }
-    FloatingActionButton(
-        onClick = {},
-        containerColor = containerColor,
-        contentColor = contentColor,
-        modifier = node.modifiers.toModifier()
-    ) {
+    val iconContent: @Composable () -> Unit = {
         Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = "Add")
+    }
+
+    when (fabSize) {
+        MaterialVariant.FabSize.SMALL -> SmallFloatingActionButton(
+            onClick = {},
+            containerColor = containerColor,
+            contentColor = contentColor,
+            modifier = node.modifiers.toModifier(),
+            content = iconContent
+        )
+        MaterialVariant.FabSize.MEDIUM -> FloatingActionButton(
+            onClick = {},
+            containerColor = containerColor,
+            contentColor = contentColor,
+            modifier = node.modifiers.toModifier(),
+            content = iconContent
+        )
+        MaterialVariant.FabSize.LARGE -> LargeFloatingActionButton(
+            onClick = {},
+            containerColor = containerColor,
+            contentColor = contentColor,
+            modifier = node.modifiers.toModifier(),
+            content = iconContent
+        )
     }
 }
 
@@ -747,6 +903,60 @@ private fun RenderButtonGroup(node: CanvasNode) {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RenderToggleButton(node: CanvasNode) {
+    val text = node.textOrDefault(default = "Toggle")
+    val iconName = node.iconProperty(key = "icon", default = "")
+    val checked = node.booleanProperty(key = "checked", default = true)
+    val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.ToggleButton
+        ?: MaterialVariant.ToggleButton.FILLED
+
+    val content: @Composable () -> Unit = {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (iconName.isNotEmpty()) {
+                Icon(
+                    imageVector = resolveMaterialIcon(iconName),
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonDefaults.IconSize)
+                )
+                Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+            }
+            Text(text = text)
+        }
+    }
+
+    when (variant) {
+        MaterialVariant.ToggleButton.FILLED -> ToggleButton(
+            checked = checked,
+            onCheckedChange = {},
+            modifier = node.modifiers.toModifier(),
+            content = { content() }
+        )
+        MaterialVariant.ToggleButton.ELEVATED -> ElevatedToggleButton(
+            checked = checked,
+            onCheckedChange = {},
+            modifier = node.modifiers.toModifier(),
+            content = { content() }
+        )
+        MaterialVariant.ToggleButton.TONAL -> TonalToggleButton(
+            checked = checked,
+            onCheckedChange = {},
+            modifier = node.modifiers.toModifier(),
+            content = { content() }
+        )
+        MaterialVariant.ToggleButton.OUTLINED -> OutlinedToggleButton(
+            checked = checked,
+            onCheckedChange = {},
+            modifier = node.modifiers.toModifier(),
+            content = { content() }
+        )
+    }
+}
+
 @Composable
 private fun RenderListItem(node: CanvasNode, controller: EditorController) {
     val headlineChild = node.childInSlot(SlotRole.HEADLINE)
@@ -933,6 +1143,40 @@ private fun RenderDialog(node: CanvasNode, controller: EditorController) {
 }
 
 @Composable
+private fun RenderBasicDialog(node: CanvasNode, controller: EditorController) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        modifier = node.modifiers.toModifier()
+            .widthIn(min = 280.dp, max = 560.dp)
+            .padding(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (node.children.isNotEmpty()) {
+                node.children.forEach { child ->
+                    ContainerChild(child = child, controller = controller)
+                }
+            } else {
+                Text(
+                    text = "Basic Alert Dialog",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "A simple dialog container without predetermined slots.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun RenderSnackbar(node: CanvasNode) {
     Snackbar(
         action = {
@@ -943,6 +1187,26 @@ private fun RenderSnackbar(node: CanvasNode) {
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
         Text(text = node.textOrDefault(default = "Material 3 Snackbar notification."))
+    }
+}
+
+@Composable
+private fun RenderSnackbarHost(node: CanvasNode) {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.inverseSurface,
+        modifier = node.modifiers.toModifier().padding(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "SnackbarHost preview",
+                color = MaterialTheme.colorScheme.inverseOnSurface,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
     }
 }
 
@@ -959,6 +1223,29 @@ private fun RenderBadge(node: CanvasNode) {
             contentDescription = "Notifications",
             tint = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Composable
+private fun RenderBadgedBox(node: CanvasNode, controller: EditorController) {
+    val badgeChild = node.childInSlot(SlotRole.BADGE)
+    val contentChild = node.childInSlot(SlotRole.CONTENT) ?: node.children.firstOrNull { it.slot != SlotRole.BADGE }
+
+    BadgedBox(
+        badge = {
+            if (badgeChild != null) {
+                ContainerChild(child = badgeChild, controller = controller)
+            } else {
+                Badge { Text("3") }
+            }
+        },
+        modifier = node.modifiers.toModifier()
+    ) {
+        if (contentChild != null) {
+            ContainerChild(child = contentChild, controller = controller)
+        } else {
+            Icon(imageVector = Icons.Outlined.Notifications, contentDescription = "Notifications")
+        }
     }
 }
 
@@ -1004,29 +1291,54 @@ private fun RenderLoadingIndicator(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderNavigationRail(node: CanvasNode) {
+private fun RenderNavigationRail(node: CanvasNode, controller: EditorController) {
     NavigationRail(
         modifier = node.modifiers.toModifier().fillMaxHeight().width(80.dp)
     ) {
-        NavigationRailItem(
-            selected = true,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
-            label = { Text("Home") }
-        )
-        NavigationRailItem(
-            selected = false,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search") },
-            label = { Text("Search") }
-        )
-        NavigationRailItem(
-            selected = false,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings") },
-            label = { Text("Settings") }
-        )
+        if (node.children.isNotEmpty()) {
+            node.children.forEach { child ->
+                if (child.type == ComponentType.NAVIGATION_RAIL_ITEM) {
+                    RenderNavigationRailItem(node = child)
+                } else {
+                    ContainerChild(child = child, controller = controller)
+                }
+            }
+        } else {
+            NavigationRailItem(
+                selected = true,
+                onClick = {},
+                icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
+                label = { Text("Home") }
+            )
+            NavigationRailItem(
+                selected = false,
+                onClick = {},
+                icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search") },
+                label = { Text("Search") }
+            )
+            NavigationRailItem(
+                selected = false,
+                onClick = {},
+                icon = { Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings") },
+                label = { Text("Settings") }
+            )
+        }
     }
+}
+
+@Composable
+private fun RenderNavigationRailItem(node: CanvasNode) {
+    val label = (node.property("label") as? ComponentProperty.Text)?.value
+        ?: (node.property("text") as? ComponentProperty.Text)?.value
+        ?: node.name
+    val iconName = node.iconProperty(key = "icon", default = "Home")
+    val selected = node.booleanProperty(key = "selected", default = true)
+    NavigationRailItem(
+        selected = selected,
+        onClick = {},
+        icon = { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = label) },
+        label = { Text(text = label) }
+    )
 }
 
 @Composable
@@ -1066,30 +1378,53 @@ private fun RenderNavigationDrawer(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderTabs(node: CanvasNode) {
+private fun RenderTabs(node: CanvasNode, controller: EditorController) {
     PrimaryTabRow(
         selectedTabIndex = 0,
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
-        Tab(
-            selected = true,
-            onClick = {},
-            text = { Text("Overview") },
-            icon = { Icon(imageVector = Icons.Outlined.Dashboard, contentDescription = null) }
-        )
-        Tab(
-            selected = false,
-            onClick = {},
-            text = { Text("Analytics") },
-            icon = { Icon(imageVector = Icons.Outlined.Analytics, contentDescription = null) }
-        )
-        Tab(
-            selected = false,
-            onClick = {},
-            text = { Text("Settings") },
-            icon = { Icon(imageVector = Icons.Outlined.Tune, contentDescription = null) }
-        )
+        if (node.children.isNotEmpty()) {
+            node.children.forEach { child ->
+                if (child.type == ComponentType.TAB) {
+                    RenderTab(node = child)
+                } else {
+                    ContainerChild(child = child, controller = controller)
+                }
+            }
+        } else {
+            Tab(
+                selected = true,
+                onClick = {},
+                text = { Text("Overview") },
+                icon = { Icon(imageVector = Icons.Outlined.Dashboard, contentDescription = null) }
+            )
+            Tab(
+                selected = false,
+                onClick = {},
+                text = { Text("Analytics") },
+                icon = { Icon(imageVector = Icons.Outlined.Analytics, contentDescription = null) }
+            )
+            Tab(
+                selected = false,
+                onClick = {},
+                text = { Text("Settings") },
+                icon = { Icon(imageVector = Icons.Outlined.Tune, contentDescription = null) }
+            )
+        }
     }
+}
+
+@Composable
+private fun RenderTab(node: CanvasNode) {
+    val text = node.textOrDefault(default = "Tab")
+    val iconName = node.iconProperty(key = "icon", default = "Dashboard")
+    val selected = node.booleanProperty(key = "selected", default = false)
+    Tab(
+        selected = selected,
+        onClick = {},
+        text = { Text(text) },
+        icon = { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) }
+    )
 }
 
 @Composable
@@ -1310,7 +1645,7 @@ private fun RenderTimePicker(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderMenu(node: CanvasNode) {
+private fun RenderMenu(node: CanvasNode, controller: EditorController) {
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -1318,24 +1653,47 @@ private fun RenderMenu(node: CanvasNode) {
         modifier = node.modifiers.toModifier().wrapContentSize()
     ) {
         Column(modifier = Modifier.width(IntrinsicSize.Max).padding(vertical = 4.dp)) {
-            DropdownMenuItem(
-                text = { Text("Edit") },
-                onClick = {},
-                leadingIcon = { Icon(imageVector = Icons.Outlined.Edit, contentDescription = null) }
-            )
-            DropdownMenuItem(
-                text = { Text("Duplicate") },
-                onClick = {},
-                leadingIcon = { Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = null) }
-            )
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text("Delete") },
-                onClick = {},
-                leadingIcon = { Icon(imageVector = Icons.Outlined.Delete, contentDescription = null) }
-            )
+            if (node.children.isNotEmpty()) {
+                node.children.forEach { child ->
+                    if (child.type == ComponentType.DROPDOWN_MENU_ITEM) {
+                        RenderDropdownMenuItem(node = child)
+                    } else {
+                        ContainerChild(child = child, controller = controller)
+                    }
+                }
+            } else {
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    onClick = {},
+                    leadingIcon = { Icon(imageVector = Icons.Outlined.Edit, contentDescription = null) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Duplicate") },
+                    onClick = {},
+                    leadingIcon = { Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = null) }
+                )
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {},
+                    leadingIcon = { Icon(imageVector = Icons.Outlined.Delete, contentDescription = null) }
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun RenderDropdownMenuItem(node: CanvasNode) {
+    val text = node.textOrDefault(default = "Item")
+    val iconName = node.iconProperty(key = "icon", default = "")
+    DropdownMenuItem(
+        text = { Text(text) },
+        onClick = {},
+        leadingIcon = if (iconName.isNotEmpty()) {
+            { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) }
+        } else null
+    )
 }
 
 @Composable
@@ -1500,6 +1858,134 @@ private fun RenderLazyVerticalGrid(
     ) {
         items(items = node.children, key = { child -> child.id }) { child ->
             ContainerChild(child = child, controller = controller)
+        }
+    }
+}
+
+@Composable
+private fun RenderLazyHorizontalGrid(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    LazyHorizontalGrid(
+        rows = GridCells.Fixed(2),
+        modifier = node.modifiers.toModifier()
+            .fillMaxSize()
+            .padding(all = node.layoutConfig.padding.dp),
+        horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig),
+        verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
+    ) {
+        items(items = node.children, key = { child -> child.id }) { child ->
+            ContainerChild(child = child, controller = controller)
+        }
+    }
+}
+
+@Composable
+private fun RenderLazyVerticalStaggeredGrid(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(2),
+        modifier = node.modifiers.toModifier()
+            .fillMaxSize()
+            .padding(all = node.layoutConfig.padding.dp),
+        verticalItemSpacing = node.layoutConfig.spacing.dp,
+        horizontalArrangement = resolveHorizontalArrangement(config = node.layoutConfig)
+    ) {
+        items(items = node.children, key = { child -> child.id }) { child ->
+            ContainerChild(child = child, controller = controller)
+        }
+    }
+}
+
+@Composable
+private fun RenderLazyHorizontalStaggeredGrid(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    LazyHorizontalStaggeredGrid(
+        rows = StaggeredGridCells.Fixed(2),
+        modifier = node.modifiers.toModifier()
+            .fillMaxSize()
+            .padding(all = node.layoutConfig.padding.dp),
+        horizontalItemSpacing = node.layoutConfig.spacing.dp,
+        verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig)
+    ) {
+        items(items = node.children, key = { child -> child.id }) { child ->
+            ContainerChild(child = child, controller = controller)
+        }
+    }
+}
+
+@Composable
+private fun RenderHorizontalPager(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    val pageCount = node.children.size.coerceAtLeast(1)
+    val pagerState = rememberPagerState { pageCount }
+    HorizontalPager(
+        state = pagerState,
+        modifier = node.modifiers.toModifier()
+            .fillMaxSize()
+            .padding(all = node.layoutConfig.padding.dp)
+    ) { pageIndex ->
+        if (node.children.isNotEmpty() && pageIndex < node.children.size) {
+            ContainerChild(child = node.children[pageIndex], controller = controller)
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Page ${pageIndex + 1}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RenderCarousel(
+    node: CanvasNode,
+    controller: EditorController
+) {
+    val itemCount = node.children.size.coerceAtLeast(3)
+    val carouselState = rememberCarouselState { itemCount }
+    HorizontalMultiBrowseCarousel(
+        state = carouselState,
+        preferredItemWidth = 186.dp,
+        itemSpacing = node.layoutConfig.spacing.dp.coerceAtLeast(8.dp),
+        modifier = node.modifiers.toModifier()
+            .fillMaxWidth()
+            .height(220.dp)
+            .padding(all = node.layoutConfig.padding.dp)
+    ) { index ->
+        if (node.children.isNotEmpty() && index < node.children.size) {
+            ContainerChild(child = node.children[index], controller = controller)
+        } else {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Item ${index + 1}", style = MaterialTheme.typography.titleMedium)
+                }
+            }
         }
     }
 }

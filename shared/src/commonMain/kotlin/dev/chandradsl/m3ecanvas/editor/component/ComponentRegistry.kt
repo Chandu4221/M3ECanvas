@@ -88,20 +88,37 @@ private fun buildDefaultDefinitions(): Map<ComponentType, ComponentDefinition> {
             defaultSize = { _, _ -> CanvasSize(260f, 40f) }
         ),
         ComponentDefinition(
+            type = ComponentType.TOGGLE_BUTTON,
+            availableVariants = MaterialVariant.ToggleButton.entries,
+            defaultSize = { _, _ -> CanvasSize(120f, 40f) }
+        ),
+        ComponentDefinition(
             type = ComponentType.CARD,
             availableVariants = MaterialVariant.Card.entries,
             defaultSize = { w, _ -> CanvasSize((w - 32f).coerceAtLeast(200f), 160f) }
         ),
         ComponentDefinition(
-            type = ComponentType.LISTS,
+            type = ComponentType.ELEVATED_CARD,
+            defaultSize = { w, _ -> CanvasSize((w - 32f).coerceAtLeast(200f), 160f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.OUTLINED_CARD,
+            defaultSize = { w, _ -> CanvasSize((w - 32f).coerceAtLeast(200f), 160f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.LIST_ITEM,
             defaultSize = { w, _ -> CanvasSize((w - 32f).coerceAtLeast(200f), 72f) }
         ),
         ComponentDefinition(
-            type = ComponentType.SHEETS,
+            type = ComponentType.MODAL_BOTTOM_SHEET,
             defaultSize = { w, _ -> CanvasSize(w, 220f) }
         ),
         ComponentDefinition(
-            type = ComponentType.DIALOG,
+            type = ComponentType.ALERT_DIALOG,
+            defaultSize = { w, _ -> CanvasSize((w - 48f).coerceAtLeast(260f), 200f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.BASIC_ALERT_DIALOG,
             defaultSize = { w, _ -> CanvasSize((w - 48f).coerceAtLeast(260f), 200f) }
         ),
         ComponentDefinition(
@@ -114,8 +131,28 @@ private fun buildDefaultDefinitions(): Map<ComponentType, ComponentDefinition> {
             defaultSize = { w, _ -> CanvasSize((w - 32f).coerceAtLeast(200f), 48f) }
         ),
         ComponentDefinition(
+            type = ComponentType.SNACKBAR_HOST,
+            defaultSize = { w, _ -> CanvasSize((w - 32f).coerceAtLeast(200f), 48f) }
+        ),
+        ComponentDefinition(
             type = ComponentType.BADGE,
             defaultSize = { _, _ -> CanvasSize(48f, 48f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.BADGED_BOX,
+            defaultSize = { _, _ -> CanvasSize(48f, 48f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.NAVIGATION_BAR_ITEM,
+            defaultSize = { _, _ -> CanvasSize(64f, 56f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.NAVIGATION_RAIL_ITEM,
+            defaultSize = { _, _ -> CanvasSize(56f, 56f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.TAB,
+            defaultSize = { _, _ -> CanvasSize(90f, 48f) }
         ),
         ComponentDefinition(
             type = ComponentType.TOOLTIP,
@@ -167,6 +204,10 @@ private fun buildDefaultDefinitions(): Map<ComponentType, ComponentDefinition> {
             defaultSize = { _, _ -> CanvasSize(180f, 140f) }
         ),
         ComponentDefinition(
+            type = ComponentType.DROPDOWN_MENU_ITEM,
+            defaultSize = { _, _ -> CanvasSize(160f, 48f) }
+        ),
+        ComponentDefinition(
             type = ComponentType.TEXT_FIELD,
             availableVariants = MaterialVariant.TextField.entries,
             defaultSize = { w, _ -> CanvasSize((w - 32f).coerceAtLeast(200f), 56f) }
@@ -200,6 +241,10 @@ private fun buildDefaultDefinitions(): Map<ComponentType, ComponentDefinition> {
             defaultSize = { w, _ -> CanvasSize(w, 80f) }
         ),
         ComponentDefinition(
+            type = ComponentType.BOTTOM_SHEET_SCAFFOLD,
+            defaultSize = { w, h -> CanvasSize(w, h) }
+        ),
+        ComponentDefinition(
             type = ComponentType.COLUMN,
             defaultSize = { w, h -> CanvasSize(w, (h - 160f).coerceAtLeast(200f)) }
         ),
@@ -209,6 +254,10 @@ private fun buildDefaultDefinitions(): Map<ComponentType, ComponentDefinition> {
         ),
         ComponentDefinition(
             type = ComponentType.BOX,
+            defaultSize = { w, _ -> CanvasSize(w, 300f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.BOX_WITH_CONSTRAINTS,
             defaultSize = { w, _ -> CanvasSize(w, 300f) }
         ),
         ComponentDefinition(
@@ -222,6 +271,27 @@ private fun buildDefaultDefinitions(): Map<ComponentType, ComponentDefinition> {
         ComponentDefinition(
             type = ComponentType.LAZY_VERTICAL_GRID,
             defaultSize = { w, h -> CanvasSize(w, (h - 160f).coerceAtLeast(200f)) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.LAZY_HORIZONTAL_GRID,
+            defaultSize = { w, _ -> CanvasSize(w, 160f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.LAZY_VERTICAL_STAGGERED_GRID,
+            defaultSize = { w, h -> CanvasSize(w, (h - 160f).coerceAtLeast(200f)) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.LAZY_HORIZONTAL_STAGGERED_GRID,
+            defaultSize = { w, _ -> CanvasSize(w, 160f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.HORIZONTAL_PAGER,
+            defaultSize = { w, _ -> CanvasSize(w, 200f) }
+        ),
+        ComponentDefinition(
+            type = ComponentType.CAROUSEL,
+            availableVariants = MaterialVariant.Carousel.entries,
+            defaultSize = { w, _ -> CanvasSize(w, 200f) }
         ),
         ComponentDefinition(
             type = ComponentType.FLOW_ROW,

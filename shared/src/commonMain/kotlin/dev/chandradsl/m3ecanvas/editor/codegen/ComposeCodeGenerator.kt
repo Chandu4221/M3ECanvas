@@ -27,9 +27,16 @@ open class ComposeCodeGenerator(
             appendLine("import androidx.compose.foundation.lazy.LazyColumn")
             appendLine("import androidx.compose.foundation.lazy.LazyRow")
             appendLine("import androidx.compose.foundation.lazy.grid.GridCells")
+            appendLine("import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid")
             appendLine("import androidx.compose.foundation.lazy.grid.LazyVerticalGrid")
             appendLine("import androidx.compose.foundation.lazy.grid.items")
             appendLine("import androidx.compose.foundation.lazy.items")
+            appendLine("import androidx.compose.foundation.lazy.staggeredgrid.LazyHorizontalStaggeredGrid")
+            appendLine("import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid")
+            appendLine("import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells")
+            appendLine("import androidx.compose.foundation.lazy.staggeredgrid.items")
+            appendLine("import androidx.compose.foundation.pager.HorizontalPager")
+            appendLine("import androidx.compose.foundation.pager.rememberPagerState")
             appendLine("import androidx.compose.foundation.rememberScrollState")
             appendLine("import androidx.compose.foundation.shape.CircleShape")
             appendLine("import androidx.compose.foundation.shape.RoundedCornerShape")
@@ -39,6 +46,8 @@ open class ComposeCodeGenerator(
             appendLine("import androidx.compose.material.icons.filled.*")
             appendLine("import androidx.compose.material.icons.outlined.*")
             appendLine("import androidx.compose.material3.*")
+            appendLine("import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel")
+            appendLine("import androidx.compose.material3.carousel.rememberCarouselState")
             appendLine("import androidx.compose.runtime.*")
             appendLine("import androidx.compose.ui.Alignment")
             appendLine("import androidx.compose.ui.Modifier")
@@ -57,16 +66,20 @@ open class ComposeCodeGenerator(
             appendLine("import androidx.compose.ui.semantics.role")
             appendLine("import androidx.compose.ui.semantics.semantics")
             appendLine()
-            appendLine("@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)")
+            appendLine("@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)")
             appendLine("@Composable")
             appendLine("fun ${functionName}(modifier: Modifier = Modifier) {")
             if (project.nodes.isEmpty()) {
                 appendLine("    // Empty canvas")
                 appendLine("    Box(modifier = modifier.fillMaxSize())")
             } else {
-                val scaffold = project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+                val scaffold = project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD || it.type == ComponentType.BOTTOM_SHEET_SCAFFOLD }
                 if (scaffold != null) {
-                    append(generateScaffoldCode(scaffold, indent = "    "))
+                    if (scaffold.type == ComponentType.BOTTOM_SHEET_SCAFFOLD) {
+                        append(generateBottomSheetScaffoldCode(scaffold, indent = "    "))
+                    } else {
+                        append(generateScaffoldCode(scaffold, indent = "    "))
+                    }
                 } else {
                     appendLine("    Box(modifier = modifier.fillMaxSize()) {")
                     project.nodes.forEach { node ->
@@ -78,6 +91,49 @@ open class ComposeCodeGenerator(
             appendLine("}")
         }
         return body
+    }
+
+    private fun generateBottomSheetScaffoldCode(scaffold: CanvasNode, indent: String): String {
+        val topBarChild = scaffold.childInSlot(SlotRole.TOP_BAR)
+        val sheetChild = scaffold.childInSlot(SlotRole.SHEET_CONTENT)
+        val snackbarChild = scaffold.childInSlot(SlotRole.SNACKBAR)
+        val contentChildren = scaffold.childrenInSlot(SlotRole.CONTENT).ifEmpty {
+            scaffold.children.filter { it.slot != SlotRole.TOP_BAR && it.slot != SlotRole.SHEET_CONTENT && it.slot != SlotRole.SNACKBAR }
+        }
+
+        return buildString {
+            appendLine("${indent}val scaffoldState = rememberBottomSheetScaffoldState()")
+            appendLine("${indent}BottomSheetScaffold(")
+            appendLine("${indent}    scaffoldState = scaffoldState,")
+            if (topBarChild != null) {
+                appendLine("${indent}    topBar = {")
+                append(generateNodeCode(topBarChild, indent = "$indent        "))
+                appendLine("${indent}    },")
+            }
+            if (snackbarChild != null) {
+                appendLine("${indent}    snackbarHost = {")
+                append(generateNodeCode(snackbarChild, indent = "$indent        "))
+                appendLine("${indent}    },")
+            }
+            appendLine("${indent}    sheetContent = {")
+            if (sheetChild != null) {
+                append(generateNodeCode(sheetChild, indent = "$indent        "))
+            } else {
+                appendLine("${indent}        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {")
+                appendLine("${indent}            Text(text = \"Sheet content\", style = MaterialTheme.typography.titleMedium)")
+                appendLine("${indent}        }")
+            }
+            appendLine("${indent}    },")
+            appendLine("${indent}    sheetPeekHeight = 64.dp,")
+            appendLine("${indent}    modifier = Modifier.fillMaxSize()")
+            appendLine("${indent}) { innerPadding ->")
+            appendLine("${indent}    Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {")
+            contentChildren.forEach { child ->
+                append(generateNodeCode(child, indent = "$indent        "))
+            }
+            appendLine("${indent}    }")
+            appendLine("${indent}}")
+        }
     }
 
     private fun generateScaffoldCode(scaffold: CanvasNode, indent: String): String {
@@ -172,6 +228,7 @@ open class ComposeCodeGenerator(
     ): String {
         return when (node.type) {
             ComponentType.SCAFFOLD -> generateScaffoldCode(node, indent)
+            ComponentType.BOTTOM_SHEET_SCAFFOLD -> generateBottomSheetScaffoldCode(node, indent)
 
             ComponentType.COLUMN -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
@@ -211,6 +268,19 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 val alignment = resolveBoxAlignmentString(node.layoutConfig.boxAlignment)
                 appendLine("${indent}Box(")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    contentAlignment = $alignment")
+                appendLine("${indent}) {")
+                node.children.forEach { child ->
+                    append(generateNodeCode(child, indent = "$indent    "))
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.BOX_WITH_CONSTRAINTS -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val alignment = resolveBoxAlignmentString(node.layoutConfig.boxAlignment)
+                appendLine("${indent}BoxWithConstraints(")
                 appendLine("${indent}    modifier = $mod,")
                 appendLine("${indent}    contentAlignment = $alignment")
                 appendLine("${indent}) {")
@@ -306,31 +376,54 @@ open class ComposeCodeGenerator(
             ComponentType.NAVIGATION_BAR -> buildString {
                 val mod = buildModifierString(node, isRootFloating = false, "fillMaxWidth()")
                 appendLine("${indent}NavigationBar(modifier = $mod) {")
-                appendLine("${indent}    NavigationBarItem(")
-                appendLine("${indent}        selected = true,")
-                appendLine("${indent}        onClick = { /* TODO: Navigate Home */ },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Home, contentDescription = \"Home\") },")
-                appendLine("${indent}        label = { Text(\"Home\") }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    NavigationBarItem(")
-                appendLine("${indent}        selected = false,")
-                appendLine("${indent}        onClick = { /* TODO: Navigate Explore */ },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Search, contentDescription = \"Explore\") },")
-                appendLine("${indent}        label = { Text(\"Explore\") }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    NavigationBarItem(")
-                appendLine("${indent}        selected = false,")
-                appendLine("${indent}        onClick = { /* TODO: Navigate Profile */ },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Person, contentDescription = \"Profile\") },")
-                appendLine("${indent}        label = { Text(\"Profile\") }")
-                appendLine("${indent}    )")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent    "))
+                    }
+                } else {
+                    appendLine("${indent}    NavigationBarItem(")
+                    appendLine("${indent}        selected = true,")
+                    appendLine("${indent}        onClick = { /* TODO: Navigate Home */ },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Home, contentDescription = \"Home\") },")
+                    appendLine("${indent}        label = { Text(\"Home\") }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    NavigationBarItem(")
+                    appendLine("${indent}        selected = false,")
+                    appendLine("${indent}        onClick = { /* TODO: Navigate Explore */ },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Search, contentDescription = \"Explore\") },")
+                    appendLine("${indent}        label = { Text(\"Explore\") }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    NavigationBarItem(")
+                    appendLine("${indent}        selected = false,")
+                    appendLine("${indent}        onClick = { /* TODO: Navigate Profile */ },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Person, contentDescription = \"Profile\") },")
+                    appendLine("${indent}        label = { Text(\"Profile\") }")
+                    appendLine("${indent}    )")
+                }
                 appendLine("${indent}}")
+            }
+
+            ComponentType.NAVIGATION_BAR_ITEM -> buildString {
+                val label = (node.property("label") as? ComponentProperty.Text)?.value
+                    ?: (node.property("text") as? ComponentProperty.Text)?.value
+                    ?: "Item"
+                val iconName = node.iconProperty("icon", default = "Home")
+                val iconExpr = resolveIconCodeExpression(iconName)
+                val selected = node.booleanProperty("selected", default = true)
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}NavigationBarItem(")
+                appendLine("${indent}    selected = $selected,")
+                appendLine("${indent}    onClick = { /* TODO: Select item */ },")
+                appendLine("${indent}    icon = { Icon($iconExpr, contentDescription = \"$label\") },")
+                appendLine("${indent}    label = { Text(\"$label\") },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
             }
 
             ComponentType.BUTTON -> buildString {
                 val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Button
                     ?: MaterialVariant.Button.FILLED
-                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Button"
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: node.name.ifEmpty { "Button" }
                 val composableName = when (variant) {
                     MaterialVariant.Button.FILLED -> "Button"
                     MaterialVariant.Button.TONAL -> "FilledTonalButton"
@@ -347,8 +440,36 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}}")
             }
 
-            ComponentType.CARD -> buildString {
-                val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Card
+            ComponentType.TOGGLE_BUTTON -> buildString {
+                val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.ToggleButton
+                    ?: MaterialVariant.ToggleButton.FILLED
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Toggle"
+                val checked = node.booleanProperty("checked", default = true)
+                val composableName = when (variant) {
+                    MaterialVariant.ToggleButton.FILLED -> "ToggleButton"
+                    MaterialVariant.ToggleButton.ELEVATED -> "ElevatedToggleButton"
+                    MaterialVariant.ToggleButton.TONAL -> "TonalToggleButton"
+                    MaterialVariant.ToggleButton.OUTLINED -> "OutlinedToggleButton"
+                }
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}var checked by remember { mutableStateOf($checked) }")
+                appendLine("${indent}$composableName(")
+                appendLine("${indent}    checked = checked,")
+                appendLine("${indent}    onCheckedChange = { checked = it },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Text(text = \"$text\")")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.CARD, ComponentType.ELEVATED_CARD, ComponentType.OUTLINED_CARD -> buildString {
+                val forcedVariant = when (node.type) {
+                    ComponentType.ELEVATED_CARD -> MaterialVariant.Card.ELEVATED
+                    ComponentType.OUTLINED_CARD -> MaterialVariant.Card.OUTLINED
+                    else -> null
+                }
+                val variant = forcedVariant
+                    ?: (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Card
                     ?: MaterialVariant.Card.FILLED
                 val composableName = when (variant) {
                     MaterialVariant.Card.FILLED -> "Card"
@@ -376,7 +497,15 @@ open class ComposeCodeGenerator(
                 val iconExpr = resolveIconCodeExpression(iconName)
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.FloatingActionButton
-                appendLine("${indent}FloatingActionButton(")
+                val fabSize = ((node.property("fabSize") as? ComponentProperty.Variant)?.value as? MaterialVariant.FabSize)
+                    ?: ((node.property("size") as? ComponentProperty.Variant)?.value as? MaterialVariant.FabSize)
+                    ?: MaterialVariant.FabSize.MEDIUM
+                val composableName = when (fabSize) {
+                    MaterialVariant.FabSize.SMALL -> "SmallFloatingActionButton"
+                    MaterialVariant.FabSize.LARGE -> "LargeFloatingActionButton"
+                    MaterialVariant.FabSize.MEDIUM -> "FloatingActionButton"
+                }
+                appendLine("${indent}$composableName(")
                 appendLine("${indent}    onClick = { /* TODO: FAB Action */ },")
                 when (variant) {
                     MaterialVariant.FloatingActionButton.SURFACE -> {
@@ -526,7 +655,7 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}}")
             }
 
-            ComponentType.LISTS -> buildString {
+            ComponentType.LIST_ITEM -> buildString {
                 val headlineChild = node.childInSlot(SlotRole.HEADLINE)
                 val supportingChild = node.childInSlot(SlotRole.SUPPORTING)
                 val leadingChild = node.childInSlot(SlotRole.LEADING)
@@ -577,13 +706,11 @@ open class ComposeCodeGenerator(
                 appendLine("${indent})")
             }
 
-            ComponentType.SHEETS -> buildString {
+            ComponentType.MODAL_BOTTOM_SHEET -> buildString {
                 val title = (node.property("text") as? ComponentProperty.Text)?.value ?: "Modal Bottom Sheet"
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
-                appendLine("${indent}Surface(")
-                appendLine("${indent}    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),")
-                appendLine("${indent}    color = MaterialTheme.colorScheme.surfaceContainerLow,")
-                appendLine("${indent}    tonalElevation = 2.dp,")
+                appendLine("${indent}ModalBottomSheet(")
+                appendLine("${indent}    onDismissRequest = { /* TODO: Dismiss sheet */ },")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 appendLine("${indent}    Column(modifier = Modifier.padding(16.dp)) {")
@@ -604,7 +731,7 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}}")
             }
 
-            ComponentType.DIALOG -> buildString {
+            ComponentType.ALERT_DIALOG -> buildString {
                 val iconChild = node.childInSlot(SlotRole.ICON)
                 val titleChild = node.childInSlot(SlotRole.TITLE)
                 val confirmChild = node.childInSlot(SlotRole.CONFIRM_BUTTON)
@@ -668,6 +795,32 @@ open class ComposeCodeGenerator(
                 appendLine("${indent})")
             }
 
+            ComponentType.BASIC_ALERT_DIALOG -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}BasicAlertDialog(")
+                appendLine("${indent}    onDismissRequest = { /* TODO: Dismiss dialog */ },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                appendLine("${indent}    Surface(")
+                appendLine("${indent}        shape = RoundedCornerShape(28.dp),")
+                appendLine("${indent}        color = MaterialTheme.colorScheme.surfaceContainerHigh,")
+                appendLine("${indent}        tonalElevation = 6.dp")
+                appendLine("${indent}    ) {")
+                if (node.children.isNotEmpty()) {
+                    appendLine("${indent}        Column(modifier = Modifier.padding(24.dp)) {")
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent            "))
+                    }
+                    appendLine("${indent}        }")
+                } else {
+                    appendLine("${indent}        Column(modifier = Modifier.padding(24.dp)) {")
+                    appendLine("${indent}            Text(text = \"Basic Alert Dialog\", style = MaterialTheme.typography.headlineSmall)")
+                    appendLine("${indent}        }")
+                }
+                appendLine("${indent}    }")
+                appendLine("${indent}}")
+            }
+
             ComponentType.SNACKBAR -> buildString {
                 val message = (node.property("text") as? ComponentProperty.Text)?.value ?: "Snackbar notification alert."
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
@@ -683,6 +836,12 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}}")
             }
 
+            ComponentType.SNACKBAR_HOST -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}val snackbarHostState = remember { SnackbarHostState() }")
+                appendLine("${indent}SnackbarHost(hostState = snackbarHostState, modifier = $mod)")
+            }
+
             ComponentType.BADGE -> buildString {
                 val count = (node.property("text") as? ComponentProperty.Text)?.value ?: "3"
                 val mod = buildModifierString(node, isRootFloating)
@@ -691,6 +850,29 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 appendLine("${indent}    Icon(Icons.Outlined.Notifications, contentDescription = \"Notifications\")")
+                appendLine("${indent}}")
+            }
+
+            ComponentType.BADGED_BOX -> buildString {
+                val badgeChild = node.childInSlot(SlotRole.BADGE)
+                val contentChild = node.childInSlot(SlotRole.CONTENT) ?: node.children.firstOrNull { it.slot != SlotRole.BADGE }
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}BadgedBox(")
+                appendLine("${indent}    badge = {")
+                if (badgeChild != null) {
+                    append(generateNodeCode(badgeChild, indent = "$indent        "))
+                } else {
+                    appendLine("${indent}        Badge { Text(\"3\") }")
+                }
+                appendLine("${indent}    },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) {")
+                if (contentChild != null) {
+                    append(generateNodeCode(contentChild, indent = "$indent        "))
+                } else {
+                    appendLine("${indent}        Icon(Icons.Outlined.Notifications, contentDescription = \"Notifications\")")
+                }
+                appendLine("${indent}    }")
                 appendLine("${indent}}")
             }
 
@@ -730,25 +912,48 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, "fillMaxHeight()")
                 appendLine("${indent}var selectedItem by remember { mutableStateOf(0) }")
                 appendLine("${indent}NavigationRail(modifier = $mod) {")
-                appendLine("${indent}    NavigationRailItem(")
-                appendLine("${indent}        selected = selectedItem == 0,")
-                appendLine("${indent}        onClick = { selectedItem = 0 },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Home, contentDescription = \"Home\") },")
-                appendLine("${indent}        label = { Text(\"Home\") }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    NavigationRailItem(")
-                appendLine("${indent}        selected = selectedItem == 1,")
-                appendLine("${indent}        onClick = { selectedItem = 1 },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Search, contentDescription = \"Search\") },")
-                appendLine("${indent}        label = { Text(\"Search\") }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    NavigationRailItem(")
-                appendLine("${indent}        selected = selectedItem == 2,")
-                appendLine("${indent}        onClick = { selectedItem = 2 },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Settings, contentDescription = \"Settings\") },")
-                appendLine("${indent}        label = { Text(\"Settings\") }")
-                appendLine("${indent}    )")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent    "))
+                    }
+                } else {
+                    appendLine("${indent}    NavigationRailItem(")
+                    appendLine("${indent}        selected = selectedItem == 0,")
+                    appendLine("${indent}        onClick = { selectedItem = 0 },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Home, contentDescription = \"Home\") },")
+                    appendLine("${indent}        label = { Text(\"Home\") }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    NavigationRailItem(")
+                    appendLine("${indent}        selected = selectedItem == 1,")
+                    appendLine("${indent}        onClick = { selectedItem = 1 },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Search, contentDescription = \"Search\") },")
+                    appendLine("${indent}        label = { Text(\"Search\") }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    NavigationRailItem(")
+                    appendLine("${indent}        selected = selectedItem == 2,")
+                    appendLine("${indent}        onClick = { selectedItem = 2 },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Settings, contentDescription = \"Settings\") },")
+                    appendLine("${indent}        label = { Text(\"Settings\") }")
+                    appendLine("${indent}    )")
+                }
                 appendLine("${indent}}")
+            }
+
+            ComponentType.NAVIGATION_RAIL_ITEM -> buildString {
+                val label = (node.property("label") as? ComponentProperty.Text)?.value
+                    ?: (node.property("text") as? ComponentProperty.Text)?.value
+                    ?: "Item"
+                val iconName = node.iconProperty("icon", default = "Home")
+                val iconExpr = resolveIconCodeExpression(iconName)
+                val selected = node.booleanProperty("selected", default = true)
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}NavigationRailItem(")
+                appendLine("${indent}    selected = $selected,")
+                appendLine("${indent}    onClick = { /* TODO: Select item */ },")
+                appendLine("${indent}    icon = { Icon($iconExpr, contentDescription = \"$label\") },")
+                appendLine("${indent}    label = { Text(\"$label\") },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
             }
 
             ComponentType.NAVIGATION_DRAWER -> buildString {
@@ -783,25 +988,48 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}var selectedTab by remember { mutableStateOf(0) }")
                 appendLine("${indent}PrimaryTabRow(selectedTabIndex = selectedTab, modifier = $mod) {")
-                appendLine("${indent}    Tab(")
-                appendLine("${indent}        selected = selectedTab == 0,")
-                appendLine("${indent}        onClick = { selectedTab = 0 },")
-                appendLine("${indent}        text = { Text(\"Overview\") },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Dashboard, contentDescription = null) }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    Tab(")
-                appendLine("${indent}        selected = selectedTab == 1,")
-                appendLine("${indent}        onClick = { selectedTab = 1 },")
-                appendLine("${indent}        text = { Text(\"Analytics\") },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Analytics, contentDescription = null) }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    Tab(")
-                appendLine("${indent}        selected = selectedTab == 2,")
-                appendLine("${indent}        onClick = { selectedTab = 2 },")
-                appendLine("${indent}        text = { Text(\"Settings\") },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Tune, contentDescription = null) }")
-                appendLine("${indent}    )")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent    "))
+                    }
+                } else {
+                    appendLine("${indent}    Tab(")
+                    appendLine("${indent}        selected = selectedTab == 0,")
+                    appendLine("${indent}        onClick = { selectedTab = 0 },")
+                    appendLine("${indent}        text = { Text(\"Overview\") },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Dashboard, contentDescription = null) }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    Tab(")
+                    appendLine("${indent}        selected = selectedTab == 1,")
+                    appendLine("${indent}        onClick = { selectedTab = 1 },")
+                    appendLine("${indent}        text = { Text(\"Analytics\") },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Analytics, contentDescription = null) }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    Tab(")
+                    appendLine("${indent}        selected = selectedTab == 2,")
+                    appendLine("${indent}        onClick = { selectedTab = 2 },")
+                    appendLine("${indent}        text = { Text(\"Settings\") },")
+                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Tune, contentDescription = null) }")
+                    appendLine("${indent}    )")
+                }
                 appendLine("${indent}}")
+            }
+
+            ComponentType.TAB -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Tab"
+                val iconName = node.iconProperty("icon", default = "")
+                val selected = node.booleanProperty("selected", default = false)
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}Tab(")
+                appendLine("${indent}    selected = $selected,")
+                appendLine("${indent}    onClick = { /* TODO: Select tab */ },")
+                appendLine("${indent}    text = { Text(\"$text\") },")
+                if (iconName.isNotEmpty()) {
+                    val iconExpr = resolveIconCodeExpression(iconName)
+                    appendLine("${indent}    icon = { Icon($iconExpr, contentDescription = null) },")
+                }
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
             }
 
             ComponentType.SEARCH -> buildString {
@@ -916,23 +1144,44 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}    onDismissRequest = { menuExpanded = false },")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
-                appendLine("${indent}    DropdownMenuItem(")
-                appendLine("${indent}        text = { Text(\"Edit\") },")
-                appendLine("${indent}        onClick = { /* TODO */ },")
-                appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    DropdownMenuItem(")
-                appendLine("${indent}        text = { Text(\"Duplicate\") },")
-                appendLine("${indent}        onClick = { /* TODO */ },")
-                appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    HorizontalDivider()")
-                appendLine("${indent}    DropdownMenuItem(")
-                appendLine("${indent}        text = { Text(\"Delete\") },")
-                appendLine("${indent}        onClick = { /* TODO */ },")
-                appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) }")
-                appendLine("${indent}    )")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent    "))
+                    }
+                } else {
+                    appendLine("${indent}    DropdownMenuItem(")
+                    appendLine("${indent}        text = { Text(\"Edit\") },")
+                    appendLine("${indent}        onClick = { /* TODO */ },")
+                    appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    DropdownMenuItem(")
+                    appendLine("${indent}        text = { Text(\"Duplicate\") },")
+                    appendLine("${indent}        onClick = { /* TODO */ },")
+                    appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) }")
+                    appendLine("${indent}    )")
+                    appendLine("${indent}    HorizontalDivider()")
+                    appendLine("${indent}    DropdownMenuItem(")
+                    appendLine("${indent}        text = { Text(\"Delete\") },")
+                    appendLine("${indent}        onClick = { /* TODO */ },")
+                    appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) }")
+                    appendLine("${indent}    )")
+                }
                 appendLine("${indent}}")
+            }
+
+            ComponentType.DROPDOWN_MENU_ITEM -> buildString {
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Item"
+                val iconName = node.iconProperty("icon", default = "")
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                appendLine("${indent}DropdownMenuItem(")
+                appendLine("${indent}    text = { Text(\"$text\") },")
+                appendLine("${indent}    onClick = { /* TODO: Action */ },")
+                if (iconName.isNotEmpty()) {
+                    val iconExpr = resolveIconCodeExpression(iconName)
+                    appendLine("${indent}    leadingIcon = { Icon($iconExpr, contentDescription = null) },")
+                }
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
             }
 
             ComponentType.BOTTOM_APP_BAR -> buildString {
@@ -1053,6 +1302,112 @@ open class ComposeCodeGenerator(
                 node.children.forEach { child ->
                     appendLine("${indent}    item {")
                     append(generateNodeCode(child, indent = "$indent        "))
+                    appendLine("${indent}    }")
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.LAZY_HORIZONTAL_GRID -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val hArrangement = resolveArrangementString(node.layoutConfig, isVertical = false)
+                val vArrangement = resolveArrangementString(node.layoutConfig, isVertical = true)
+                appendLine("${indent}LazyHorizontalGrid(")
+                appendLine("${indent}    rows = GridCells.Fixed(2),")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    horizontalArrangement = $hArrangement,")
+                appendLine("${indent}    verticalArrangement = $vArrangement")
+                appendLine("${indent}) {")
+                node.children.forEach { child ->
+                    appendLine("${indent}    item {")
+                    append(generateNodeCode(child, indent = "$indent        "))
+                    appendLine("${indent}    }")
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.LAZY_VERTICAL_STAGGERED_GRID -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val hArrangement = resolveArrangementString(node.layoutConfig, isVertical = false)
+                val spacing = node.layoutConfig.spacing.toInt()
+                appendLine("${indent}LazyVerticalStaggeredGrid(")
+                appendLine("${indent}    columns = StaggeredGridCells.Fixed(2),")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    verticalItemSpacing = ${spacing}.dp,")
+                appendLine("${indent}    horizontalArrangement = $hArrangement")
+                appendLine("${indent}) {")
+                node.children.forEach { child ->
+                    appendLine("${indent}    item {")
+                    append(generateNodeCode(child, indent = "$indent        "))
+                    appendLine("${indent}    }")
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.LAZY_HORIZONTAL_STAGGERED_GRID -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val vArrangement = resolveArrangementString(node.layoutConfig, isVertical = true)
+                val spacing = node.layoutConfig.spacing.toInt()
+                appendLine("${indent}LazyHorizontalStaggeredGrid(")
+                appendLine("${indent}    rows = StaggeredGridCells.Fixed(2),")
+                appendLine("${indent}    modifier = $mod,")
+                appendLine("${indent}    horizontalItemSpacing = ${spacing}.dp,")
+                appendLine("${indent}    verticalArrangement = $vArrangement")
+                appendLine("${indent}) {")
+                node.children.forEach { child ->
+                    appendLine("${indent}    item {")
+                    append(generateNodeCode(child, indent = "$indent        "))
+                    appendLine("${indent}    }")
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.HORIZONTAL_PAGER -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val pageCount = node.children.size.coerceAtLeast(1)
+                appendLine("${indent}val pagerState = rememberPagerState { $pageCount }")
+                appendLine("${indent}HorizontalPager(")
+                appendLine("${indent}    state = pagerState,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) { page ->")
+                if (node.children.isNotEmpty()) {
+                    appendLine("${indent}    when (page) {")
+                    node.children.forEachIndexed { index, child ->
+                        appendLine("${indent}        $index -> {")
+                        append(generateNodeCode(child, indent = "$indent            "))
+                        appendLine("${indent}        }")
+                    }
+                    appendLine("${indent}    }")
+                } else {
+                    appendLine("${indent}    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {")
+                    appendLine("${indent}        Text(text = \"Page \${page + 1}\")")
+                    appendLine("${indent}    }")
+                }
+                appendLine("${indent}}")
+            }
+
+            ComponentType.CAROUSEL -> buildString {
+                val mod = buildModifierString(node, isRootFloating, extraModifier)
+                val itemCount = node.children.size.coerceAtLeast(3)
+                appendLine("${indent}val carouselState = rememberCarouselState { $itemCount }")
+                appendLine("${indent}HorizontalMultiBrowseCarousel(")
+                appendLine("${indent}    state = carouselState,")
+                appendLine("${indent}    preferredItemWidth = 186.dp,")
+                appendLine("${indent}    itemSpacing = 8.dp,")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent}) { index ->")
+                if (node.children.isNotEmpty()) {
+                    appendLine("${indent}    when (index) {")
+                    node.children.forEachIndexed { idx, child ->
+                        appendLine("${indent}        $idx -> {")
+                        append(generateNodeCode(child, indent = "$indent            "))
+                        appendLine("${indent}        }")
+                    }
+                    appendLine("${indent}    }")
+                } else {
+                    appendLine("${indent}    Card(modifier = Modifier.fillMaxWidth().height(200.dp)) {")
+                    appendLine("${indent}        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {")
+                    appendLine("${indent}            Text(text = \"Item \${index + 1}\")")
+                    appendLine("${indent}        }")
                     appendLine("${indent}    }")
                 }
                 appendLine("${indent}}")

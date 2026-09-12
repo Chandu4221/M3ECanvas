@@ -1,5 +1,9 @@
 package dev.chandradsl.m3ecanvas.domain.model
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
+
 /**
  * Categories used to group components in the palette.
  * These mirror the official Material 3 component categories,
@@ -19,10 +23,12 @@ enum class ComponentCategory(val displayName: String) {
 
 /**
  * All Material 3 and Foundation components available in the M3E Canvas.
- * Each type maps to a real Material 3 or Compose composable rendered on the canvas.
+ * Each type maps 1:1 to a real Material 3 or Compose composable rendered on the canvas.
  *
  * [isContainer] marks types that can hold child nodes, enabling hierarchical layouts.
  */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
 enum class ComponentType(
     val displayName: String,
     val category: ComponentCategory,
@@ -36,28 +42,40 @@ enum class ComponentType(
     SEGMENTED_BUTTON(displayName = "Segmented Button", category = ComponentCategory.ACTION),
     SPLIT_BUTTON(displayName = "Split Button", category = ComponentCategory.ACTION),
     BUTTON_GROUP(displayName = "Button Group", category = ComponentCategory.ACTION),
+    TOGGLE_BUTTON(displayName = "Toggle Button", category = ComponentCategory.ACTION),
 
     // Containment
     CARD(displayName = "Card", category = ComponentCategory.CONTAINMENT, isContainer = true),
-    LISTS(displayName = "Lists", category = ComponentCategory.CONTAINMENT, isContainer = true),
-    SHEETS(displayName = "Sheets", category = ComponentCategory.CONTAINMENT, isContainer = true),
-    DIALOG(displayName = "Dialog", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    ELEVATED_CARD(displayName = "Elevated Card", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    OUTLINED_CARD(displayName = "Outlined Card", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    @JsonNames("LISTS")
+    LIST_ITEM(displayName = "ListItem", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    @JsonNames("SHEETS")
+    MODAL_BOTTOM_SHEET(displayName = "Modal Bottom Sheet", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    @JsonNames("DIALOG")
+    ALERT_DIALOG(displayName = "Alert Dialog", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    BASIC_ALERT_DIALOG(displayName = "Basic Alert Dialog", category = ComponentCategory.CONTAINMENT, isContainer = true),
     SURFACE(displayName = "Surface", category = ComponentCategory.CONTAINMENT, isContainer = true),
 
     // Communication
     SNACKBAR(displayName = "Snackbar", category = ComponentCategory.COMMUNICATION),
+    SNACKBAR_HOST(displayName = "Snackbar Host", category = ComponentCategory.COMMUNICATION),
     BADGE(displayName = "Badge", category = ComponentCategory.COMMUNICATION),
+    BADGED_BOX(displayName = "Badged Box", category = ComponentCategory.COMMUNICATION, isContainer = true),
     TOOLTIP(displayName = "Tooltip", category = ComponentCategory.COMMUNICATION),
     PROGRESS_INDICATOR(displayName = "Progress Indicator", category = ComponentCategory.COMMUNICATION),
     LOADING_INDICATOR(displayName = "Loading Indicator", category = ComponentCategory.COMMUNICATION),
 
     // Navigation
     TOP_APP_BAR(displayName = "Top App Bar", category = ComponentCategory.NAVIGATION, isContainer = true),
-    NAVIGATION_BAR(displayName = "Navigation Bar", category = ComponentCategory.NAVIGATION),
-    BOTTOM_APP_BAR(displayName = "Bottom App Bar", category = ComponentCategory.NAVIGATION),
-    NAVIGATION_RAIL(displayName = "Navigation Rail", category = ComponentCategory.NAVIGATION),
-    NAVIGATION_DRAWER(displayName = "Navigation Drawer", category = ComponentCategory.NAVIGATION),
-    TABS(displayName = "Tabs", category = ComponentCategory.NAVIGATION),
+    NAVIGATION_BAR(displayName = "Navigation Bar", category = ComponentCategory.NAVIGATION, isContainer = true),
+    NAVIGATION_BAR_ITEM(displayName = "Navigation Bar Item", category = ComponentCategory.NAVIGATION),
+    BOTTOM_APP_BAR(displayName = "Bottom App Bar", category = ComponentCategory.NAVIGATION, isContainer = true),
+    NAVIGATION_RAIL(displayName = "Navigation Rail", category = ComponentCategory.NAVIGATION, isContainer = true),
+    NAVIGATION_RAIL_ITEM(displayName = "Navigation Rail Item", category = ComponentCategory.NAVIGATION),
+    NAVIGATION_DRAWER(displayName = "Navigation Drawer", category = ComponentCategory.NAVIGATION, isContainer = true),
+    TABS(displayName = "Tabs", category = ComponentCategory.NAVIGATION, isContainer = true),
+    TAB(displayName = "Tab", category = ComponentCategory.NAVIGATION),
     SEARCH(displayName = "Search", category = ComponentCategory.NAVIGATION),
 
     // Selection
@@ -69,7 +87,8 @@ enum class ComponentType(
     CHIPS(displayName = "Chips", category = ComponentCategory.SELECTION),
     DATE_PICKER(displayName = "Date Picker", category = ComponentCategory.SELECTION),
     TIME_PICKER(displayName = "Time Picker", category = ComponentCategory.SELECTION),
-    MENUS(displayName = "Menus", category = ComponentCategory.SELECTION),
+    MENUS(displayName = "Menus", category = ComponentCategory.SELECTION, isContainer = true),
+    DROPDOWN_MENU_ITEM(displayName = "Dropdown Menu Item", category = ComponentCategory.SELECTION),
 
     // Text input
     TEXT_FIELD(displayName = "Text Field", category = ComponentCategory.TEXT_INPUT),
@@ -85,15 +104,38 @@ enum class ComponentType(
 
     // Layout containers
     SCAFFOLD(displayName = "Scaffold", category = ComponentCategory.LAYOUT, isContainer = true),
+    BOTTOM_SHEET_SCAFFOLD(displayName = "Bottom Sheet Scaffold", category = ComponentCategory.LAYOUT, isContainer = true),
     COLUMN(displayName = "Column", category = ComponentCategory.LAYOUT, isContainer = true),
     ROW(displayName = "Row", category = ComponentCategory.LAYOUT, isContainer = true),
     BOX(displayName = "Box", category = ComponentCategory.LAYOUT, isContainer = true),
+    BOX_WITH_CONSTRAINTS(displayName = "BoxWithConstraints", category = ComponentCategory.LAYOUT, isContainer = true),
     LAZY_COLUMN(displayName = "Lazy Column", category = ComponentCategory.LAYOUT, isContainer = true),
     LAZY_ROW(displayName = "Lazy Row", category = ComponentCategory.LAYOUT, isContainer = true),
     LAZY_VERTICAL_GRID(displayName = "Lazy Vertical Grid", category = ComponentCategory.LAYOUT, isContainer = true),
+    LAZY_HORIZONTAL_GRID(displayName = "Lazy Horizontal Grid", category = ComponentCategory.LAYOUT, isContainer = true),
+    LAZY_VERTICAL_STAGGERED_GRID(displayName = "Lazy Vertical Staggered Grid", category = ComponentCategory.LAYOUT, isContainer = true),
+    LAZY_HORIZONTAL_STAGGERED_GRID(displayName = "Lazy Horizontal Staggered Grid", category = ComponentCategory.LAYOUT, isContainer = true),
+    HORIZONTAL_PAGER(displayName = "Horizontal Pager", category = ComponentCategory.LAYOUT, isContainer = true),
+    CAROUSEL(displayName = "Carousel", category = ComponentCategory.LAYOUT, isContainer = true),
     FLOW_ROW(displayName = "Flow Row", category = ComponentCategory.LAYOUT, isContainer = true),
     FLOW_COLUMN(displayName = "Flow Column", category = ComponentCategory.LAYOUT, isContainer = true),
     SPACER(displayName = "Spacer", category = ComponentCategory.LAYOUT);
+
+    /**
+     * Determines whether this component is a vertically scrolling lazy layout.
+     */
+    fun isVerticalLazy(): Boolean = when (this) {
+        LAZY_COLUMN, LAZY_VERTICAL_GRID, LAZY_VERTICAL_STAGGERED_GRID -> true
+        else -> false
+    }
+
+    /**
+     * Determines whether this component is a horizontally scrolling lazy layout.
+     */
+    fun isHorizontalLazy(): Boolean = when (this) {
+        LAZY_ROW, LAZY_HORIZONTAL_GRID, LAZY_HORIZONTAL_STAGGERED_GRID, HORIZONTAL_PAGER, CAROUSEL -> true
+        else -> false
+    }
 
     /**
      * Determines the canonical structural slot role this component type binds to
@@ -106,7 +148,7 @@ enum class ComponentType(
             NAVIGATION_RAIL -> SlotRole.RAIL
             NAVIGATION_DRAWER -> SlotRole.DRAWER
             FAB, EXTENDED_FAB -> SlotRole.FAB
-            SNACKBAR -> SlotRole.SNACKBAR
+            SNACKBAR, SNACKBAR_HOST -> SlotRole.SNACKBAR
             else -> SlotRole.CONTENT
         }
     }
@@ -125,33 +167,55 @@ enum class ComponentType(
                 SlotRole.SNACKBAR,
                 SlotRole.CONTENT
             )
+            BOTTOM_SHEET_SCAFFOLD -> listOf(
+                SlotRole.SHEET_CONTENT,
+                SlotRole.TOP_BAR,
+                SlotRole.FAB,
+                SlotRole.SNACKBAR,
+                SlotRole.CONTENT
+            )
             TOP_APP_BAR -> listOf(
                 SlotRole.NAVIGATION_ICON,
                 SlotRole.TITLE,
                 SlotRole.ACTIONS
             )
-            LISTS -> listOf(
+            LIST_ITEM -> listOf(
                 SlotRole.LEADING,
                 SlotRole.HEADLINE,
                 SlotRole.SUPPORTING,
                 SlotRole.TRAILING,
                 SlotRole.OVERLINE
             )
-            DIALOG -> listOf(
+            ALERT_DIALOG -> listOf(
                 SlotRole.ICON,
                 SlotRole.TITLE,
                 SlotRole.CONTENT,
                 SlotRole.CONFIRM_BUTTON,
                 SlotRole.DISMISS_BUTTON
             )
+            BADGED_BOX -> listOf(
+                SlotRole.BADGE,
+                SlotRole.CONTENT
+            )
+            NAVIGATION_RAIL -> listOf(
+                SlotRole.HEADER,
+                SlotRole.CONTENT
+            )
+            BOTTOM_APP_BAR -> listOf(
+                SlotRole.ACTIONS,
+                SlotRole.FAB
+            )
             TEXT_FIELD -> listOf(
                 SlotRole.LEADING,
                 SlotRole.TRAILING
             )
-            CARD, SHEETS, SURFACE,
-            COLUMN, ROW, BOX,
-            LAZY_COLUMN, LAZY_ROW, LAZY_VERTICAL_GRID,
-            FLOW_ROW, FLOW_COLUMN -> listOf(SlotRole.CONTENT)
+            CARD, ELEVATED_CARD, OUTLINED_CARD, MODAL_BOTTOM_SHEET, BASIC_ALERT_DIALOG, SURFACE,
+            COLUMN, ROW, BOX, BOX_WITH_CONSTRAINTS,
+            LAZY_COLUMN, LAZY_ROW, LAZY_VERTICAL_GRID, LAZY_HORIZONTAL_GRID,
+            LAZY_VERTICAL_STAGGERED_GRID, LAZY_HORIZONTAL_STAGGERED_GRID,
+            HORIZONTAL_PAGER, CAROUSEL,
+            FLOW_ROW, FLOW_COLUMN,
+            NAVIGATION_BAR, NAVIGATION_DRAWER, TABS, MENUS -> listOf(SlotRole.CONTENT)
             else -> emptyList()
         }
     }
@@ -161,22 +225,34 @@ enum class ComponentType(
      */
     fun canonicalSlotFor(parentType: ComponentType): SlotRole {
         return when (parentType) {
-            SCAFFOLD -> canonicalSlot()
+            SCAFFOLD, BOTTOM_SHEET_SCAFFOLD -> canonicalSlot()
             TOP_APP_BAR -> when (this) {
                 TEXT -> SlotRole.TITLE
                 ICON, ICON_BUTTON -> SlotRole.ACTIONS
                 else -> SlotRole.ACTIONS
             }
-            LISTS -> when (this) {
+            LIST_ITEM -> when (this) {
                 ICON, IMAGE -> SlotRole.LEADING
-                CHECKBOX, SWITCH, RADIO_BUTTON, ICON_BUTTON -> SlotRole.TRAILING
+                CHECKBOX, SWITCH, RADIO_BUTTON, ICON_BUTTON, BADGE -> SlotRole.TRAILING
                 TEXT -> SlotRole.HEADLINE
-                else -> SlotRole.CONTENT
+                else -> SlotRole.HEADLINE
             }
-            DIALOG -> when (this) {
+            ALERT_DIALOG -> when (this) {
                 ICON, IMAGE -> SlotRole.ICON
                 TEXT -> SlotRole.CONTENT
-                BUTTON -> SlotRole.CONFIRM_BUTTON
+                BUTTON, ICON_BUTTON, TOGGLE_BUTTON -> SlotRole.CONFIRM_BUTTON
+                else -> SlotRole.CONTENT
+            }
+            BADGED_BOX -> when (this) {
+                BADGE -> SlotRole.BADGE
+                else -> SlotRole.CONTENT
+            }
+            BOTTOM_APP_BAR -> when (this) {
+                FAB, EXTENDED_FAB -> SlotRole.FAB
+                else -> SlotRole.ACTIONS
+            }
+            NAVIGATION_RAIL -> when (this) {
+                FAB, EXTENDED_FAB, ICON, IMAGE -> SlotRole.HEADER
                 else -> SlotRole.CONTENT
             }
             TEXT_FIELD -> when (this) {
@@ -194,76 +270,53 @@ enum class ComponentType(
     fun canAcceptChild(childType: ComponentType): Boolean {
         if (!this.isContainer) return false
 
+        // Cannot nest screen-level scaffolds
+        if (childType == SCAFFOLD || childType == BOTTOM_SHEET_SCAFFOLD) return false
+
+        // Overlay dialogs cannot be in-flow children
+        if (childType == ALERT_DIALOG || childType == BASIC_ALERT_DIALOG) return false
+
+        // Scaffold-specific structural bars & snackbars belong only to Scaffolds
+        when (childType) {
+            TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR, NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR, SNACKBAR_HOST -> {
+                return this == SCAFFOLD || this == BOTTOM_SHEET_SCAFFOLD
+            }
+            else -> Unit
+        }
+
+        // Compose runtime constraints: prevent nested same-axis lazy layouts (infinite dimension crash)
+        if (this.isVerticalLazy() && childType.isVerticalLazy()) return false
+        if (this.isHorizontalLazy() && childType.isHorizontalLazy()) return false
+
         return when (this) {
-            SCAFFOLD -> when (childType) {
-                // Scaffold cannot be nested inside another Scaffold
-                SCAFFOLD -> false
-                // Dedicated structural slots
-                TOP_APP_BAR, NAVIGATION_BAR, BOTTOM_APP_BAR,
-                NAVIGATION_RAIL, NAVIGATION_DRAWER,
-                FAB, EXTENDED_FAB, SNACKBAR -> true
-                // Dialog is an overlay window, not in-flow content
-                DIALOG -> false
-                else -> true
-            }
-
+            SCAFFOLD, BOTTOM_SHEET_SCAFFOLD -> true
             TOP_APP_BAR -> when (childType) {
-                TEXT, ICON, ICON_BUTTON -> true
+                TEXT, ICON, ICON_BUTTON, IMAGE, ROW -> true
                 else -> false
             }
-
-            LISTS -> when (childType) {
-                TEXT, ICON, IMAGE, ICON_BUTTON,
-                CHECKBOX, SWITCH, RADIO_BUTTON, BADGE -> true
-                else -> false
-            }
-
-            DIALOG -> when (childType) {
-                // Dialog header / icon / title / action buttons / content layouts
-                ICON, IMAGE, TEXT, BUTTON, ICON_BUTTON,
-                COLUMN, ROW, BOX -> true
-                else -> false
-            }
-
-            CARD, SURFACE -> when (childType) {
-                // Cannot contain screen-level scaffold or structural scaffold slots
-                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
-                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR,
-                DIALOG, SHEETS -> false
+            BADGED_BOX -> true
+            NAVIGATION_BAR -> when (childType) {
+                NAVIGATION_BAR_ITEM, ICON, TEXT, BADGE -> true
                 else -> true
             }
-
-            SHEETS -> when (childType) {
-                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
-                NAVIGATION_RAIL, NAVIGATION_DRAWER, DIALOG, SHEETS, SNACKBAR -> false
+            NAVIGATION_RAIL -> when (childType) {
+                NAVIGATION_RAIL_ITEM, FAB, EXTENDED_FAB, ICON, IMAGE -> true
                 else -> true
             }
-
-            COLUMN, ROW, BOX, FLOW_ROW, FLOW_COLUMN -> when (childType) {
-                // Cannot contain screen-level scaffold or structural scaffold slots or dialog overlay
-                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
-                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR, DIALOG -> false
+            TABS -> when (childType) {
+                TAB, TEXT, ICON -> true
                 else -> true
             }
-
-            LAZY_COLUMN, LAZY_VERTICAL_GRID -> when (childType) {
-                // Compose constraint: Cannot nest vertical lazy layout inside vertical lazy layout (infinite height exception)
-                LAZY_COLUMN, LAZY_VERTICAL_GRID -> false
-                // Cannot contain scaffold, structural slots, or dialog
-                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
-                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR, DIALOG -> false
+            MENUS -> when (childType) {
+                DROPDOWN_MENU_ITEM, HORIZONTAL_DIVIDER -> true
                 else -> true
             }
-
-            LAZY_ROW -> when (childType) {
-                // Compose constraint: Cannot nest horizontal lazy layout inside horizontal lazy layout (infinite width exception)
-                LAZY_ROW -> false
-                // Cannot contain scaffold, structural slots, or dialog
-                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
-                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR, DIALOG -> false
-                else -> true
-            }
-
+            LIST_ITEM, CARD, ELEVATED_CARD, OUTLINED_CARD, SURFACE, MODAL_BOTTOM_SHEET, BASIC_ALERT_DIALOG, ALERT_DIALOG,
+            COLUMN, ROW, BOX, BOX_WITH_CONSTRAINTS,
+            LAZY_COLUMN, LAZY_ROW, LAZY_VERTICAL_GRID, LAZY_HORIZONTAL_GRID,
+            LAZY_VERTICAL_STAGGERED_GRID, LAZY_HORIZONTAL_STAGGERED_GRID,
+            HORIZONTAL_PAGER, CAROUSEL,
+            FLOW_ROW, FLOW_COLUMN -> true
             else -> false
         }
     }
@@ -281,7 +334,7 @@ enum class ComponentType(
      */
     fun isAllowedAtRoot(hasScaffold: Boolean): Boolean {
         return if (hasScaffold) {
-            this != SCAFFOLD
+            this != SCAFFOLD && this != BOTTOM_SHEET_SCAFFOLD
         } else {
             true
         }
@@ -292,42 +345,79 @@ enum class ComponentType(
      * If this returns a list with 1 or 0 elements, no slot selection dropdown should be shown.
      */
     fun allowedSlotsIn(parentType: ComponentType): List<SlotRole> {
+        if (!parentType.canAcceptChild(this)) return emptyList()
+
         return when (parentType) {
             SCAFFOLD -> when (this) {
-                // In Scaffold, each component binds strictly to its own structural slot.
-                // A FAB is never a TopAppBar or Drawer; a TopAppBar is never a FAB.
                 TOP_APP_BAR -> listOf(SlotRole.TOP_BAR)
                 NAVIGATION_BAR, BOTTOM_APP_BAR -> listOf(SlotRole.BOTTOM_BAR)
                 NAVIGATION_RAIL -> listOf(SlotRole.RAIL)
                 NAVIGATION_DRAWER -> listOf(SlotRole.DRAWER)
                 FAB, EXTENDED_FAB -> listOf(SlotRole.FAB)
-                SNACKBAR -> listOf(SlotRole.SNACKBAR)
-                else -> if (parentType.canAcceptChild(this)) listOf(SlotRole.CONTENT) else emptyList()
+                SNACKBAR, SNACKBAR_HOST -> listOf(SlotRole.SNACKBAR)
+                else -> listOf(SlotRole.CONTENT)
+            }
+            BOTTOM_SHEET_SCAFFOLD -> when (this) {
+                TOP_APP_BAR -> listOf(SlotRole.TOP_BAR)
+                FAB, EXTENDED_FAB -> listOf(SlotRole.FAB)
+                SNACKBAR, SNACKBAR_HOST -> listOf(SlotRole.SNACKBAR)
+                else -> listOf(SlotRole.CONTENT, SlotRole.SHEET_CONTENT)
             }
             TOP_APP_BAR -> when (this) {
                 ICON, ICON_BUTTON -> listOf(SlotRole.ACTIONS, SlotRole.NAVIGATION_ICON)
                 TEXT -> listOf(SlotRole.TITLE)
-                else -> emptyList()
+                else -> listOf(SlotRole.ACTIONS)
             }
-            LISTS -> when (this) {
-                ICON, IMAGE -> listOf(SlotRole.LEADING, SlotRole.TRAILING)
-                CHECKBOX, SWITCH, RADIO_BUTTON, ICON_BUTTON -> listOf(SlotRole.TRAILING, SlotRole.LEADING)
-                TEXT -> listOf(SlotRole.HEADLINE, SlotRole.SUPPORTING, SlotRole.OVERLINE, SlotRole.TRAILING)
-                BADGE -> listOf(SlotRole.TRAILING)
-                else -> emptyList()
+            LIST_ITEM -> when (this) {
+                ICON, IMAGE -> listOf(
+                    SlotRole.LEADING,
+                    SlotRole.TRAILING,
+                    SlotRole.HEADLINE,
+                    SlotRole.SUPPORTING,
+                    SlotRole.OVERLINE
+                )
+                CHECKBOX, SWITCH, RADIO_BUTTON, ICON_BUTTON, BADGE -> listOf(
+                    SlotRole.TRAILING,
+                    SlotRole.LEADING,
+                    SlotRole.HEADLINE,
+                    SlotRole.SUPPORTING,
+                    SlotRole.OVERLINE
+                )
+                TEXT -> listOf(
+                    SlotRole.HEADLINE,
+                    SlotRole.SUPPORTING,
+                    SlotRole.OVERLINE,
+                    SlotRole.TRAILING,
+                    SlotRole.LEADING
+                )
+                else -> listOf(
+                    SlotRole.HEADLINE,
+                    SlotRole.SUPPORTING,
+                    SlotRole.LEADING,
+                    SlotRole.TRAILING,
+                    SlotRole.OVERLINE
+                )
             }
-            DIALOG -> when (this) {
-                BUTTON -> listOf(SlotRole.CONFIRM_BUTTON, SlotRole.DISMISS_BUTTON)
+            ALERT_DIALOG -> when (this) {
+                BUTTON, ICON_BUTTON, TOGGLE_BUTTON -> listOf(SlotRole.CONFIRM_BUTTON, SlotRole.DISMISS_BUTTON)
                 ICON, IMAGE -> listOf(SlotRole.ICON)
                 TEXT -> listOf(SlotRole.TITLE, SlotRole.CONTENT, SlotRole.SUPPORTING)
-                COLUMN, ROW, BOX -> listOf(SlotRole.CONTENT)
-                else -> emptyList()
+                else -> listOf(SlotRole.CONTENT)
             }
-            TEXT_FIELD -> when (this) {
-                ICON, ICON_BUTTON -> listOf(SlotRole.LEADING, SlotRole.TRAILING)
-                else -> emptyList()
+            BADGED_BOX -> when (this) {
+                BADGE -> listOf(SlotRole.BADGE)
+                else -> listOf(SlotRole.CONTENT)
             }
-            else -> if (parentType.canAcceptChild(this)) listOf(SlotRole.CONTENT) else emptyList()
+            NAVIGATION_RAIL -> when (this) {
+                FAB, EXTENDED_FAB, ICON, IMAGE -> listOf(SlotRole.HEADER, SlotRole.CONTENT)
+                else -> listOf(SlotRole.CONTENT)
+            }
+            BOTTOM_APP_BAR -> when (this) {
+                FAB, EXTENDED_FAB -> listOf(SlotRole.FAB, SlotRole.ACTIONS)
+                else -> listOf(SlotRole.ACTIONS)
+            }
+            TEXT_FIELD -> listOf(SlotRole.LEADING, SlotRole.TRAILING)
+            else -> listOf(SlotRole.CONTENT)
         }
     }
 }

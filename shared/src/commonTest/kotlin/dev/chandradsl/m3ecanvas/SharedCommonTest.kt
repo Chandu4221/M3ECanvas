@@ -359,7 +359,7 @@ class SharedCommonTest {
 
     @Test
     fun testAllComponentTypesEmitValidCodeWithoutPlaceholders() {
-        assertEquals(49, ComponentType.entries.size)
+        assertEquals(66, ComponentType.entries.size)
         for (type in ComponentType.entries) {
             val node = CanvasNode(
                 type = type,
@@ -382,7 +382,7 @@ class SharedCommonTest {
 
     @Test
     fun testAllComponentTypesHaveNonZeroDefaultSize() {
-        assertEquals(49, ComponentType.entries.size)
+        assertEquals(66, ComponentType.entries.size)
         for (type in ComponentType.entries) {
             val size = EditorController.defaultSizeFor(type)
             assertTrue(size.width > 0f, "Width must be > 0 for ${type.name}")
@@ -392,7 +392,7 @@ class SharedCommonTest {
 
     @Test
     fun testEveryComponentTypeIsDeletableFromProject() {
-        assertEquals(49, ComponentType.entries.size)
+        assertEquals(66, ComponentType.entries.size)
         for (type in ComponentType.entries) {
             val project = EditorController.newProject(name = "DeleteTest_${type.name}", withDefaultScaffold = false)
             val controller = EditorController(initialProject = project)
@@ -1752,8 +1752,8 @@ class SharedCommonTest {
     @Test
     fun testListItemSlots() {
         val controller = EditorController(initialProject = EditorController.newProject("ListProject", withDefaultScaffold = false))
-        controller.addNode(ComponentType.LISTS, CanvasPosition.Zero)
-        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LISTS }
+        controller.addNode(ComponentType.LIST_ITEM, CanvasPosition.Zero)
+        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LIST_ITEM }
 
         controller.addChildToContainer(listItem.id, ComponentType.ICON)
         controller.addChildToContainer(listItem.id, ComponentType.TEXT)
@@ -1851,7 +1851,7 @@ class SharedCommonTest {
     @Test
     fun testScaffoldRejectsNestedScaffoldAndDialog() {
         assertFalse(ComponentType.SCAFFOLD.canAcceptChild(ComponentType.SCAFFOLD))
-        assertFalse(ComponentType.SCAFFOLD.canAcceptChild(ComponentType.DIALOG))
+        assertFalse(ComponentType.SCAFFOLD.canAcceptChild(ComponentType.ALERT_DIALOG))
 
         val controller = EditorController(initialProject = EditorController.newProject("ScaffoldTest", withDefaultScaffold = true))
         val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
@@ -1859,7 +1859,7 @@ class SharedCommonTest {
         val addedScaffold = controller.addChildToContainer(scaffold.id, ComponentType.SCAFFOLD)
         assertFalse(addedScaffold, "Scaffold must reject adding another Scaffold as child")
 
-        val addedDialog = controller.addChildToContainer(scaffold.id, ComponentType.DIALOG)
+        val addedDialog = controller.addChildToContainer(scaffold.id, ComponentType.ALERT_DIALOG)
         assertFalse(addedDialog, "Scaffold must reject Dialog as in-flow child")
     }
 
@@ -1887,24 +1887,26 @@ class SharedCommonTest {
     }
 
     @Test
-    fun testListItemRejectsContainersAndRestrictedTypes() {
-        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.TEXT))
-        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.ICON))
-        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.CHECKBOX))
-        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.SWITCH))
+    fun testListItemAcceptsUniversalSlotChildren() {
+        assertTrue(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.TEXT))
+        assertTrue(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.ICON))
+        assertTrue(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.CHECKBOX))
+        assertTrue(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.SWITCH))
+        assertTrue(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.CARD))
+        assertTrue(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.COLUMN))
+        assertTrue(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.BUTTON))
 
-        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.CARD))
-        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.COLUMN))
-        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.SCAFFOLD))
-        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.LAZY_COLUMN))
-        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.DIALOG))
+        assertFalse(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.SCAFFOLD))
+        assertFalse(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.BOTTOM_SHEET_SCAFFOLD))
+        assertFalse(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.TOP_APP_BAR))
+        assertFalse(ComponentType.LIST_ITEM.canAcceptChild(ComponentType.ALERT_DIALOG))
 
         val controller = EditorController(initialProject = EditorController.newProject("ListItemTest", withDefaultScaffold = false))
-        controller.addNode(ComponentType.LISTS, CanvasPosition.Zero)
-        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LISTS }
+        controller.addNode(ComponentType.LIST_ITEM, CanvasPosition.Zero)
+        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LIST_ITEM }
 
-        assertFalse(controller.addChildToContainer(listItem.id, ComponentType.CARD))
-        assertFalse(controller.addChildToContainer(listItem.id, ComponentType.COLUMN))
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.CARD))
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.COLUMN))
         assertTrue(controller.addChildToContainer(listItem.id, ComponentType.TEXT))
     }
 
@@ -1916,7 +1918,7 @@ class SharedCommonTest {
         assertFalse(ComponentType.LAZY_VERTICAL_GRID.canAcceptChild(ComponentType.LAZY_VERTICAL_GRID))
 
         assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.CARD))
-        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LISTS))
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LIST_ITEM))
         assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.ROW))
         assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_ROW)) // Cross-axis lazy layout is allowed
 
@@ -1944,7 +1946,7 @@ class SharedCommonTest {
         assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.BOTTOM_APP_BAR))
         assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.NAVIGATION_RAIL))
         assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.NAVIGATION_DRAWER))
-        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.DIALOG))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.ALERT_DIALOG))
         assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.SNACKBAR))
 
         assertTrue(ComponentType.CARD.canAcceptChild(ComponentType.BUTTON))
@@ -1959,13 +1961,13 @@ class SharedCommonTest {
         val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
         val contentColumn = scaffold.children.first { it.slot == SlotRole.CONTENT }
 
-        // Add a ListItem to contentColumn
-        assertTrue(controller.addChildToContainer(contentColumn.id, ComponentType.LISTS))
-        val listItem = controller.state.project.findNode(contentColumn.id)!!.children.first { it.type == ComponentType.LISTS }
+        // Add a LazyColumn to contentColumn
+        assertTrue(controller.addChildToContainer(contentColumn.id, ComponentType.LAZY_COLUMN))
+        val lazyCol = controller.state.project.findNode(contentColumn.id)!!.children.first { it.type == ComponentType.LAZY_COLUMN }
 
-        // When ListItem is selected and user wants to add a Card, ListItem cannot accept Card,
+        // When LazyColumn is selected and user wants to add a LazyColumn, LazyColumn cannot accept same-axis LazyColumn,
         // so findValidTargetContainer must climb to contentColumn!
-        val target = controller.findValidTargetContainer(forType = ComponentType.CARD, startingFromNodeId = listItem.id)
+        val target = controller.findValidTargetContainer(forType = ComponentType.LAZY_COLUMN, startingFromNodeId = lazyCol.id)
         assertNotNull(target)
         assertEquals(contentColumn.id, target.id)
     }
@@ -1992,12 +1994,12 @@ class SharedCommonTest {
         val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
         val contentColumn = scaffold.children.first { it.slot == SlotRole.CONTENT }
 
-        // Add a ListItem
-        assertTrue(controller.addChildToContainer(contentColumn.id, ComponentType.LISTS))
-        val listItem = controller.state.project.findNode(contentColumn.id)!!.children.first { it.type == ComponentType.LISTS }
+        // Add a Button (non-container) to contentColumn
+        assertTrue(controller.addChildToContainer(contentColumn.id, ComponentType.BUTTON))
+        val button = controller.state.project.findNode(contentColumn.id)!!.children.first { it.type == ComponentType.BUTTON }
 
-        // Select the ListItem
-        controller.selectNode(listItem.id)
+        // Select the Button
+        controller.selectNode(button.id)
 
         // Copy a Card
         val cardNode = CanvasNode(
@@ -2007,12 +2009,12 @@ class SharedCommonTest {
             size = CanvasSize(200f, 100f)
         )
 
-        // Paste while ListItem is selected: paste must climb to contentColumn and not corrupt ListItem
+        // Paste while Button is selected: paste must climb to contentColumn and not corrupt Button
         val pasted = controller.paste(sourceNode = cardNode)
         assertNotNull(pasted)
 
-        val updatedListItem = controller.state.project.findNode(listItem.id)!!
-        assertEquals(0, updatedListItem.children.size, "ListItem must not have the pasted Card as child")
+        val updatedButton = controller.state.project.findNode(button.id)!!
+        assertEquals(0, updatedButton.children.size, "Button must not have the pasted Card as child")
 
         val updatedContent = controller.state.project.findNode(contentColumn.id)!!
         assertTrue(updatedContent.children.any { it.type == ComponentType.CARD }, "Content Column must contain the pasted Card")
@@ -2056,8 +2058,8 @@ class SharedCommonTest {
     @Test
     fun testListItemConsecutiveAddsPopulatesDifferentSlots() {
         val controller = EditorController(initialProject = EditorController.newProject("MultiItemTest", withDefaultScaffold = false))
-        controller.addNode(ComponentType.LISTS, CanvasPosition.Zero)
-        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LISTS }
+        controller.addNode(ComponentType.LIST_ITEM, CanvasPosition.Zero)
+        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LIST_ITEM }
 
         // 1st text -> HEADLINE
         assertTrue(controller.addChildToContainer(listItem.id, ComponentType.TEXT))
@@ -2093,8 +2095,8 @@ class SharedCommonTest {
     @Test
     fun testDialogConsecutiveButtonsPopulatesConfirmAndDismiss() {
         val controller = EditorController(initialProject = EditorController.newProject("DialogTest", withDefaultScaffold = false))
-        controller.addNode(ComponentType.DIALOG, CanvasPosition.Zero)
-        val dialog = controller.state.project.nodes.first { it.type == ComponentType.DIALOG }
+        controller.addNode(ComponentType.ALERT_DIALOG, CanvasPosition.Zero)
+        val dialog = controller.state.project.nodes.first { it.type == ComponentType.ALERT_DIALOG }
 
         // 1st button -> CONFIRM_BUTTON
         assertTrue(controller.addChildToContainer(dialog.id, ComponentType.BUTTON))
@@ -2107,5 +2109,217 @@ class SharedCommonTest {
         updated = controller.state.project.findNode(dialog.id)!!
         assertEquals(2, updated.children.size)
         assertEquals(SlotRole.DISMISS_BUTTON, updated.children[1].slot)
+    }
+
+    @Test
+    fun testLegacySerializationBackwardsCompatibility() {
+        val legacyJson = """
+            {
+              "id": "node-1",
+              "type": "LISTS",
+              "name": "Legacy List Item",
+              "position": {"x": 0.0, "y": 0.0},
+              "size": {"width": 360.0, "height": 56.0},
+              "properties": [],
+              "children": [
+                {
+                  "id": "node-2",
+                  "type": "DIALOG",
+                  "name": "Legacy Dialog",
+                  "position": {"x": 0.0, "y": 0.0},
+                  "size": {"width": 280.0, "height": 200.0},
+                  "properties": [],
+                  "children": []
+                },
+                {
+                  "id": "node-3",
+                  "type": "SHEETS",
+                  "name": "Legacy Sheet",
+                  "position": {"x": 0.0, "y": 0.0},
+                  "size": {"width": 360.0, "height": 300.0},
+                  "properties": [],
+                  "children": []
+                }
+              ]
+            }
+        """.trimIndent()
+        val node = M3EJson.decodeFromString<CanvasNode>(legacyJson)
+        assertEquals(ComponentType.LIST_ITEM, node.type)
+        assertEquals(ComponentType.ALERT_DIALOG, node.children[0].type)
+        assertEquals(ComponentType.MODAL_BOTTOM_SHEET, node.children[1].type)
+    }
+
+    @Test
+    fun testNewComponentsRegisteredInComponentRegistry() {
+        val registeredTypes = ComponentRegistry.all().map { it.type }.toSet()
+        val expectedNewTypes = listOf(
+            ComponentType.BOX_WITH_CONSTRAINTS,
+            ComponentType.BOTTOM_SHEET_SCAFFOLD,
+            ComponentType.LAZY_HORIZONTAL_GRID,
+            ComponentType.LAZY_VERTICAL_STAGGERED_GRID,
+            ComponentType.LAZY_HORIZONTAL_STAGGERED_GRID,
+            ComponentType.HORIZONTAL_PAGER,
+            ComponentType.CAROUSEL,
+            ComponentType.ELEVATED_CARD,
+            ComponentType.OUTLINED_CARD,
+            ComponentType.BASIC_ALERT_DIALOG,
+            ComponentType.TOGGLE_BUTTON,
+            ComponentType.NAVIGATION_BAR_ITEM,
+            ComponentType.NAVIGATION_RAIL_ITEM,
+            ComponentType.TAB,
+            ComponentType.DROPDOWN_MENU_ITEM,
+            ComponentType.BADGED_BOX,
+            ComponentType.SNACKBAR_HOST
+        )
+        for (type in expectedNewTypes) {
+            assertTrue(registeredTypes.contains(type), "Missing registration for component type $type")
+            assertNotNull(ComponentRegistry.get(type), "Definition missing for $type")
+        }
+    }
+
+    @Test
+    fun testSameAxisLazyLayoutNestingPrevention() {
+        // Vertical lazy layouts reject vertical lazy layouts
+        assertFalse(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_VERTICAL_GRID))
+        assertFalse(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_VERTICAL_STAGGERED_GRID))
+        assertFalse(ComponentType.LAZY_VERTICAL_GRID.canAcceptChild(ComponentType.LAZY_COLUMN))
+        assertFalse(ComponentType.LAZY_VERTICAL_STAGGERED_GRID.canAcceptChild(ComponentType.LAZY_COLUMN))
+
+        // Horizontal lazy layouts reject horizontal lazy layouts
+        assertFalse(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.LAZY_HORIZONTAL_GRID))
+        assertFalse(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.LAZY_HORIZONTAL_STAGGERED_GRID))
+        assertFalse(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.HORIZONTAL_PAGER))
+        assertFalse(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.CAROUSEL))
+        assertFalse(ComponentType.HORIZONTAL_PAGER.canAcceptChild(ComponentType.LAZY_ROW))
+        assertFalse(ComponentType.CAROUSEL.canAcceptChild(ComponentType.HORIZONTAL_PAGER))
+
+        // Cross-axis is explicitly permitted
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_ROW))
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_HORIZONTAL_GRID))
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.CAROUSEL))
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.HORIZONTAL_PAGER))
+        assertTrue(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.LAZY_COLUMN))
+        assertTrue(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.LAZY_VERTICAL_GRID))
+    }
+
+    @Test
+    fun testComposeCodeGeneratorNewComponentsAndFabSizes() {
+        val generator = ComposeCodeGenerator.default
+
+        // BottomSheetScaffold code generation
+        val sheetScaffoldNode = CanvasNode(
+            type = ComponentType.BOTTOM_SHEET_SCAFFOLD,
+            name = "MyBottomSheetScaffold",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(412f, 917f),
+            children = listOf(
+                CanvasNode(
+                    type = ComponentType.TEXT,
+                    name = "Sheet Header",
+                    position = CanvasPosition.Zero,
+                    size = CanvasSize(200f, 24f),
+                    slot = SlotRole.SHEET_CONTENT
+                ),
+                CanvasNode(
+                    type = ComponentType.BUTTON,
+                    name = "Main Content Button",
+                    position = CanvasPosition.Zero,
+                    size = CanvasSize(150f, 48f),
+                    properties = listOf(ComponentProperty.Text("text", "Main Content Button")),
+                    slot = SlotRole.CONTENT
+                )
+            )
+        )
+        val testProject = M3EProject(
+            name = "TestScaffold",
+            nodes = listOf(sheetScaffoldNode)
+        )
+        val scaffoldFile = generator.generateFile(testProject, "TestScaffold")
+        assertTrue(scaffoldFile.contains("BottomSheetScaffold("))
+        assertTrue(scaffoldFile.contains("sheetContent = {"))
+        assertTrue(scaffoldFile.contains("Sheet Header"))
+        assertTrue(scaffoldFile.contains("Main Content Button"))
+
+        // BoxWithConstraints
+        val bwcNode = CanvasNode(
+            type = ComponentType.BOX_WITH_CONSTRAINTS,
+            name = "MyBwc",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(300f, 200f)
+        )
+        val bwcCode = generator.generateNodeCode(bwcNode)
+        assertTrue(bwcCode.contains("BoxWithConstraints("))
+
+        // LazyHorizontalGrid
+        val lhgNode = CanvasNode(
+            type = ComponentType.LAZY_HORIZONTAL_GRID,
+            name = "MyLhg",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(400f, 200f)
+        )
+        assertTrue(generator.generateNodeCode(lhgNode).contains("LazyHorizontalGrid("))
+
+        // Staggered Grids
+        val lvsgNode = CanvasNode(
+            type = ComponentType.LAZY_VERTICAL_STAGGERED_GRID,
+            name = "MyLvsg",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(400f, 600f)
+        )
+        assertTrue(generator.generateNodeCode(lvsgNode).contains("LazyVerticalStaggeredGrid("))
+
+        val lhsgNode = CanvasNode(
+            type = ComponentType.LAZY_HORIZONTAL_STAGGERED_GRID,
+            name = "MyLhsg",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(600f, 400f)
+        )
+        assertTrue(generator.generateNodeCode(lhsgNode).contains("LazyHorizontalStaggeredGrid("))
+
+        // Pager & Carousel
+        val pagerNode = CanvasNode(
+            type = ComponentType.HORIZONTAL_PAGER,
+            name = "MyPager",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(400f, 300f)
+        )
+        assertTrue(generator.generateNodeCode(pagerNode).contains("HorizontalPager("))
+
+        val carouselNode = CanvasNode(
+            type = ComponentType.CAROUSEL,
+            name = "MyCarousel",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(400f, 220f)
+        )
+        assertTrue(generator.generateNodeCode(carouselNode).contains("HorizontalMultiBrowseCarousel("))
+
+        // Small and Large FAB
+        val smallFab = CanvasNode(
+            type = ComponentType.FAB,
+            name = "SmallFab",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(40f, 40f),
+            properties = listOf(ComponentProperty.Variant("fabSize", MaterialVariant.FabSize.SMALL))
+        )
+        assertTrue(generator.generateNodeCode(smallFab).contains("SmallFloatingActionButton("))
+
+        val largeFab = CanvasNode(
+            type = ComponentType.FAB,
+            name = "LargeFab",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(96f, 96f),
+            properties = listOf(ComponentProperty.Variant("fabSize", MaterialVariant.FabSize.LARGE))
+        )
+        assertTrue(generator.generateNodeCode(largeFab).contains("LargeFloatingActionButton("))
+
+        // ToggleButton
+        val toggleBtn = CanvasNode(
+            type = ComponentType.TOGGLE_BUTTON,
+            name = "MyToggle",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(100f, 40f),
+            properties = listOf(ComponentProperty.Variant("variant", MaterialVariant.ToggleButton.ELEVATED))
+        )
+        assertTrue(generator.generateNodeCode(toggleBtn).contains("ElevatedToggleButton("))
     }
 }

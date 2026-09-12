@@ -65,6 +65,32 @@ sealed interface MaterialVariant {
         RECTANGLE(displayName = "Rectangle"),
         CIRCLE(displayName = "Circle")
     }
+
+    enum class ToggleButton(override val displayName: String) : MaterialVariant {
+        FILLED(displayName = "Filled"),
+        ELEVATED(displayName = "Elevated"),
+        TONAL(displayName = "Tonal"),
+        OUTLINED(displayName = "Outlined")
+    }
+
+    enum class FabSize(override val displayName: String) : MaterialVariant {
+        SMALL(displayName = "Small"),
+        MEDIUM(displayName = "Medium"),
+        LARGE(displayName = "Large")
+    }
+
+    enum class Carousel(override val displayName: String) : MaterialVariant {
+        MULTI_BROWSE(displayName = "Multi-browse"),
+        UNCONTAINED(displayName = "Uncontained"),
+        CENTERED_HERO(displayName = "Centered Hero")
+    }
+
+    enum class TopAppBar(override val displayName: String) : MaterialVariant {
+        SMALL(displayName = "Small"),
+        CENTER_ALIGNED(displayName = "Center Aligned"),
+        MEDIUM(displayName = "Medium"),
+        LARGE(displayName = "Large")
+    }
 }
 
 /** Stable wire format: "Family.NAME", e.g. "Button.OUTLINED". */
@@ -77,6 +103,10 @@ fun MaterialVariant.toSerialString(): String {
         is MaterialVariant.Chip -> "Chip.$name"
         is MaterialVariant.TextField -> "TextField.$name"
         is MaterialVariant.Surface -> "Surface.$name"
+        is MaterialVariant.ToggleButton -> "ToggleButton.$name"
+        is MaterialVariant.FabSize -> "FabSize.$name"
+        is MaterialVariant.Carousel -> "Carousel.$name"
+        is MaterialVariant.TopAppBar -> "TopAppBar.$name"
     }
 }
 
@@ -94,6 +124,10 @@ fun materialVariantFromSerialString(value: String): MaterialVariant {
         "Chip" -> MaterialVariant.Chip.valueOf(value = parts[1])
         "TextField" -> MaterialVariant.TextField.valueOf(value = parts[1])
         "Surface" -> MaterialVariant.Surface.valueOf(value = parts[1])
+        "ToggleButton" -> MaterialVariant.ToggleButton.valueOf(value = parts[1])
+        "FabSize" -> MaterialVariant.FabSize.valueOf(value = parts[1])
+        "Carousel" -> MaterialVariant.Carousel.valueOf(value = parts[1])
+        "TopAppBar" -> MaterialVariant.TopAppBar.valueOf(value = parts[1])
         else -> throw SerializationException(message = "Unknown MaterialVariant family: ${parts[0]}")
     }
 }

@@ -35,5 +35,9 @@ enum class SlotRole(
     OVERLINE(displayName = "Overline"),
     CONFIRM_BUTTON(displayName = "Confirm Button"),
     DISMISS_BUTTON(displayName = "Dismiss Button"),
-    ICON(displayName = "Icon")
+    ICON(displayName = "Icon"),
+    BADGE(displayName = "Badge"),
+    SHEET_CONTENT(displayName = "Sheet Content", isMultiOccupant = true),
+    HEADER(displayName = "Header")
 }
+
