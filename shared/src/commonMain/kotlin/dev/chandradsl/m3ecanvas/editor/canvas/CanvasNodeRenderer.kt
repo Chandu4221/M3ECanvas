@@ -36,8 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
@@ -583,7 +582,14 @@ internal fun Modifier.selectOnPress(
         awaitEachGesture {
             awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
             focusManager.clearFocus()
-            controller.selectNode(nodeId = nodeId)
+            val isMulti = currentEvent.keyboardModifiers.isShiftPressed ||
+                    currentEvent.keyboardModifiers.isCtrlPressed ||
+                    currentEvent.keyboardModifiers.isMetaPressed
+            if (isMulti) {
+                controller.toggleSelectNode(nodeId = nodeId)
+            } else {
+                controller.selectNode(nodeId = nodeId)
+            }
             try {
                 focusRequester?.requestFocus()
             } catch (_: Throwable) {}

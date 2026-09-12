@@ -75,9 +75,20 @@ open class MaterialIconResolver(
                 "thumbup", "thumb_up" -> Icons.Outlined.ThumbUp
                 "playarrow", "play_arrow" -> Icons.Outlined.PlayArrow
                 "warning" -> Icons.Outlined.Warning
-                else -> Icons.Outlined.Favorite
+                else -> {
+                    dev.chandradsl.m3ecanvas.util.AppLogger.warn(
+                        "MaterialIconResolver",
+                        "Unknown icon name '$iconName', falling back to Favorite"
+                    )
+                    Icons.Outlined.Favorite
+                }
             }
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            dev.chandradsl.m3ecanvas.util.AppLogger.error(
+                "MaterialIconResolver",
+                "Failed to resolve icon '$iconName', falling back to Favorite",
+                t
+            )
             Icons.Outlined.Favorite
         }
     }

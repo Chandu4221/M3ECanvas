@@ -34,6 +34,7 @@ import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import dev.chandradsl.m3ecanvas.editor.theme.EditorTheme
 
 import dev.chandradsl.m3ecanvas.editor.persistence.LoadResult
+import dev.chandradsl.m3ecanvas.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -93,14 +94,23 @@ fun App(repository: ProjectRepository) {
                                 statusMessage = "Undo"
                                 return@onKeyEvent true
                             }
+                            event.key == Key.A -> {
+                                controller.selectAll()
+                                val count = controller.state.selectedNodeIds.size
+                                statusMessage = if (count > 0) "Selected all ($count components)" else "No components to select"
+                                return@onKeyEvent true
+                            }
                             event.key == Key.C -> {
                                 val copied = controller.copySelected()
                                 if (copied != null) {
                                     try {
                                         val json = M3EJson.encodeToString(copied)
                                         clipboardManager.setText(AnnotatedString(json))
-                                    } catch (_: Exception) {}
-                                    statusMessage = "Copied ${copied.name}"
+                                        statusMessage = "Copied ${copied.name}"
+                                    } catch (e: Exception) {
+                                        AppLogger.error("Clipboard", "Failed to serialize node '${copied.name}' to JSON", e)
+                                        statusMessage = "Failed to copy to clipboard"
+                                    }
                                 }
                                 return@onKeyEvent true
                             }
@@ -111,8 +121,12 @@ fun App(repository: ProjectRepository) {
                                     val text = clipboardManager.getText()?.text
                                     val parsed = try {
                                         if (text != null) M3EJson.decodeFromString<CanvasNode>(text) else null
-                                    } catch (_: Exception) {
+                                    } catch (e: Exception) {
+                                        AppLogger.warn("Clipboard", "Failed to parse system clipboard as CanvasNode: ${e.message}", e)
                                         null
+                                    }
+                                    if (text != null && parsed == null) {
+                                        statusMessage = "Clipboard does not contain a valid M3E component"
                                     }
                                     controller.paste(sourceNode = parsed)
                                 }

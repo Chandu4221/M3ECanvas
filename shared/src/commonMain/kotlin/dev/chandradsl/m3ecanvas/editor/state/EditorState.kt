@@ -33,14 +33,16 @@ data class EditorState(
 }
 
 /**
- * Represents an in-progress drag operation on a single node.
+ * Represents an in-progress drag operation on one or more nodes.
  *
- * [originalNodePosition] is kept for future undo or snap-back behaviour.
+ * [originalNodePosition] and [originalPositions] are kept for future undo or snap-back behaviour.
  * Movement itself is applied incrementally via deltas from drag gestures.
  */
 data class DragState(
     val nodeId: String,
-    val originalNodePosition: CanvasPosition
+    val originalNodePosition: CanvasPosition,
+    val nodeIds: Set<String> = setOf(nodeId),
+    val originalPositions: Map<String, CanvasPosition> = mapOf(nodeId to originalNodePosition)
 )
 
 /**

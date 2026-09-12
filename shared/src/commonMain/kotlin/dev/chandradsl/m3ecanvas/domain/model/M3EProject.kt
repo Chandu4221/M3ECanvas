@@ -14,6 +14,20 @@ import kotlin.uuid.Uuid
  * Timestamps are stored as epoch milliseconds and are populated by the
  * persistence layer, keeping this domain model free of platform time APIs.
  */
+/**
+ * Configuration for the canvas's Material 3 theme.
+ * Allows choosing a seed color (as a hex string, e.g. "#6750A4") and toggling dark mode.
+ */
+@Serializable
+data class CanvasThemeConfig(
+    val seedColorHex: String = DEFAULT_SEED_HEX,
+    val isDark: Boolean = false
+) {
+    companion object {
+        const val DEFAULT_SEED_HEX = "#6750A4"
+    }
+}
+
 @OptIn(ExperimentalUuidApi::class)
 @Serializable
 data class M3EProject(
@@ -21,6 +35,7 @@ data class M3EProject(
     val name: String,
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val deviceProfile: DeviceProfile = DeviceProfile.default,
+    val themeConfig: CanvasThemeConfig = CanvasThemeConfig(),
     val nodes: List<CanvasNode> = emptyList(),
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
@@ -65,5 +80,10 @@ data class M3EProject(
             .filterNot { it.id == nodeId }
             .map { it.removeNodeDeep(nodeId = nodeId) }
         return copy(nodes = updated)
+    }
+
+    /** Returns a copy with the given theme config applied. */
+    fun withTheme(themeConfig: CanvasThemeConfig): M3EProject {
+        return copy(themeConfig = themeConfig)
     }
 }

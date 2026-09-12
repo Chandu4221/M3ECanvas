@@ -196,6 +196,25 @@ class EditorController(
         state = state.copy(selectedNodeIds = setOf(nodeId))
     }
 
+    fun toggleSelectNode(nodeId: String) {
+        val current = state.selectedNodeIds
+        val updated = if (nodeId in current) current - nodeId else current + nodeId
+        state = state.copy(selectedNodeIds = updated)
+    }
+
+    fun selectAdditionalNode(nodeId: String) {
+        state = state.copy(selectedNodeIds = state.selectedNodeIds + nodeId)
+    }
+
+    fun selectNodes(nodeIds: Collection<String>) {
+        state = state.copy(selectedNodeIds = nodeIds.toSet())
+    }
+
+    fun selectAll() {
+        val allTopLevelIds = state.project.nodes.map { it.id }.toSet()
+        state = state.copy(selectedNodeIds = allTopLevelIds)
+    }
+
     fun clearSelection() {
         state = state.copy(selectedNodeIds = emptySet())
     }
@@ -436,26 +455,46 @@ class EditorController(
 
     //region Drag
 
-    /** Begins a drag on the node with [nodeId]. Selection is not changed here. */
+    /** Begins a drag on the node with [nodeId]. If multiple nodes are selected, all non-locked selected nodes move together. */
     fun startDrag(nodeId: String) {
         val node = state.project.findNode(nodeId = nodeId) ?: return
         if (node.isLockedInSlot) return // Locked slot nodes cannot be moved arbitrarily
         preDragProject = state.project
+
+        val targetNodeIds = if (nodeId in state.selectedNodeIds && state.selectedNodeIds.size > 1) {
+            state.selectedNodeIds.filter { id ->
+                val n = state.project.findNode(id)
+                n != null && !n.isLockedInSlot
+            }.toSet()
+        } else {
+            setOf(nodeId)
+        }
+
+        val originalPositions = targetNodeIds.mapNotNull { id ->
+            val n = state.project.findNode(id)
+            if (n != null) id to n.position else null
+        }.toMap()
+
         state = state.copy(
             drag = DragState(
                 nodeId = nodeId,
-                originalNodePosition = node.position
+                originalNodePosition = node.position,
+                nodeIds = targetNodeIds,
+                originalPositions = originalPositions
             )
         )
     }
 
     fun updateDrag(deltaX: Float, deltaY: Float) {
         val drag = state.drag ?: return
-        val node = state.project.findNode(nodeId = drag.nodeId) ?: return
-        val movedNode = node.movedBy(dx = deltaX, dy = deltaY)
-        state = state.copy(
-            project = state.project.updateNode(node = movedNode)
-        )
+        var updatedProject = state.project
+        for (id in drag.nodeIds) {
+            val n = updatedProject.findNode(nodeId = id) ?: continue
+            if (!n.isLockedInSlot) {
+                updatedProject = updatedProject.updateNode(node = n.movedBy(dx = deltaX, dy = deltaY))
+            }
+        }
+        state = state.copy(project = updatedProject)
     }
 
     fun endDrag() {
@@ -469,6 +508,26 @@ class EditorController(
             canUndo = history.canUndo,
             canRedo = history.canRedo
         )
+    }
+
+    //endregion
+
+    //region Theme
+
+    fun updateTheme(themeConfig: CanvasThemeConfig) {
+        if (state.project.themeConfig != themeConfig) {
+            pushState()
+            val updated = state.project.withTheme(themeConfig = themeConfig)
+            updateProject(newProject = updated)
+        }
+    }
+
+    fun setThemeSeed(hex: String) {
+        updateTheme(state.project.themeConfig.copy(seedColorHex = hex))
+    }
+
+    fun toggleThemeDarkMode() {
+        updateTheme(state.project.themeConfig.copy(isDark = !state.project.themeConfig.isDark))
     }
 
     //endregion

@@ -2,6 +2,8 @@ package dev.chandradsl.m3ecanvas.editor.inspector
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
@@ -118,7 +121,19 @@ private fun LayerRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { controller.selectNode(nodeId = node.id) }
+            .pointerInput(node.id) {
+                awaitEachGesture {
+                    awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                    val isMulti = currentEvent.keyboardModifiers.isShiftPressed ||
+                            currentEvent.keyboardModifiers.isCtrlPressed ||
+                            currentEvent.keyboardModifiers.isMetaPressed
+                    if (isMulti) {
+                        controller.toggleSelectNode(nodeId = node.id)
+                    } else {
+                        controller.selectNode(nodeId = node.id)
+                    }
+                }
+            }
             .background(
                 color = if (isSelected) {
                     MaterialTheme.colorScheme.secondaryContainer

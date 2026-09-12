@@ -9,6 +9,8 @@ import dev.chandradsl.m3ecanvas.editor.component.ComponentDefinition
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
+import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
+import dev.chandradsl.m3ecanvas.util.AppLogger
 import kotlin.test.*
 
 class SharedCommonTest {
@@ -1088,5 +1090,223 @@ class SharedCommonTest {
         assertFalse(json.contains("\"themeId\""), "Serialized JSON must not contain dead themeId")
         val decoded = M3EJson.decodeFromString<M3EProject>(json)
         assertEquals("NoThemeProject", decoded.name)
+    }
+
+    // --- Phase 2 Tests ---
+
+    @Test
+    fun testMultiSelectToggleAndSelectAll() {
+        val controller = EditorController(initialProject = M3EProject(name = "MultiSelectTest"))
+        controller.addNode(ComponentType.BUTTON, CanvasPosition(10f, 10f))
+        controller.addNode(ComponentType.CARD, CanvasPosition(20f, 20f))
+        controller.addNode(ComponentType.FAB, CanvasPosition(30f, 30f))
+
+        val nodes = controller.state.project.nodes
+        assertEquals(3, nodes.size)
+
+        // Select first node
+        controller.selectNode(nodes[0].id)
+        assertEquals(setOf(nodes[0].id), controller.state.selectedNodeIds)
+
+        // Toggle second node (extends selection)
+        controller.toggleSelectNode(nodes[1].id)
+        assertEquals(setOf(nodes[0].id, nodes[1].id), controller.state.selectedNodeIds)
+
+        // Toggle first node off
+        controller.toggleSelectNode(nodes[0].id)
+        assertEquals(setOf(nodes[1].id), controller.state.selectedNodeIds)
+
+        // Select all
+        controller.selectAll()
+        assertEquals(3, controller.state.selectedNodeIds.size)
+        assertTrue(nodes.all { it.id in controller.state.selectedNodeIds })
+
+        // Clear selection
+        controller.clearSelection()
+        assertTrue(controller.state.selectedNodeIds.isEmpty())
+    }
+
+    @Test
+    fun testMultiSelectGroupDelete() {
+        val controller = EditorController(initialProject = M3EProject(name = "GroupDeleteTest"))
+        controller.addNode(ComponentType.BUTTON, CanvasPosition(10f, 10f))
+        controller.addNode(ComponentType.CARD, CanvasPosition(20f, 20f))
+        controller.addNode(ComponentType.FAB, CanvasPosition(30f, 30f))
+
+        val nodes = controller.state.project.nodes
+        // Multi-select BUTTON and CARD
+        controller.selectNodes(setOf(nodes[0].id, nodes[1].id))
+        assertEquals(2, controller.state.selectedNodeIds.size)
+
+        controller.deleteSelected()
+        assertEquals(1, controller.state.project.nodes.size)
+        assertEquals(ComponentType.FAB, controller.state.project.nodes.first().type)
+        assertTrue(controller.state.selectedNodeIds.isEmpty(), "Selection must be cleared after delete")
+    }
+
+    @Test
+    fun testMultiSelectGroupNudge() {
+        val controller = EditorController(initialProject = M3EProject(name = "GroupNudgeTest"))
+        controller.addNode(ComponentType.BUTTON, CanvasPosition(10f, 10f))
+        controller.addNode(ComponentType.CARD, CanvasPosition(50f, 50f))
+
+        val nodes = controller.state.project.nodes
+        controller.selectAll()
+
+        controller.nudgeSelected(dx = 5f, dy = 10f)
+
+        val updatedNodes = controller.state.project.nodes
+        assertEquals(CanvasPosition(15f, 20f), updatedNodes[0].position)
+        assertEquals(CanvasPosition(55f, 60f), updatedNodes[1].position)
+    }
+
+    @Test
+    fun testMultiSelectGroupDrag() {
+        val controller = EditorController(initialProject = M3EProject(name = "GroupDragTest"))
+        controller.addNode(ComponentType.BUTTON, CanvasPosition(10f, 10f))
+        controller.addNode(ComponentType.CARD, CanvasPosition(50f, 50f))
+
+        val nodes = controller.state.project.nodes
+        controller.selectAll()
+
+        // Drag started on the first node
+        controller.startDrag(nodeId = nodes[0].id)
+        assertNotNull(controller.state.drag)
+        assertEquals(2, controller.state.drag?.nodeIds?.size)
+
+        // Drag movement
+        controller.updateDrag(deltaX = 20f, deltaY = 30f)
+        val draggedNodes = controller.state.project.nodes
+        assertEquals(CanvasPosition(30f, 40f), draggedNodes[0].position)
+        assertEquals(CanvasPosition(70f, 80f), draggedNodes[1].position)
+
+        controller.endDrag()
+        assertNull(controller.state.drag)
+        assertTrue(controller.state.canUndo)
+
+        // Undo group drag
+        controller.undo()
+        val undoneNodes = controller.state.project.nodes
+        assertEquals(CanvasPosition(10f, 10f), undoneNodes[0].position)
+        assertEquals(CanvasPosition(50f, 50f), undoneNodes[1].position)
+    }
+
+    @Test
+    fun testCanvasThemeConfigSerializationAndDefaults() {
+        val projectWithDefaultTheme = M3EProject(name = "DefaultThemeProject")
+        assertEquals(CanvasThemeConfig.DEFAULT_SEED_HEX, projectWithDefaultTheme.themeConfig.seedColorHex)
+        assertFalse(projectWithDefaultTheme.themeConfig.isDark)
+
+        val customTheme = CanvasThemeConfig(seedColorHex = "#006A60", isDark = true)
+        val projectWithCustomTheme = projectWithDefaultTheme.withTheme(customTheme)
+        assertEquals("#006A60", projectWithCustomTheme.themeConfig.seedColorHex)
+        assertTrue(projectWithCustomTheme.themeConfig.isDark)
+
+        val json = M3EJson.encodeToString(projectWithCustomTheme)
+        assertTrue(json.contains("\"seedColorHex\": \"#006A60\"") || json.contains("\"seedColorHex\":\"#006A60\""))
+        assertTrue(json.contains("\"isDark\": true") || json.contains("\"isDark\":true"))
+
+        val decoded = M3EJson.decodeFromString<M3EProject>(json)
+        assertEquals("#006A60", decoded.themeConfig.seedColorHex)
+        assertTrue(decoded.themeConfig.isDark)
+    }
+
+    @Test
+    fun testLegacyProjectDeserializationWithDefaultTheme() {
+        // Simulates project JSON saved before Phase 2 without themeConfig field
+        val legacyJson = """
+            {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "name": "LegacyProject",
+                "schemaVersion": 1,
+                "deviceProfile": {
+                    "id": "pixel_7",
+                    "displayName": "Pixel 7",
+                    "category": "PHONE",
+                    "size": { "width": 412.0, "height": 915.0 }
+                },
+                "nodes": [],
+                "createdAt": 0,
+                "updatedAt": 0
+            }
+        """.trimIndent()
+
+        val project = M3EJson.decodeFromString<M3EProject>(legacyJson)
+        assertEquals("LegacyProject", project.name)
+        assertNotNull(project.themeConfig, "Legacy JSON should automatically receive default themeConfig")
+        assertEquals(CanvasThemeConfig.DEFAULT_SEED_HEX, project.themeConfig.seedColorHex)
+        assertFalse(project.themeConfig.isDark)
+    }
+
+    @Test
+    fun testCanvasThemeGeneratorColorSchemes() {
+        // Baseline purple
+        val lightPurple = CanvasThemeGenerator.generateColorScheme(CanvasThemeConfig("#6750A4", isDark = false))
+        assertNotNull(lightPurple)
+
+        val darkPurple = CanvasThemeGenerator.generateColorScheme(CanvasThemeConfig("#6750A4", isDark = true))
+        assertNotNull(darkPurple)
+
+        // Custom Teal
+        val lightTeal = CanvasThemeGenerator.generateColorScheme(CanvasThemeConfig("#006A60", isDark = false))
+        assertNotNull(lightTeal)
+
+        val darkTeal = CanvasThemeGenerator.generateColorScheme(CanvasThemeConfig("#006A60", isDark = true))
+        assertNotNull(darkTeal)
+    }
+
+    @Test
+    fun testCanvasThemeHexParsing() {
+        assertTrue(CanvasThemeGenerator.isValidHexColor("#FF0000"))
+        assertTrue(CanvasThemeGenerator.isValidHexColor("00FF00"))
+        assertTrue(CanvasThemeGenerator.isValidHexColor("#FFF"))
+        assertFalse(CanvasThemeGenerator.isValidHexColor("invalid-color"))
+
+        val parsedRed = CanvasThemeGenerator.parseHexColor("#FF0000")
+        assertEquals(1f, parsedRed.red, 0.05f)
+        assertEquals(0f, parsedRed.green, 0.05f)
+        assertEquals(0f, parsedRed.blue, 0.05f)
+    }
+
+    @Test
+    fun testEditorControllerThemeUndoRedo() {
+        val controller = EditorController(initialProject = M3EProject(name = "ThemeUndoTest"))
+        assertEquals("#6750A4", controller.state.project.themeConfig.seedColorHex)
+        assertFalse(controller.state.project.themeConfig.isDark)
+
+        controller.setThemeSeed("#0061A4")
+        assertEquals("#0061A4", controller.state.project.themeConfig.seedColorHex)
+        assertTrue(controller.state.canUndo)
+
+        controller.toggleThemeDarkMode()
+        assertTrue(controller.state.project.themeConfig.isDark)
+
+        // Undo dark mode toggle
+        controller.undo()
+        assertFalse(controller.state.project.themeConfig.isDark)
+        assertEquals("#0061A4", controller.state.project.themeConfig.seedColorHex)
+
+        // Undo seed change
+        controller.undo()
+        assertEquals("#6750A4", controller.state.project.themeConfig.seedColorHex)
+
+        // Redo
+        controller.redo()
+        assertEquals("#0061A4", controller.state.project.themeConfig.seedColorHex)
+    }
+
+    @Test
+    fun testMaterialIconResolverFallbackLogging() {
+        val resolved = resolveMaterialIcon("non_existent_icon_name_xyz")
+        assertNotNull(resolved)
+        // Resolves to Favorite gracefully with diagnostic warning
+    }
+
+    @Test
+    fun testAppLogger() {
+        // AppLogger should execute cleanly without throwing
+        AppLogger.info("TestTag", "Info message")
+        AppLogger.warn("TestTag", "Warning message", RuntimeException("Test warning"))
+        AppLogger.error("TestTag", "Error message", RuntimeException("Test error"))
     }
 }

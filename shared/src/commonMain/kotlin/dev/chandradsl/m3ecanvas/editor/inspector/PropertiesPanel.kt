@@ -1,7 +1,13 @@
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+
 package dev.chandradsl.m3ecanvas.editor.inspector
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
@@ -10,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
@@ -17,17 +24,19 @@ import dev.chandradsl.m3ecanvas.editor.canvas.AVAILABLE_MATERIAL_ICONS
 import dev.chandradsl.m3ecanvas.editor.canvas.resolveMaterialIcon
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
+import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
 
 /**
  * The inspector panel. Shows project-level settings when nothing is
- * selected, and editable properties for the selected node otherwise.
+ * selected, editable properties for a single selected node, or group actions
+ * when multiple nodes are selected.
  */
 @Composable
 fun PropertiesPanel(
     controller: EditorController,
     modifier: Modifier = Modifier
 ) {
-    val selected = controller.state.selectedNodes.firstOrNull()
+    val selectedNodes = controller.state.selectedNodes
 
     Column(
         modifier = modifier
@@ -47,7 +56,7 @@ fun PropertiesPanel(
                     fontWeight = FontWeight.Bold
                 )
             )
-            if (selected != null) {
+            if (selectedNodes.isNotEmpty()) {
                 TextButton(
                     onClick = { controller.clearSelection() },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
@@ -60,10 +69,10 @@ fun PropertiesPanel(
             }
         }
         HorizontalDivider()
-        if (selected == null) {
-            ProjectSection(controller = controller)
-        } else {
-            NodeSection(node = selected, controller = controller)
+        when {
+            selectedNodes.isEmpty() -> ProjectSection(controller = controller)
+            selectedNodes.size == 1 -> NodeSection(node = selectedNodes.first(), controller = controller)
+            else -> MultiSelectSection(selectedNodes = selectedNodes, controller = controller)
         }
     }
 }
@@ -180,11 +189,11 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProjectSection(controller: EditorController) {
     var expanded by remember { mutableStateOf(value = false) }
     val current = controller.state.project.deviceProfile
+    val themeConfig = controller.state.project.themeConfig
 
     SectionLabel(text = "Project")
 
@@ -218,10 +227,183 @@ private fun ProjectSection(controller: EditorController) {
         }
     }
 
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+    SectionLabel(text = "Theme & Colors")
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (themeConfig.isDark) "Dark Mode" else "Light Mode",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Switch(
+            checked = themeConfig.isDark,
+            onCheckedChange = { controller.toggleThemeDarkMode() }
+        )
+    }
+
     Text(
-        text = "Select a component on the canvas to edit its properties.",
-        style = MaterialTheme.typography.bodySmall
+        text = "Seed Color Presets",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        CanvasThemeGenerator.PRESETS.forEach { preset ->
+            val isSelected = themeConfig.seedColorHex.equals(preset.hexColor, ignoreCase = true)
+            FilterChip(
+                selected = isSelected,
+                onClick = { controller.setThemeSeed(preset.hexColor) },
+                label = { Text(preset.name, style = MaterialTheme.typography.labelSmall) },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(preset.color, shape = CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
+                    )
+                }
+            )
+        }
+    }
+
+    var hexInput by remember(themeConfig.seedColorHex) { mutableStateOf(themeConfig.seedColorHex) }
+    val isValid = CanvasThemeGenerator.isValidHexColor(hexInput)
+
+    OutlinedTextField(
+        value = hexInput,
+        onValueChange = { input ->
+            hexInput = input
+            if (CanvasThemeGenerator.isValidHexColor(input)) {
+                val formatted = if (input.startsWith("#")) input else "#$input"
+                controller.setThemeSeed(formatted)
+            }
+        },
+        label = { Text(text = "Custom Seed Hex") },
+        placeholder = { Text("#6750A4") },
+        isError = !isValid && hexInput.isNotBlank(),
+        trailingIcon = {
+            val previewColor = if (isValid) CanvasThemeGenerator.parseHexColor(hexInput) else Color.Transparent
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(previewColor, shape = CircleShape)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+    Text(
+        text = "Select a component on the canvas or layer tree to edit its properties.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun MultiSelectSection(
+    selectedNodes: List<CanvasNode>,
+    controller: EditorController
+) {
+    SectionLabel(text = "Selection (${selectedNodes.size} items)")
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "${selectedNodes.size} components selected",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            val summaryNames = selectedNodes.take(4).joinToString(", ") { it.name }
+            val suffix = if (selectedNodes.size > 4) " + ${selectedNodes.size - 4} more" else ""
+            Text(
+                text = "$summaryNames$suffix",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    SectionLabel(text = "Quick Actions")
+
+    Button(
+        onClick = { controller.deleteSelected() },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(Icons.Outlined.Delete, contentDescription = "Delete All", modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Delete Selected (${selectedNodes.size})")
+    }
+
+    Text(
+        text = "Group Nudge",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedButton(
+            onClick = { controller.nudgeSelected(0f, -4f) },
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("↑ Up")
+        }
+        OutlinedButton(
+            onClick = { controller.nudgeSelected(0f, 4f) },
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("↓ Down")
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedButton(
+            onClick = { controller.nudgeSelected(-4f, 0f) },
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("← Left")
+        }
+        OutlinedButton(
+            onClick = { controller.nudgeSelected(4f, 0f) },
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("→ Right")
+        }
+    }
+
+    OutlinedButton(
+        onClick = { controller.clearSelection() },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("Clear Selection")
+    }
 }
 
 @Composable

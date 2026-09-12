@@ -3,6 +3,8 @@ package dev.chandradsl.m3ecanvas.editor.canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -23,10 +25,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +40,9 @@ import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
 import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
+import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
+import kotlin.math.max
+import kotlin.math.min
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -155,27 +164,128 @@ fun CanvasScreen(controller: EditorController) {
                     color = Color(0xFF1C1D22),
                     border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF383A42))
                 ) {
+                    val canvasColorScheme = remember(state.project.themeConfig) {
+                        CanvasThemeGenerator.generateColorScheme(state.project.themeConfig)
+                    }
+
                     // Inner Screen Display
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(all = 8.dp)
-                            .clip(RoundedCornerShape(28.dp))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .focusable()
+                    MaterialTheme(
+                        colorScheme = canvasColorScheme,
+                        typography = Typography()
                     ) {
-                        MaterialTheme(
-                            typography = Typography()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(all = 8.dp)
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .focusable()
                         ) {
                             Column(modifier = Modifier.fillMaxSize()) {
                                 // Simulated Android Status Bar
                                 SimulatedStatusBar()
 
-                                // Screen Content Area
+                                // Screen Content Area with Marquee Drag Selection
+                                val density = LocalDensity.current
+                                var marqueeStart by remember { mutableStateOf<Offset?>(null) }
+                                var marqueeCurrent by remember { mutableStateOf<Offset?>(null) }
+                                var isModifierActive by remember { mutableStateOf(false) }
+
+                                val marqueeRect = remember(marqueeStart, marqueeCurrent) {
+                                    val s = marqueeStart
+                                    val c = marqueeCurrent
+                                    if (s != null && c != null) {
+                                        Rect(
+                                            left = min(s.x, c.x),
+                                            top = min(s.y, c.y),
+                                            right = max(s.x, c.x),
+                                            bottom = max(s.y, c.y)
+                                        )
+                                    } else null
+                                }
+
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxWidth()
+                                        .pointerInput(Unit) {
+                                            awaitEachGesture {
+                                                val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                                                val isModifier = currentEvent.keyboardModifiers.isShiftPressed ||
+                                                        currentEvent.keyboardModifiers.isCtrlPressed ||
+                                                        currentEvent.keyboardModifiers.isMetaPressed
+                                                var start = down.position
+                                                var current = down.position
+                                                marqueeStart = start
+                                                marqueeCurrent = current
+
+                                                while (true) {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                                    if (change.changedToUp()) {
+                                                        change.consume()
+                                                        break
+                                                    }
+                                                    if (change.positionChange() != Offset.Zero) {
+                                                        change.consume()
+                                                        current = change.position
+                                                        marqueeCurrent = current
+                                                    }
+                                                }
+
+                                                val finalStart = marqueeStart
+                                                val finalCurrent = marqueeCurrent
+                                                if (finalStart != null && finalCurrent != null) {
+                                                    val rect = Rect(
+                                                        left = min(finalStart.x, finalCurrent.x),
+                                                        top = min(finalStart.y, finalCurrent.y),
+                                                        right = max(finalStart.x, finalCurrent.x),
+                                                        bottom = max(finalStart.y, finalCurrent.y)
+                                                    )
+                                                    if (rect.width > 5f || rect.height > 5f) {
+                                                        val hits = state.project.nodes.filter { node ->
+                                                            if (node.type == ComponentType.SCAFFOLD) return@filter false
+                                                            val leftPx = with(density) { node.position.x.dp.toPx() }
+                                                            val topPx = with(density) { node.position.y.dp.toPx() }
+                                                            val widthPx = with(density) { node.size.width.dp.toPx() }
+                                                            val heightPx = with(density) { node.size.height.dp.toPx() }
+                                                            val nodeRect = Rect(leftPx, topPx, leftPx + widthPx, topPx + heightPx)
+                                                            !(rect.right < nodeRect.left || rect.left > nodeRect.right ||
+                                                                    rect.bottom < nodeRect.top || rect.top > nodeRect.bottom)
+                                                        }.map { it.id }.toSet()
+
+                                                        if (isModifier) {
+                                                            controller.selectNodes(state.selectedNodeIds + hits)
+                                                        } else {
+                                                            controller.selectNodes(hits)
+                                                        }
+                                                    } else {
+                                                        controller.clearSelection()
+                                                    }
+                                                }
+                                                marqueeStart = null
+                                                marqueeCurrent = null
+                                            }
+                                        }
+                                        .drawBehind {
+                                            val rect = marqueeRect
+                                            if (rect != null && (rect.width > 2f || rect.height > 2f)) {
+                                                drawRect(
+                                                    color = canvasColorScheme.primary.copy(alpha = 0.15f),
+                                                    topLeft = rect.topLeft,
+                                                    size = rect.size
+                                                )
+                                                drawRect(
+                                                    color = canvasColorScheme.primary,
+                                                    topLeft = rect.topLeft,
+                                                    size = rect.size,
+                                                    style = Stroke(
+                                                        width = 1.5.dp.toPx(),
+                                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
+                                                    )
+                                                )
+                                            }
+                                        }
                                 ) {
                                     state.project.nodes.forEach { node ->
                                         CanvasNodePlacement(node = node, controller = controller)
