@@ -40,6 +40,8 @@ import dev.chandradsl.m3ecanvas.editor.history.HistoryDialog
 import dev.chandradsl.m3ecanvas.editor.inspector.LayersPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.PropertiesPanel
 import dev.chandradsl.m3ecanvas.editor.palette.ComponentPalette
+import dev.chandradsl.m3ecanvas.editor.ui.HorizontalResizeSplitter
+import dev.chandradsl.m3ecanvas.editor.ui.VerticalResizeSplitter
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.persistence.ProjectRepository
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
@@ -72,6 +74,10 @@ fun App(repository: ProjectRepository) {
     var layersExpanded by remember { mutableStateOf(value = true) }
     var propertiesExpanded by remember { mutableStateOf(value = true) }
     var showHistoryDialog by remember { mutableStateOf(value = false) }
+    var paletteWidth by remember { mutableStateOf(240.dp) }
+    var inspectorWidth by remember { mutableStateOf(280.dp) }
+    var codeExportWidth by remember { mutableStateOf(440.dp) }
+    var layersHeightRatio by remember { mutableStateOf(0.5f) }
     var isOperating by remember { mutableStateOf(value = false) }
     var errorMessage by remember { mutableStateOf<String?>(value = null) }
     var recoveryProject by remember { mutableStateOf<M3EProject?>(value = null) }
@@ -323,50 +329,67 @@ fun App(repository: ProjectRepository) {
             )
             HorizontalDivider()
             Row(modifier = Modifier.weight(weight = 1f)) {
-                // Collapsible Palette
+                // Collapsible & Resizable Palette
                 AnimatedVisibility(
                     visible = showPalette,
                     enter = expandHorizontally() + fadeIn(),
                     exit = shrinkHorizontally() + fadeOut()
                 ) {
-                    ComponentPalette(
-                        onAddComponent = { type ->
-                            val selected = controller.state.selectedNodes.firstOrNull()
-                            if (selected != null && selected.isContainer) {
-                                controller.addChildToContainer(
-                                    containerId = selected.id,
-                                    type = type
-                                )
-                            } else {
-                                val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
-                                if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
-                                    val contentContainer = rootScaffold.children.firstOrNull {
-                                        it.slot == SlotRole.CONTENT && it.isContainer
-                                    }
-                                    val targetContainerId = if (type.canonicalSlot() == SlotRole.CONTENT && contentContainer != null) {
-                                        contentContainer.id
-                                    } else {
-                                        rootScaffold.id
-                                    }
+                    Row(modifier = Modifier.fillMaxHeight()) {
+                        ComponentPalette(
+                            onAddComponent = { type ->
+                                val selected = controller.state.selectedNodes.firstOrNull()
+                                if (selected != null && selected.isContainer) {
                                     controller.addChildToContainer(
-                                        containerId = targetContainerId,
+                                        containerId = selected.id,
                                         type = type
                                     )
                                 } else {
-                                    val count = controller.state.project.nodes.size
-                                    controller.addNode(
-                                        type = type,
-                                        position = CanvasPosition(
-                                            x = 40f + count * 24f,
-                                            y = 40f + count * 24f
+                                    val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+                                    if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
+                                        val contentContainer = rootScaffold.children.firstOrNull {
+                                            it.slot == SlotRole.CONTENT && it.isContainer
+                                        }
+                                        val targetContainerId = if (type.canonicalSlot() == SlotRole.CONTENT && contentContainer != null) {
+                                            contentContainer.id
+                                        } else {
+                                            rootScaffold.id
+                                        }
+                                        controller.addChildToContainer(
+                                            containerId = targetContainerId,
+                                            type = type
                                         )
-                                    )
+                                    } else {
+                                        val count = controller.state.project.nodes.size
+                                        controller.addNode(
+                                            type = type,
+                                            position = CanvasPosition(
+                                                x = 40f + count * 24f,
+                                                y = 40f + count * 24f
+                                            )
+                                        )
+                                    }
                                 }
+                            },
+                            modifier = Modifier.width(paletteWidth),
+                            onCollapse = { showPalette = false }
+                        )
+                        VerticalResizeSplitter(
+                            onResize = { deltaDp ->
+                                val newWidth = paletteWidth + deltaDp.dp
+                                if (newWidth < 120.dp) {
+                                    showPalette = false
+                                    statusMessage = "Palette collapsed"
+                                } else {
+                                    paletteWidth = newWidth.coerceIn(160.dp, 480.dp)
+                                }
+                            },
+                            onResetToDefault = {
+                                paletteWidth = 240.dp
+                                statusMessage = "Palette reset to 240dp"
                             }
-                        },
-                        modifier = Modifier.width(width = 240.dp),
-                        onCollapse = { showPalette = false }
-                    )
+                        )
+                    }
                 }
 
                 // Left Slim Expand Handle when Palette is collapsed
@@ -393,8 +416,17 @@ fun App(repository: ProjectRepository) {
                 }
 
                 if (showCodeExport) {
-                    VerticalDivider()
-                    Box(modifier = Modifier.width(440.dp)) {
+                    VerticalResizeSplitter(
+                        onResize = { deltaDp ->
+                            val newWidth = codeExportWidth - deltaDp.dp
+                            codeExportWidth = newWidth.coerceIn(320.dp, 760.dp)
+                        },
+                        onResetToDefault = {
+                            codeExportWidth = 440.dp
+                            statusMessage = "Code export reset to 440dp"
+                        }
+                    )
+                    Box(modifier = Modifier.width(codeExportWidth)) {
                         CodeExportPanel(
                             project = controller.state.project,
                             onClose = { showCodeExport = false }
@@ -421,15 +453,29 @@ fun App(repository: ProjectRepository) {
                     }
                 }
 
-                // Collapsible Inspector (Layers + Properties)
+                // Collapsible & Resizable Inspector (Layers + Properties)
                 AnimatedVisibility(
                     visible = showInspector,
                     enter = expandHorizontally() + fadeIn(),
                     exit = shrinkHorizontally() + fadeOut()
                 ) {
                     Row(modifier = Modifier.fillMaxHeight()) {
-                        VerticalDivider()
-                        Column(modifier = Modifier.width(width = 280.dp).fillMaxHeight()) {
+                        VerticalResizeSplitter(
+                            onResize = { deltaDp ->
+                                val newWidth = inspectorWidth - deltaDp.dp
+                                if (newWidth < 150.dp) {
+                                    showInspector = false
+                                    statusMessage = "Inspector collapsed"
+                                } else {
+                                    inspectorWidth = newWidth.coerceIn(220.dp, 600.dp)
+                                }
+                            },
+                            onResetToDefault = {
+                                inspectorWidth = 280.dp
+                                statusMessage = "Inspector reset to 280dp"
+                            }
+                        )
+                        Column(modifier = Modifier.width(inspectorWidth).fillMaxHeight()) {
                             // Inspector Top Header Bar with collapse icon
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
@@ -462,64 +508,78 @@ fun App(repository: ProjectRepository) {
                             }
                             HorizontalDivider()
 
-                            // Layers and Properties collapsible sections
-                            if (layersExpanded && propertiesExpanded) {
-                                LayersPanel(
-                                    controller = controller,
-                                    modifier = Modifier.weight(weight = 1f),
-                                    isExpanded = true,
-                                    onToggleExpand = { layersExpanded = false }
-                                )
-                                HorizontalDivider()
-                                PropertiesPanel(
-                                    controller = controller,
-                                    modifier = Modifier.weight(weight = 1f),
-                                    isExpanded = true,
-                                    onToggleExpand = { propertiesExpanded = false }
-                                )
-                            } else if (layersExpanded && !propertiesExpanded) {
-                                LayersPanel(
-                                    controller = controller,
-                                    modifier = Modifier.weight(weight = 1f),
-                                    isExpanded = true,
-                                    onToggleExpand = { layersExpanded = false }
-                                )
-                                HorizontalDivider()
-                                PropertiesPanel(
-                                    controller = controller,
-                                    modifier = Modifier.wrapContentHeight(),
-                                    isExpanded = false,
-                                    onToggleExpand = { propertiesExpanded = true }
-                                )
-                            } else if (!layersExpanded && propertiesExpanded) {
-                                LayersPanel(
-                                    controller = controller,
-                                    modifier = Modifier.wrapContentHeight(),
-                                    isExpanded = false,
-                                    onToggleExpand = { layersExpanded = true }
-                                )
-                                HorizontalDivider()
-                                PropertiesPanel(
-                                    controller = controller,
-                                    modifier = Modifier.weight(weight = 1f),
-                                    isExpanded = true,
-                                    onToggleExpand = { propertiesExpanded = false }
-                                )
-                            } else {
-                                LayersPanel(
-                                    controller = controller,
-                                    modifier = Modifier.wrapContentHeight(),
-                                    isExpanded = false,
-                                    onToggleExpand = { layersExpanded = true }
-                                )
-                                HorizontalDivider()
-                                PropertiesPanel(
-                                    controller = controller,
-                                    modifier = Modifier.wrapContentHeight(),
-                                    isExpanded = false,
-                                    onToggleExpand = { propertiesExpanded = true }
-                                )
-                                Box(modifier = Modifier.weight(weight = 1f))
+                            // Layers and Properties collapsible & resizable sections
+                            BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                val totalHeightDp = maxHeight.value.coerceAtLeast(200f)
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    if (layersExpanded && propertiesExpanded) {
+                                        LayersPanel(
+                                            controller = controller,
+                                            modifier = Modifier.weight(layersHeightRatio),
+                                            isExpanded = true,
+                                            onToggleExpand = { layersExpanded = false }
+                                        )
+                                        HorizontalResizeSplitter(
+                                            onResize = { deltaDp ->
+                                                val deltaRatio = deltaDp / totalHeightDp
+                                                layersHeightRatio = (layersHeightRatio + deltaRatio).coerceIn(0.15f, 0.85f)
+                                            },
+                                            onResetToDefault = {
+                                                layersHeightRatio = 0.5f
+                                                statusMessage = "Layers / Properties reset to 50/50"
+                                            }
+                                        )
+                                        PropertiesPanel(
+                                            controller = controller,
+                                            modifier = Modifier.weight(1f - layersHeightRatio),
+                                            isExpanded = true,
+                                            onToggleExpand = { propertiesExpanded = false }
+                                        )
+                                    } else if (layersExpanded && !propertiesExpanded) {
+                                        LayersPanel(
+                                            controller = controller,
+                                            modifier = Modifier.weight(1f),
+                                            isExpanded = true,
+                                            onToggleExpand = { layersExpanded = false }
+                                        )
+                                        HorizontalDivider()
+                                        PropertiesPanel(
+                                            controller = controller,
+                                            modifier = Modifier.wrapContentHeight(),
+                                            isExpanded = false,
+                                            onToggleExpand = { propertiesExpanded = true }
+                                        )
+                                    } else if (!layersExpanded && propertiesExpanded) {
+                                        LayersPanel(
+                                            controller = controller,
+                                            modifier = Modifier.wrapContentHeight(),
+                                            isExpanded = false,
+                                            onToggleExpand = { layersExpanded = true }
+                                        )
+                                        HorizontalDivider()
+                                        PropertiesPanel(
+                                            controller = controller,
+                                            modifier = Modifier.weight(1f),
+                                            isExpanded = true,
+                                            onToggleExpand = { propertiesExpanded = false }
+                                        )
+                                    } else {
+                                        LayersPanel(
+                                            controller = controller,
+                                            modifier = Modifier.wrapContentHeight(),
+                                            isExpanded = false,
+                                            onToggleExpand = { layersExpanded = true }
+                                        )
+                                        HorizontalDivider()
+                                        PropertiesPanel(
+                                            controller = controller,
+                                            modifier = Modifier.wrapContentHeight(),
+                                            isExpanded = false,
+                                            onToggleExpand = { propertiesExpanded = true }
+                                        )
+                                        Box(modifier = Modifier.weight(1f))
+                                    }
+                                }
                             }
                         }
                     }

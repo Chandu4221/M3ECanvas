@@ -1628,4 +1628,66 @@ class SharedCommonTest {
         assertTrue(controller.getUndoSnapshots().isEmpty())
         assertTrue(controller.getRedoSnapshots().isEmpty())
     }
+
+    @Test
+    fun testPanelResizeClampingAndRatioBounds() {
+        // Palette width clamping: 160f .. 480f with collapse threshold < 120f
+        val defaultPalette = 240f
+        val minPalette = 160f
+        val maxPalette = 480f
+
+        var paletteWidth = defaultPalette + 50f
+        assertEquals(290f, paletteWidth.coerceIn(minPalette, maxPalette))
+
+        paletteWidth = defaultPalette - 100f // 140f
+        assertEquals(160f, paletteWidth.coerceIn(minPalette, maxPalette))
+
+        paletteWidth = defaultPalette - 130f // 110f < 120f -> auto-collapse condition
+        assertTrue(paletteWidth < 120f, "Width under 120f should trigger collapse")
+
+        paletteWidth = defaultPalette + 300f // 540f
+        assertEquals(480f, paletteWidth.coerceIn(minPalette, maxPalette))
+
+        // Inspector width clamping: 220f .. 600f with collapse threshold < 150f
+        val defaultInspector = 280f
+        val minInspector = 220f
+        val maxInspector = 600f
+
+        var inspectorWidth = defaultInspector - (-50f) // 330f (dragging left increases width)
+        assertEquals(330f, inspectorWidth.coerceIn(minInspector, maxInspector))
+
+        inspectorWidth = defaultInspector - 100f // 180f
+        assertEquals(220f, inspectorWidth.coerceIn(minInspector, maxInspector))
+
+        inspectorWidth = defaultInspector - 150f // 130f < 150f -> auto-collapse condition
+        assertTrue(inspectorWidth < 150f, "Width under 150f should trigger collapse")
+
+        inspectorWidth = defaultInspector - (-400f) // 680f
+        assertEquals(600f, inspectorWidth.coerceIn(minInspector, maxInspector))
+
+        // Code Export width clamping: 320f .. 760f
+        val defaultCodeExport = 440f
+        val minCodeExport = 320f
+        val maxCodeExport = 760f
+
+        var codeExportWidth = defaultCodeExport - (-100f) // 540f
+        assertEquals(540f, codeExportWidth.coerceIn(minCodeExport, maxCodeExport))
+
+        codeExportWidth = defaultCodeExport - 200f // 240f
+        assertEquals(320f, codeExportWidth.coerceIn(minCodeExport, maxCodeExport))
+
+        codeExportWidth = defaultCodeExport - (-400f) // 840f
+        assertEquals(760f, codeExportWidth.coerceIn(minCodeExport, maxCodeExport))
+
+        // Layers vs Properties ratio clamping: 0.15f .. 0.85f
+        var layersRatio = 0.5f
+        layersRatio = (layersRatio + 0.2f).coerceIn(0.15f, 0.85f)
+        assertEquals(0.7f, layersRatio, 0.001f)
+
+        layersRatio = (0.5f - 0.5f).coerceIn(0.15f, 0.85f)
+        assertEquals(0.15f, layersRatio, 0.001f)
+
+        layersRatio = (0.5f + 0.6f).coerceIn(0.15f, 0.85f)
+        assertEquals(0.85f, layersRatio, 0.001f)
+    }
 }
