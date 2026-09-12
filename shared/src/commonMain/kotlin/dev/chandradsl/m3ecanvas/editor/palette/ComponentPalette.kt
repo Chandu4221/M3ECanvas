@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +32,7 @@ fun ComponentPalette(
     onCollapse: (() -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var collapsedCategories by remember { mutableStateOf(setOf<ComponentCategory>()) }
 
     Column(modifier = modifier.fillMaxHeight()) {
         // Sticky Search Input Header
@@ -47,17 +50,39 @@ fun ComponentPalette(
                         text = "Palette",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
-                    if (onCollapse != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         IconButton(
-                            onClick = onCollapse,
+                            onClick = {
+                                collapsedCategories = if (collapsedCategories.isEmpty()) {
+                                    ComponentCategory.entries.toSet()
+                                } else {
+                                    emptySet()
+                                }
+                            },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                                contentDescription = "Collapse Palette",
+                                imageVector = if (collapsedCategories.isEmpty()) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                                contentDescription = if (collapsedCategories.isEmpty()) "Collapse All Categories" else "Expand All Categories",
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                        if (onCollapse != null) {
+                            IconButton(
+                                onClick = onCollapse,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+                                    contentDescription = "Collapse Palette",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -159,11 +184,25 @@ fun ComponentPalette(
                     }
 
                     if (types.isNotEmpty()) {
+                        val isExpanded = allTypes != null || !collapsedCategories.contains(category)
                         item(key = "header_${category.name}") {
-                            PaletteCategoryHeader(category = category, matchCount = if (allTypes != null) types.size else null)
+                            PaletteCategoryHeader(
+                                category = category,
+                                itemCount = types.size,
+                                isExpanded = isExpanded,
+                                onToggle = {
+                                    collapsedCategories = if (collapsedCategories.contains(category)) {
+                                        collapsedCategories - category
+                                    } else {
+                                        collapsedCategories + category
+                                    }
+                                }
+                            )
                         }
-                        items(items = types, key = { it.name }) { type ->
-                            PaletteItem(type = type, onAddComponent = onAddComponent)
+                        if (isExpanded) {
+                            items(items = types, key = { it.name }) { type ->
+                                PaletteItem(type = type, onAddComponent = onAddComponent)
+                            }
                         }
                     }
                 }
@@ -173,29 +212,53 @@ fun ComponentPalette(
 }
 
 @Composable
-private fun PaletteCategoryHeader(category: ComponentCategory, matchCount: Int? = null) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+private fun PaletteCategoryHeader(
+    category: ComponentCategory,
+    itemCount: Int,
+    isExpanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Surface(
+        onClick = onToggle,
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface
     ) {
-        Text(
-            text = category.displayName,
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold
-            )
-        )
-        if (matchCount != null) {
-            Text(
-                text = "$matchCount",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = category.displayName,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+                Badge(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ) {
+                    Text(
+                        text = "$itemCount",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+            Icon(
+                imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (isExpanded) "Collapse ${category.displayName}" else "Expand ${category.displayName}",
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
-    HorizontalDivider()
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 
 @Composable
