@@ -186,4 +186,46 @@ enum class ComponentType(
             else -> SlotRole.CONTENT
         }
     }
+
+    /**
+     * Returns the valid slots this component type is semantically allowed to occupy inside [parentType].
+     * If this returns a list with 1 or 0 elements, no slot selection dropdown should be shown.
+     */
+    fun allowedSlotsIn(parentType: ComponentType): List<SlotRole> {
+        return when (parentType) {
+            SCAFFOLD -> when (this) {
+                // In Scaffold, each component binds strictly to its own structural slot.
+                // A FAB is never a TopAppBar or Drawer; a TopAppBar is never a FAB.
+                TOP_APP_BAR -> listOf(SlotRole.TOP_BAR)
+                NAVIGATION_BAR, BOTTOM_APP_BAR -> listOf(SlotRole.BOTTOM_BAR)
+                NAVIGATION_RAIL -> listOf(SlotRole.RAIL)
+                NAVIGATION_DRAWER -> listOf(SlotRole.DRAWER)
+                FAB, EXTENDED_FAB -> listOf(SlotRole.FAB)
+                SNACKBAR -> listOf(SlotRole.SNACKBAR)
+                else -> listOf(SlotRole.CONTENT)
+            }
+            TOP_APP_BAR -> when (this) {
+                ICON, ICON_BUTTON -> listOf(SlotRole.ACTIONS, SlotRole.NAVIGATION_ICON)
+                TEXT -> listOf(SlotRole.TITLE)
+                else -> listOf(SlotRole.ACTIONS)
+            }
+            LISTS -> when (this) {
+                ICON, IMAGE -> listOf(SlotRole.LEADING, SlotRole.TRAILING)
+                CHECKBOX, SWITCH, RADIO_BUTTON, ICON_BUTTON -> listOf(SlotRole.TRAILING, SlotRole.LEADING)
+                TEXT -> listOf(SlotRole.HEADLINE, SlotRole.SUPPORTING, SlotRole.OVERLINE, SlotRole.TRAILING)
+                else -> listOf(SlotRole.LEADING, SlotRole.TRAILING, SlotRole.HEADLINE, SlotRole.SUPPORTING)
+            }
+            DIALOG -> when (this) {
+                BUTTON -> listOf(SlotRole.CONFIRM_BUTTON, SlotRole.DISMISS_BUTTON)
+                ICON, IMAGE -> listOf(SlotRole.ICON)
+                TEXT -> listOf(SlotRole.TITLE, SlotRole.CONTENT, SlotRole.SUPPORTING)
+                else -> listOf(SlotRole.CONTENT)
+            }
+            TEXT_FIELD -> when (this) {
+                ICON, ICON_BUTTON -> listOf(SlotRole.LEADING, SlotRole.TRAILING)
+                else -> listOf(SlotRole.CONTENT)
+            }
+            else -> listOf(SlotRole.CONTENT)
+        }
+    }
 }

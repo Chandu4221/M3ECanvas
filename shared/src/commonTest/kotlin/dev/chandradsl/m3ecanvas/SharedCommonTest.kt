@@ -1812,4 +1812,39 @@ class SharedCommonTest {
         assertTrue(topBarCode.contains("title = {"))
         assertTrue(topBarCode.contains("actions = {"))
     }
+
+    @Test
+    fun testFabAllowedSlotsInScaffoldOnlyHasFab() {
+        assertEquals(listOf(SlotRole.FAB), ComponentType.FAB.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.FAB), ComponentType.EXTENDED_FAB.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.TOP_BAR), ComponentType.TOP_APP_BAR.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.BOTTOM_BAR), ComponentType.NAVIGATION_BAR.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.BOTTOM_BAR), ComponentType.BOTTOM_APP_BAR.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.RAIL), ComponentType.NAVIGATION_RAIL.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.DRAWER), ComponentType.NAVIGATION_DRAWER.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.SNACKBAR), ComponentType.SNACKBAR.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.CONTENT), ComponentType.CARD.allowedSlotsIn(ComponentType.SCAFFOLD))
+        assertEquals(listOf(SlotRole.CONTENT), ComponentType.BUTTON.allowedSlotsIn(ComponentType.SCAFFOLD))
+    }
+
+    @Test
+    fun testSetNodeSlotRejectsInvalidSlot() {
+        val controller = EditorController(initialProject = EditorController.newProject("ScaffoldFabTest", withDefaultScaffold = true))
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        controller.addChildToContainer(scaffold.id, ComponentType.FAB)
+
+        val fab = controller.state.project.findNode(scaffold.id)!!.children.first { it.type == ComponentType.FAB }
+        assertEquals(SlotRole.FAB, fab.slot)
+
+        // Attempting to move FAB to TOP_BAR should be rejected
+        controller.setNodeSlot(fab.id, SlotRole.TOP_BAR)
+        val unChangedFab = controller.state.project.findNode(fab.id)!!
+        assertEquals(SlotRole.FAB, unChangedFab.slot, "FAB must not be permitted in TOP_BAR slot")
+    }
+
+    @Test
+    fun testIconButtonAllowedSlotsInTopAppBar() {
+        val allowed = ComponentType.ICON_BUTTON.allowedSlotsIn(ComponentType.TOP_APP_BAR)
+        assertEquals(listOf(SlotRole.ACTIONS, SlotRole.NAVIGATION_ICON), allowed)
+    }
 }

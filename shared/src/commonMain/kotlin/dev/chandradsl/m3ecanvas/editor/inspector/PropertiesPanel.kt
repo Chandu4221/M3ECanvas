@@ -118,7 +118,7 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
     SectionLabel(text = node.type.displayName)
 
     val parent = controller.findParent(node.id)
-    val availableSlots = parent?.type?.supportedSlots() ?: emptyList()
+    val availableSlots = if (parent != null) node.type.allowedSlotsIn(parent.type) else emptyList()
 
     if (node.slot != null || availableSlots.size > 1) {
         Column(

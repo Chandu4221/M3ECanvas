@@ -369,6 +369,7 @@ class EditorController(
 
         val parent = findParent(nodeId = nodeId)
         if (parent != null && slotRole != null) {
+            if (!node.type.allowedSlotsIn(parent.type).contains(slotRole)) return
             val cleanedChildren = if (!slotRole.isMultiOccupant) {
                 parent.children.filterNot { it.id != nodeId && it.slot == slotRole }
             } else {

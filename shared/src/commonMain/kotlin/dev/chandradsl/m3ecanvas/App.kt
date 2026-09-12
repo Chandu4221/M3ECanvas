@@ -338,28 +338,32 @@ fun App(repository: ProjectRepository) {
                     Row(modifier = Modifier.fillMaxHeight()) {
                         ComponentPalette(
                             onAddComponent = { type ->
-                                val selected = controller.state.selectedNodes.firstOrNull()
-                                val targetContainer = if (selected != null) {
-                                    if (selected.isContainer) selected
-                                    else controller.findParent(selected.id)?.takeIf { it.isContainer }
-                                } else null
+                                val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
 
-                                if (targetContainer != null) {
+                                if (rootScaffold != null && type.canonicalSlot() != SlotRole.CONTENT) {
+                                    // Structural Scaffold slot components (TopAppBar, NavigationBar, BottomAppBar, Rail, Drawer, FAB, Snackbar)
+                                    // always bind directly to the Scaffold.
                                     controller.addChildToContainer(
-                                        containerId = targetContainer.id,
+                                        containerId = rootScaffold.id,
                                         type = type
                                     )
                                 } else {
-                                    val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
-                                    if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
+                                    val selected = controller.state.selectedNodes.firstOrNull()
+                                    val targetContainer = if (selected != null) {
+                                        if (selected.isContainer && selected.type != ComponentType.SCAFFOLD) selected
+                                        else controller.findParent(selected.id)?.takeIf { it.isContainer && it.type != ComponentType.SCAFFOLD }
+                                    } else null
+
+                                    if (targetContainer != null) {
+                                        controller.addChildToContainer(
+                                            containerId = targetContainer.id,
+                                            type = type
+                                        )
+                                    } else if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
                                         val contentContainer = rootScaffold.children.firstOrNull {
                                             it.slot == SlotRole.CONTENT && it.isContainer
                                         }
-                                        val targetContainerId = if (type.canonicalSlot() == SlotRole.CONTENT && contentContainer != null) {
-                                            contentContainer.id
-                                        } else {
-                                            rootScaffold.id
-                                        }
+                                        val targetContainerId = contentContainer?.id ?: rootScaffold.id
                                         controller.addChildToContainer(
                                             containerId = targetContainerId,
                                             type = type
