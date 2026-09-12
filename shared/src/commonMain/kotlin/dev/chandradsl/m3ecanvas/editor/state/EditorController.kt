@@ -4,8 +4,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.canvas.AlignmentSnapper
+import dev.chandradsl.m3ecanvas.editor.canvas.SnapResult
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Manages the editor's state in response to user actions.
@@ -14,20 +19,43 @@ import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
  */
 class EditorController(
     initialProject: M3EProject = newProject(),
-    val componentRegistry: ComponentRegistry = ComponentRegistry.default
+    val componentRegistry: ComponentRegistry = ComponentRegistry.default,
+    val alignmentSnapper: AlignmentSnapper = AlignmentSnapper.default
 ) {
 
     private val history = HistoryStack<M3EProject>()
     private var preDragProject: M3EProject? = null
 
-    var state: EditorState by mutableStateOf(
+    var snappingEnabled: Boolean by mutableStateOf(true)
+
+    private var _state by mutableStateOf(
         EditorState(
             project = initialProject,
             canUndo = false,
             canRedo = false
         )
     )
-        private set
+
+    private val _stateFlow = MutableStateFlow(_state)
+
+    /** StateFlow stream for non-Compose or headless consumers (e.g. CLI, tests, background workers). */
+    val stateFlow: StateFlow<EditorState> = _stateFlow.asStateFlow()
+
+    /** Primary Compose observable state. Automatically triggers recomposition upon mutation. */
+    var state: EditorState
+        get() = _state
+        private set(value) {
+            _state = value
+            _stateFlow.value = value
+        }
+
+    fun toggleSnapping() {
+        snappingEnabled = !snappingEnabled
+    }
+
+    fun toggleMultiDevicePreview() {
+        state = state.copy(multiDevicePreview = !state.multiDevicePreview)
+    }
 
     val canUndo: Boolean
         get() = history.canUndo
@@ -487,14 +515,37 @@ class EditorController(
 
     fun updateDrag(deltaX: Float, deltaY: Float) {
         val drag = state.drag ?: return
+        val primaryNode = state.project.findNode(drag.nodeId) ?: return
+
+        val candidatePos = primaryNode.position.offset(deltaX, deltaY)
+        val otherNodes = state.project.nodes.filter { it.id !in drag.nodeIds && it.type != ComponentType.SCAFFOLD }
+        val snapResult = if (snappingEnabled && drag.nodeIds.size == 1) {
+            alignmentSnapper.computeSnap(
+                node = primaryNode,
+                candidatePos = candidatePos,
+                otherNodes = otherNodes,
+                deviceWidth = state.project.deviceProfile.size.width,
+                deviceHeight = state.project.deviceProfile.size.height,
+                enabled = true
+            )
+        } else {
+            SnapResult(candidatePos, emptyList())
+        }
+
+        val effectiveDeltaX = snapResult.snappedPosition.x - primaryNode.position.x
+        val effectiveDeltaY = snapResult.snappedPosition.y - primaryNode.position.y
+
         var updatedProject = state.project
         for (id in drag.nodeIds) {
             val n = updatedProject.findNode(nodeId = id) ?: continue
             if (!n.isLockedInSlot) {
-                updatedProject = updatedProject.updateNode(node = n.movedBy(dx = deltaX, dy = deltaY))
+                updatedProject = updatedProject.updateNode(node = n.movedBy(dx = effectiveDeltaX, dy = effectiveDeltaY))
             }
         }
-        state = state.copy(project = updatedProject)
+        state = state.copy(
+            project = updatedProject,
+            alignmentGuides = snapResult.guides
+        )
     }
 
     fun endDrag() {
@@ -505,6 +556,7 @@ class EditorController(
         }
         state = state.copy(
             drag = null,
+            alignmentGuides = emptyList(),
             canUndo = history.canUndo,
             canRedo = history.canRedo
         )

@@ -52,6 +52,10 @@ open class ComposeCodeGenerator(
             appendLine("import androidx.compose.ui.text.font.FontWeight")
             appendLine("import androidx.compose.ui.unit.dp")
             appendLine("import androidx.compose.ui.zIndex")
+            appendLine("import androidx.compose.ui.semantics.Role")
+            appendLine("import androidx.compose.ui.semantics.contentDescription")
+            appendLine("import androidx.compose.ui.semantics.role")
+            appendLine("import androidx.compose.ui.semantics.semantics")
             appendLine()
             appendLine("@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)")
             appendLine("@Composable")
@@ -1052,6 +1056,19 @@ open class ComposeCodeGenerator(
                 is ModifierSpec.ZIndex -> parts.add("zIndex(${spec.value}f)")
                 is ModifierSpec.Clickable -> parts.add("clickable(enabled = ${spec.enabled}) { /* TODO */ }")
             }
+        }
+
+        val contentDesc = (node.property("contentDescription") as? ComponentProperty.Text)?.value
+        val semanticsRole = (node.property("semanticsRole") as? ComponentProperty.Text)?.value
+        if (!contentDesc.isNullOrBlank() || (!semanticsRole.isNullOrBlank() && semanticsRole != "None")) {
+            val semParts = mutableListOf<String>()
+            if (!contentDesc.isNullOrBlank()) {
+                semParts.add("contentDescription = \"${contentDesc.replace("\"", "\\\"")}\"")
+            }
+            if (!semanticsRole.isNullOrBlank() && semanticsRole != "None") {
+                semParts.add("role = Role.$semanticsRole")
+            }
+            parts.add("semantics { ${semParts.joinToString("; ")} }")
         }
 
         return if (parts.isEmpty()) {

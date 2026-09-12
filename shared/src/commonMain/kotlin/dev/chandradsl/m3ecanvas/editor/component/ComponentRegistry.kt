@@ -240,31 +240,39 @@ private fun buildDefaultDefinitions(): Map<ComponentType, ComponentDefinition> {
  * Can be instantiated and injected for testing without touching the UI or file system.
  */
 open class ComponentRegistry(
-    private val definitions: Map<ComponentType, ComponentDefinition> = DEFAULT_DEFINITIONS
+    definitions: Map<ComponentType, ComponentDefinition> = DEFAULT_DEFINITIONS
 ) {
-    open fun get(type: ComponentType): ComponentDefinition? = definitions[type]
+    private val _definitions: MutableMap<ComponentType, ComponentDefinition> = definitions.toMutableMap()
+    val registeredDefinitions: Map<ComponentType, ComponentDefinition>
+        get() = _definitions
+
+    open fun registerComponent(definition: ComponentDefinition) {
+        _definitions[definition.type] = definition
+    }
+
+    open fun get(type: ComponentType): ComponentDefinition? = _definitions[type]
 
     open fun getOrThrow(type: ComponentType): ComponentDefinition =
-        definitions[type] ?: error("No ComponentDefinition registered for $type")
+        _definitions[type] ?: error("No ComponentDefinition registered for $type")
 
     open fun defaultSizeFor(
         type: ComponentType,
         deviceWidth: Float = 412f,
         deviceHeight: Float = 915f
     ): CanvasSize {
-        val def = definitions[type] ?: return CanvasSize(120f, 40f)
+        val def = _definitions[type] ?: return CanvasSize(120f, 40f)
         return def.defaultSize(deviceWidth, deviceHeight)
     }
 
     open fun variantsFor(type: ComponentType): List<MaterialVariant> {
-        return definitions[type]?.availableVariants ?: emptyList()
+        return _definitions[type]?.availableVariants ?: emptyList()
     }
 
     open fun byCategory(category: ComponentCategory): List<ComponentDefinition> {
-        return definitions.values.filter { it.category == category }
+        return _definitions.values.filter { it.category == category }
     }
 
-    open fun all(): List<ComponentDefinition> = definitions.values.toList()
+    open fun all(): List<ComponentDefinition> = _definitions.values.toList()
 
     companion object {
         val default: ComponentRegistry by lazy { ComponentRegistry(DEFAULT_DEFINITIONS) }

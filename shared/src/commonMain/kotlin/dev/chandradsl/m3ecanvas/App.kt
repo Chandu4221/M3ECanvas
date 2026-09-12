@@ -34,6 +34,9 @@ import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import dev.chandradsl.m3ecanvas.editor.theme.EditorTheme
 
 import dev.chandradsl.m3ecanvas.editor.persistence.LoadResult
+import dev.chandradsl.m3ecanvas.editor.persistence.AutosaveManager
+import dev.chandradsl.m3ecanvas.editor.persistence.FileProjectRepository
+import dev.chandradsl.m3ecanvas.domain.model.M3EProject
 import dev.chandradsl.m3ecanvas.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -45,6 +48,7 @@ fun App(repository: ProjectRepository) {
             initialProject = EditorController.newProject()
         )
     }
+    val autosaveManager = remember { AutosaveManager.default }
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     @Suppress("DEPRECATION")
@@ -53,6 +57,7 @@ fun App(repository: ProjectRepository) {
     var showCodeExport by remember { mutableStateOf(value = false) }
     var isOperating by remember { mutableStateOf(value = false) }
     var errorMessage by remember { mutableStateOf<String?>(value = null) }
+    var recoveryProject by remember { mutableStateOf<M3EProject?>(value = null) }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -63,7 +68,14 @@ fun App(repository: ProjectRepository) {
                 statusMessage = "Loaded saved project"
             }
             is LoadResult.NotFound -> {
-                // Keep default new project
+                if (autosaveManager.hasAutosave()) {
+                    when (val auto = autosaveManager.loadAutosave()) {
+                        is LoadResult.Success -> {
+                            recoveryProject = auto.project
+                        }
+                        else -> {}
+                    }
+                }
             }
             is LoadResult.Corrupted -> {
                 errorMessage = "Failed to load project: ${result.reason}"
@@ -71,6 +83,13 @@ fun App(repository: ProjectRepository) {
             }
         }
         isOperating = false
+    }
+
+    LaunchedEffect(controller.state.project) {
+        kotlinx.coroutines.delay(4000)
+        try {
+            autosaveManager.saveAutosave(controller.state.project)
+        } catch (_: Throwable) {}
     }
 
     EditorTheme {
@@ -217,6 +236,13 @@ fun App(repository: ProjectRepository) {
                         statusMessage = "Saving..."
                         try {
                             repository.save(project = controller.state.project)
+                            autosaveManager.clearAutosave()
+                            try {
+                                autosaveManager.addRecentProject(
+                                    name = controller.state.project.name,
+                                    path = FileProjectRepository.defaultFile().absolutePath
+                                )
+                            } catch (_: Throwable) {}
                             statusMessage = "Saved"
                         } catch (e: Throwable) {
                             statusMessage = "Save failed"
@@ -325,6 +351,36 @@ fun App(repository: ProjectRepository) {
                 confirmButton = {
                     TextButton(onClick = { errorMessage = null }) {
                         Text("OK")
+                    }
+                }
+            )
+        }
+
+        if (recoveryProject != null) {
+            AlertDialog(
+                onDismissRequest = { recoveryProject = null },
+                title = { Text(text = "Recover Unsaved Work") },
+                text = { Text(text = "An unsaved session was found from a previous edit (${recoveryProject?.name ?: "Untitled"}). Would you like to restore it?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val toRestore = recoveryProject
+                        recoveryProject = null
+                        if (toRestore != null) {
+                            controller.replaceProject(toRestore)
+                            statusMessage = "Restored unsaved session"
+                        }
+                    }) {
+                        Text("Restore")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        recoveryProject = null
+                        coroutineScope.launch {
+                            autosaveManager.clearAutosave()
+                        }
+                    }) {
+                        Text("Discard")
                     }
                 }
             )

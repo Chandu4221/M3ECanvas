@@ -18,7 +18,9 @@ data class EditorState(
     val viewport: ViewportState = ViewportState(),
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
-    val clipboard: CanvasNode? = null
+    val clipboard: CanvasNode? = null,
+    val alignmentGuides: List<AlignmentGuide> = emptyList(),
+    val multiDevicePreview: Boolean = false
 ) {
 
     /** Returns true if the node with [nodeId] is currently selected. */
@@ -51,4 +53,21 @@ data class DragState(
 data class ViewportState(
     val zoom: Float = 1f,
     val panOffset: CanvasPosition = CanvasPosition.Zero
+)
+
+/**
+ * Orientation of visual alignment snap guides on the canvas.
+ */
+enum class GuideOrientation {
+    HORIZONTAL,
+    VERTICAL
+}
+
+/**
+ * Visual alignment snap guide shown while dragging elements.
+ */
+data class AlignmentGuide(
+    val orientation: GuideOrientation,
+    val position: Float,
+    val label: String? = null
 )

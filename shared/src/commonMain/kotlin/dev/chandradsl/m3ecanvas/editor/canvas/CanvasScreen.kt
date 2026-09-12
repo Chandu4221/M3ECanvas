@@ -38,8 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
+import dev.chandradsl.m3ecanvas.domain.model.CanvasSize
 import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
+import dev.chandradsl.m3ecanvas.editor.state.GuideOrientation
 import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
 import kotlin.math.max
 import kotlin.math.min
@@ -128,10 +130,10 @@ fun CanvasScreen(controller: EditorController) {
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Transformed Device Chassis Column (Scaled and Translated via graphicsLayer)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            // Transformed Device Chassis Row (Scaled and Translated via graphicsLayer)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .graphicsLayer {
                         scaleX = viewport.zoom
@@ -141,8 +143,13 @@ fun CanvasScreen(controller: EditorController) {
                     }
                     .padding(16.dp)
             ) {
-                // Device Information Header Badge (Click to select Project & display Project properties)
-                DeviceHeaderBadge(
+                // Primary Device Column
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Device Information Header Badge (Click to select Project & display Project properties)
+                    DeviceHeaderBadge(
                     currentProfile = deviceProfile,
                     isSelected = state.selectedNodeIds.isEmpty(),
                     onClick = { controller.clearSelection() }
@@ -285,6 +292,29 @@ fun CanvasScreen(controller: EditorController) {
                                                     )
                                                 )
                                             }
+
+                                            // Draw magnetic alignment guides during dragging
+                                            val guides = state.alignmentGuides
+                                            for (guide in guides) {
+                                                val guidePx = with(density) { guide.position.dp.toPx() }
+                                                if (guide.orientation == GuideOrientation.VERTICAL) {
+                                                    drawLine(
+                                                        color = canvasColorScheme.tertiary,
+                                                        start = Offset(guidePx, 0f),
+                                                        end = Offset(guidePx, size.height),
+                                                        strokeWidth = 1.5.dp.toPx(),
+                                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+                                                    )
+                                                } else {
+                                                    drawLine(
+                                                        color = canvasColorScheme.tertiary,
+                                                        start = Offset(0f, guidePx),
+                                                        end = Offset(size.width, guidePx),
+                                                        strokeWidth = 1.5.dp.toPx(),
+                                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+                                                    )
+                                                }
+                                            }
                                         }
                                 ) {
                                     state.project.nodes.forEach { node ->
@@ -299,12 +329,92 @@ fun CanvasScreen(controller: EditorController) {
                     }
                 }
             }
+
+            // Secondary Tablet Preview (Adaptive Screen Preview)
+                if (state.multiDevicePreview) {
+                    val tabletProfile = DeviceProfile.presets.firstOrNull { it.category == DeviceCategory.TABLET }
+                        ?: DeviceProfile("pixel_tablet", "Pixel Tablet", CanvasSize(840f, 600f), DeviceCategory.TABLET)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Tablet,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "${tabletProfile.displayName} (Adaptive Preview) • ${tabletProfile.size.width.toInt()} × ${tabletProfile.size.height.toInt()} dp",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .size(
+                                    width = (tabletProfile.size.width + 16f).dp,
+                                    height = (tabletProfile.size.height + 16f).dp
+                                )
+                                .shadow(
+                                    elevation = 20.dp,
+                                    shape = RoundedCornerShape(24.dp),
+                                    spotColor = Color.Black.copy(alpha = 0.35f)
+                                ),
+                            shape = RoundedCornerShape(24.dp),
+                            color = Color(0xFF1C1D22),
+                            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF383A42))
+                        ) {
+                            val canvasColorScheme = remember(state.project.themeConfig) {
+                                CanvasThemeGenerator.generateColorScheme(state.project.themeConfig)
+                            }
+                            MaterialTheme(
+                                colorScheme = canvasColorScheme,
+                                typography = Typography()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(all = 8.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(MaterialTheme.colorScheme.surface)
+                                ) {
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        SimulatedStatusBar()
+                                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                            state.project.nodes.forEach { node ->
+                                                CanvasNodeRenderer(node = node, controller = controller)
+                                            }
+                                        }
+                                        SimulatedNavigationBar()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Floating Viewport Controls Toolbar
         ViewportControlBar(
             zoom = viewport.zoom,
             panOffset = viewport.panOffset,
+            snappingEnabled = controller.snappingEnabled,
+            onToggleSnapping = { controller.toggleSnapping() },
+            multiDevicePreview = state.multiDevicePreview,
+            onToggleMultiDevicePreview = { controller.toggleMultiDevicePreview() },
             onZoomIn = { controller.zoomIn() },
             onZoomOut = { controller.zoomOut() },
             onResetZoom = { controller.resetZoom() },
@@ -321,6 +431,10 @@ fun CanvasScreen(controller: EditorController) {
 private fun ViewportControlBar(
     zoom: Float,
     panOffset: CanvasPosition,
+    snappingEnabled: Boolean,
+    onToggleSnapping: () -> Unit,
+    multiDevicePreview: Boolean,
+    onToggleMultiDevicePreview: () -> Unit,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onResetZoom: () -> Unit,
@@ -340,6 +454,38 @@ private fun ViewportControlBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            // Magnetic Snapping Toggle
+            IconButton(
+                onClick = onToggleSnapping,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Straighten,
+                    contentDescription = if (snappingEnabled) "Snapping Enabled" else "Snapping Disabled",
+                    tint = if (snappingEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Multi-Device Preview Toggle
+            IconButton(
+                onClick = onToggleMultiDevicePreview,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Devices,
+                    contentDescription = if (multiDevicePreview) "Multi-Device Preview Active" else "Single Device Preview",
+                    tint = if (multiDevicePreview) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            VerticalDivider(
+                modifier = Modifier
+                    .height(20.dp)
+                    .padding(horizontal = 2.dp)
+            )
+
             // Zoom Out
             IconButton(
                 onClick = onZoomOut,

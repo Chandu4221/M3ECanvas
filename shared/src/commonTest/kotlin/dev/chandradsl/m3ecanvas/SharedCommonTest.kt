@@ -9,8 +9,18 @@ import dev.chandradsl.m3ecanvas.editor.component.ComponentDefinition
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
+import dev.chandradsl.m3ecanvas.editor.state.GuideOrientation
 import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
+import dev.chandradsl.m3ecanvas.editor.canvas.AlignmentSnapper
+import dev.chandradsl.m3ecanvas.editor.canvas.SnapResult
+import dev.chandradsl.m3ecanvas.editor.codegen.ProjectCodeExporter
+import dev.chandradsl.m3ecanvas.editor.inspector.ContrastCalculator
+import dev.chandradsl.m3ecanvas.editor.inspector.ContrastLevel
+import dev.chandradsl.m3ecanvas.editor.persistence.AutosaveManager
+import dev.chandradsl.m3ecanvas.editor.persistence.LoadResult
 import dev.chandradsl.m3ecanvas.util.AppLogger
+import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
 class SharedCommonTest {
@@ -1308,5 +1318,170 @@ class SharedCommonTest {
         AppLogger.info("TestTag", "Info message")
         AppLogger.warn("TestTag", "Warning message", RuntimeException("Test warning"))
         AppLogger.error("TestTag", "Error message", RuntimeException("Test error"))
+    }
+
+    @Test
+    fun testDualStateFlowSynchronization() {
+        val controller = EditorController(EditorController.newProject(withDefaultScaffold = false))
+        assertEquals(0, controller.stateFlow.value.project.nodes.size)
+        assertEquals(controller.state, controller.stateFlow.value)
+
+        controller.addNode(ComponentType.BUTTON, CanvasPosition(50f, 50f))
+        assertEquals(1, controller.stateFlow.value.project.nodes.size)
+        assertEquals(controller.state, controller.stateFlow.value)
+
+        controller.deleteSelected()
+        assertEquals(0, controller.stateFlow.value.project.nodes.size)
+        assertEquals(controller.state, controller.stateFlow.value)
+    }
+
+    @Test
+    fun testAlignmentSnapperEdgesAndCenter() {
+        val snapper = AlignmentSnapper(snapThreshold = 6f)
+        val fixedNode = CanvasNode(
+            type = ComponentType.BUTTON,
+            name = "Fixed",
+            position = CanvasPosition(100f, 100f),
+            size = CanvasSize(100f, 40f)
+        )
+        val movingNode = CanvasNode(
+            type = ComponentType.BUTTON,
+            name = "Moving",
+            position = CanvasPosition(20f, 20f),
+            size = CanvasSize(100f, 40f)
+        )
+
+        // Test Left-to-Left snap (candidate at 103f should snap to 100f)
+        val snapLeft = snapper.computeSnap(
+            node = movingNode,
+            candidatePos = CanvasPosition(103f, 50f),
+            otherNodes = listOf(fixedNode),
+            deviceWidth = 412f,
+            deviceHeight = 915f
+        )
+        assertEquals(100f, snapLeft.snappedPosition.x)
+        assertTrue(snapLeft.guides.any { it.orientation == GuideOrientation.VERTICAL && it.position == 100f })
+
+        // Test Canvas Center X snap (deviceWidth = 412, center = 206, node width = 100 -> x = 156)
+        val snapCenter = snapper.computeSnap(
+            node = movingNode,
+            candidatePos = CanvasPosition(158f, 50f),
+            otherNodes = emptyList(),
+            deviceWidth = 412f,
+            deviceHeight = 915f
+        )
+        assertEquals(156f, snapCenter.snappedPosition.x)
+        assertTrue(snapCenter.guides.any { it.orientation == GuideOrientation.VERTICAL && it.position == 206f })
+    }
+
+    @Test
+    fun testContrastCalculator() {
+        // Black on White
+        val black = Color(0xFF000000)
+        val white = Color(0xFFFFFFFF)
+        val maxContrast = ContrastCalculator.contrastRatio(black, white)
+        assertTrue(maxContrast >= 20.9f, "Black on white contrast should be ~21.0")
+
+        val evalMax = ContrastCalculator.evaluate(black, white)
+        assertEquals(ContrastLevel.AAA_PASS, evalMax.level)
+
+        // Same color on same color
+        val minContrast = ContrastCalculator.contrastRatio(white, white)
+        assertEquals(1.0f, minContrast)
+        val evalMin = ContrastCalculator.evaluate(white, white)
+        assertEquals(ContrastLevel.FAIL, evalMin.level)
+
+        // Hex parsing
+        val parsed = ContrastCalculator.parseColorHex("#FF0000")
+        assertEquals(1f, parsed.red)
+        assertEquals(0f, parsed.green)
+        assertEquals(0f, parsed.blue)
+    }
+
+    @Test
+    fun testProjectCodeExporter() {
+        val project = EditorController.newProject(name = "TestApp", withDefaultScaffold = true)
+        val files = ProjectCodeExporter.exportProject(project)
+
+        assertEquals(5, files.size)
+        val filenames = files.map { it.filename }.toSet()
+        assertTrue(filenames.contains("TestAppScreen.kt"))
+        assertTrue(filenames.contains("Theme.kt"))
+        assertTrue(filenames.contains("MainActivity.kt"))
+        assertTrue(filenames.contains("Main.kt"))
+        assertTrue(filenames.contains("build.gradle.kts"))
+
+        val screenFile = files.first { it.filename == "TestAppScreen.kt" }
+        assertTrue(screenFile.content.contains("fun TestAppScreen"))
+
+        val themeFile = files.first { it.filename == "Theme.kt" }
+        assertTrue(themeFile.content.contains("AppTheme"))
+        assertTrue(themeFile.content.contains("LightColorScheme"))
+        assertTrue(themeFile.content.contains("DarkColorScheme"))
+    }
+
+    @Test
+    fun testA11yCodeGeneration() {
+        val button = CanvasNode(
+            type = ComponentType.BUTTON,
+            name = "Accessible Button",
+            position = CanvasPosition(20f, 20f),
+            size = CanvasSize(120f, 40f),
+            properties = listOf(
+                ComponentProperty.Text(key = "contentDescription", value = "Submit Form Button"),
+                ComponentProperty.Text(key = "semanticsRole", value = "Button")
+            )
+        )
+        val project = M3EProject(
+            name = "A11yProject",
+            nodes = listOf(button)
+        )
+        val code = ComposeCodeGenerator.generateFile(project)
+
+        assertTrue(code.contains("contentDescription = \"Submit Form Button\""))
+        assertTrue(code.contains("role = Role.Button"))
+        assertTrue(code.contains("import androidx.compose.ui.semantics.semantics"))
+    }
+
+    @Test
+    fun testCustomComponentRegistrationDynamically() {
+        val registry = ComponentRegistry()
+        val customDef = ComponentDefinition(
+            type = ComponentType.BUTTON,
+            defaultSize = { _, _ -> CanvasSize(333f, 444f) }
+        )
+        registry.registerComponent(customDef)
+        assertEquals(CanvasSize(333f, 444f), registry.defaultSizeFor(ComponentType.BUTTON))
+    }
+
+    @Test
+    fun testAutosaveManagerOperations() = runBlocking {
+        val tempDir = java.io.File.createTempFile("m3e_autosave_dir", "").apply { delete(); mkdirs() }
+        val autosaveFile = java.io.File(tempDir, "autosave.json")
+        val recentsFile = java.io.File(tempDir, "recents.json")
+
+        val manager = AutosaveManager(autosaveFile = autosaveFile, recentsFile = recentsFile)
+        assertFalse(manager.hasAutosave())
+
+        val project = EditorController.newProject("AutosaveTest")
+        manager.saveAutosave(project)
+        assertTrue(manager.hasAutosave())
+
+        val loaded = manager.loadAutosave()
+        assertTrue(loaded is LoadResult.Success)
+        assertEquals("AutosaveTest", loaded.project.name)
+
+        manager.clearAutosave()
+        assertFalse(manager.hasAutosave())
+
+        // Recents
+        manager.addRecentProject("Recent 1", "/path/1")
+        manager.addRecentProject("Recent 2", "/path/2")
+        val recents = manager.getRecentProjects()
+        assertEquals(2, recents.size)
+        assertEquals("Recent 2", recents[0].name)
+
+        tempDir.deleteRecursively()
+        Unit
     }
 }

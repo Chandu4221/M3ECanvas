@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Done
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ import dev.chandradsl.m3ecanvas.domain.model.M3EProject
 
 enum class CodeExportTab(val displayName: String) {
     COMPOSE_CODE("Kotlin Compose"),
+    FULL_PROJECT("Full Project (Multi-File)"),
     AI_PROMPT("AI Prompt Spec")
 }
 
@@ -40,9 +42,17 @@ fun CodeExportPanel(
     val clipboardManager = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
 
-    val codeText = remember(project, selectedTab) {
+    val fullProjectFiles = remember(project) {
+        ProjectCodeExporter.exportProject(project)
+    }
+    var selectedFileIndex by remember { mutableStateOf(0) }
+
+    val currentFile = fullProjectFiles.getOrElse(selectedFileIndex) { fullProjectFiles.first() }
+
+    val codeText = remember(project, selectedTab, selectedFileIndex) {
         when (selectedTab) {
             CodeExportTab.COMPOSE_CODE -> ComposeCodeGenerator.generateFile(project)
+            CodeExportTab.FULL_PROJECT -> currentFile.content
             CodeExportTab.AI_PROMPT -> AIPromptGenerator.generate(project)
         }
     }
@@ -74,7 +84,7 @@ fun CodeExportPanel(
                         FilterChip(
                             selected = selectedTab == tab,
                             onClick = { selectedTab = tab },
-                            label = { Text(tab.displayName) },
+                            label = { Text(tab.displayName, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -90,6 +100,20 @@ fun CodeExportPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (selectedTab == CodeExportTab.FULL_PROJECT) {
+                        TextButton(
+                            onClick = {
+                                val allFilesCombined = fullProjectFiles.joinToString("\n\n" + "=".repeat(60) + "\n\n") { file ->
+                                    "// File: ${file.path}\n\n${file.content}"
+                                }
+                                clipboardManager.setText(AnnotatedString(allFilesCombined))
+                                copied = true
+                            }
+                        ) {
+                            Text("Copy All Files", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+
                     Button(
                         onClick = {
                             clipboardManager.setText(AnnotatedString(codeText))
@@ -106,7 +130,7 @@ fun CodeExportPanel(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (copied) "Copied!" else "Copy ${selectedTab.displayName}",
+                            text = if (copied) "Copied!" else if (selectedTab == CodeExportTab.FULL_PROJECT) "Copy ${currentFile.filename}" else "Copy ${selectedTab.displayName}",
                             style = MaterialTheme.typography.labelMedium
                         )
                     }
@@ -117,6 +141,48 @@ fun CodeExportPanel(
                             contentDescription = "Close",
                             tint = Color(0xFFB0B3C0)
                         )
+                    }
+                }
+            }
+
+            // Sub-header for Multi-File Project navigation
+            if (selectedTab == CodeExportTab.FULL_PROJECT) {
+                Surface(
+                    color = Color(0xFF1B1C22),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Folder,
+                            contentDescription = null,
+                            tint = Color(0xFF8B8E9D),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Project Files:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF8B8E9D)
+                        )
+                        fullProjectFiles.forEachIndexed { index, file ->
+                            InputChip(
+                                selected = selectedFileIndex == index,
+                                onClick = { selectedFileIndex = index },
+                                label = { Text(file.filename, fontSize = 11.sp) },
+                                colors = InputChipDefaults.inputChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    containerColor = Color(0xFF262832),
+                                    labelColor = Color(0xFFB0B3C0)
+                                )
+                            )
+                        }
                     }
                 }
             }

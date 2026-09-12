@@ -169,6 +169,7 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
         LayoutSection(node = node, controller = controller)
     }
     ModifierSection(node = node, controller = controller)
+    AccessibilitySection(node = node, controller = controller)
 
     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
     Button(
@@ -872,5 +873,126 @@ private fun FloatSliderRow(
             },
             valueRange = range
         )
+    }
+}
+
+@Composable
+private fun AccessibilitySection(node: CanvasNode, controller: EditorController) {
+    SectionLabel(text = "Accessibility & Semantics")
+
+    // Content Description (A11y)
+    val contentDesc = (node.property("contentDescription") as? ComponentProperty.Text)?.value.orEmpty()
+    OutlinedTextField(
+        value = contentDesc,
+        onValueChange = {
+            controller.updateNodeProperty(
+                nodeId = node.id,
+                property = ComponentProperty.Text(key = "contentDescription", value = it)
+            )
+        },
+        label = { Text("Content Description") },
+        placeholder = { Text("Spoken by screen readers") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+
+    // Semantics Role
+    val currentRole = (node.property("semanticsRole") as? ComponentProperty.Text)?.value ?: "None"
+    val availableRoles = listOf("None", "Button", "Checkbox", "Switch", "Image", "Tab", "Heading", "DropdownList")
+    var roleExpanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = roleExpanded,
+        onExpandedChange = { roleExpanded = it }
+    ) {
+        OutlinedTextField(
+            value = currentRole,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Semantics Role") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = roleExpanded,
+            onDismissRequest = { roleExpanded = false }
+        ) {
+            availableRoles.forEach { role ->
+                DropdownMenuItem(
+                    text = { Text(role) },
+                    onClick = {
+                        controller.updateNodeProperty(
+                            nodeId = node.id,
+                            property = ComponentProperty.Text(key = "semanticsRole", value = role)
+                        )
+                        roleExpanded = false
+                    }
+                )
+            }
+        }
+    }
+
+    // Live Contrast Ratio Analysis
+    val themeConfig = controller.state.project.themeConfig
+    val colorScheme = remember(themeConfig) { CanvasThemeGenerator.generateColorScheme(themeConfig) }
+
+    val bgModifier = node.modifiers.filterIsInstance<ModifierSpec.Background>().lastOrNull()
+    val bgColor = if (bgModifier != null) {
+        ContrastCalculator.parseColorHex(bgModifier.colorHex, fallback = colorScheme.surface)
+    } else {
+        if (node.type == ComponentType.BUTTON) colorScheme.primary else colorScheme.surface
+    }
+
+    val fgColor = if (node.type == ComponentType.BUTTON) {
+        colorScheme.onPrimary
+    } else {
+        colorScheme.onSurface
+    }
+
+    val contrastResult = remember(fgColor, bgColor) {
+        ContrastCalculator.evaluate(fgColor, bgColor)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = if (contrastResult.level.isPassing) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        } else {
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "WCAG Contrast: ${contrastResult.formattedRatio}",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (contrastResult.level.isPassing) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
+                ) {
+                    Text(
+                        text = contrastResult.level.label,
+                        style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (contrastResult.level.isPassing) {
+                    "Meets WCAG AA standard (>= 4.5:1) for readable foreground content."
+                } else {
+                    "Low contrast warning. Increase color difference for better accessibility."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
