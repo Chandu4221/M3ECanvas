@@ -2052,4 +2052,60 @@ class SharedCommonTest {
         assertEquals(illegalCard.id, violations.first().nodeId)
         assertTrue(violations.first().description.contains("Top App Bar cannot contain Card"))
     }
+
+    @Test
+    fun testListItemConsecutiveAddsPopulatesDifferentSlots() {
+        val controller = EditorController(initialProject = EditorController.newProject("MultiItemTest", withDefaultScaffold = false))
+        controller.addNode(ComponentType.LISTS, CanvasPosition.Zero)
+        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LISTS }
+
+        // 1st text -> HEADLINE
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.TEXT))
+        var updated = controller.state.project.findNode(listItem.id)!!
+        assertEquals(1, updated.children.size)
+        assertEquals(SlotRole.HEADLINE, updated.children[0].slot)
+
+        // 2nd text -> SUPPORTING
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.TEXT))
+        updated = controller.state.project.findNode(listItem.id)!!
+        assertEquals(2, updated.children.size)
+        assertEquals(SlotRole.SUPPORTING, updated.children[1].slot)
+
+        // 3rd text -> OVERLINE
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.TEXT))
+        updated = controller.state.project.findNode(listItem.id)!!
+        assertEquals(3, updated.children.size)
+        assertEquals(SlotRole.OVERLINE, updated.children[2].slot)
+
+        // 1st icon -> LEADING
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.ICON))
+        updated = controller.state.project.findNode(listItem.id)!!
+        assertEquals(4, updated.children.size)
+        assertEquals(SlotRole.LEADING, updated.children.first { it.type == ComponentType.ICON }.slot)
+
+        // Checkbox -> TRAILING
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.CHECKBOX))
+        updated = controller.state.project.findNode(listItem.id)!!
+        assertEquals(5, updated.children.size)
+        assertEquals(SlotRole.TRAILING, updated.children.first { it.type == ComponentType.CHECKBOX }.slot)
+    }
+
+    @Test
+    fun testDialogConsecutiveButtonsPopulatesConfirmAndDismiss() {
+        val controller = EditorController(initialProject = EditorController.newProject("DialogTest", withDefaultScaffold = false))
+        controller.addNode(ComponentType.DIALOG, CanvasPosition.Zero)
+        val dialog = controller.state.project.nodes.first { it.type == ComponentType.DIALOG }
+
+        // 1st button -> CONFIRM_BUTTON
+        assertTrue(controller.addChildToContainer(dialog.id, ComponentType.BUTTON))
+        var updated = controller.state.project.findNode(dialog.id)!!
+        assertEquals(1, updated.children.size)
+        assertEquals(SlotRole.CONFIRM_BUTTON, updated.children[0].slot)
+
+        // 2nd button -> DISMISS_BUTTON
+        assertTrue(controller.addChildToContainer(dialog.id, ComponentType.BUTTON))
+        updated = controller.state.project.findNode(dialog.id)!!
+        assertEquals(2, updated.children.size)
+        assertEquals(SlotRole.DISMISS_BUTTON, updated.children[1].slot)
+    }
 }

@@ -193,7 +193,10 @@ class EditorController(
         val updatedProject = if (targetContainer != null) {
             val supported = targetContainer.type.supportedSlots()
             val targetSlot = if (supported.isNotEmpty()) {
-                clone.type.canonicalSlotFor(targetContainer.type)
+                val allowed = clone.type.allowedSlotsIn(targetContainer.type)
+                val occupiedSlots = targetContainer.children.mapNotNull { it.slot }.toSet()
+                allowed.firstOrNull { it.isMultiOccupant || it !in occupiedSlots }
+                    ?: clone.type.canonicalSlotFor(targetContainer.type)
             } else {
                 null
             }
@@ -366,7 +369,10 @@ class EditorController(
 
         val supported = container.type.supportedSlots()
         val targetSlot = if (supported.isNotEmpty()) {
-            type.canonicalSlotFor(container.type)
+            val allowed = type.allowedSlotsIn(container.type)
+            val occupiedSlots = container.children.mapNotNull { it.slot }.toSet()
+            allowed.firstOrNull { it.isMultiOccupant || it !in occupiedSlots }
+                ?: type.canonicalSlotFor(container.type)
         } else {
             null
         }
