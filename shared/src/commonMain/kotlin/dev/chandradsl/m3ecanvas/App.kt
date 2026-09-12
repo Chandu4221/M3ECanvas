@@ -1,14 +1,24 @@
 package dev.chandradsl.m3ecanvas
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.automirrored.outlined.ViewSidebar
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +28,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
@@ -25,6 +36,7 @@ import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.domain.model.SlotRole
 import dev.chandradsl.m3ecanvas.editor.canvas.CanvasScreen
 import dev.chandradsl.m3ecanvas.editor.codegen.CodeExportPanel
+import dev.chandradsl.m3ecanvas.editor.history.HistoryDialog
 import dev.chandradsl.m3ecanvas.editor.inspector.LayersPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.PropertiesPanel
 import dev.chandradsl.m3ecanvas.editor.palette.ComponentPalette
@@ -55,6 +67,11 @@ fun App(repository: ProjectRepository) {
     val clipboardManager = LocalClipboardManager.current
     var statusMessage by remember { mutableStateOf(value = "") }
     var showCodeExport by remember { mutableStateOf(value = false) }
+    var showPalette by remember { mutableStateOf(value = true) }
+    var showInspector by remember { mutableStateOf(value = true) }
+    var layersExpanded by remember { mutableStateOf(value = true) }
+    var propertiesExpanded by remember { mutableStateOf(value = true) }
+    var showHistoryDialog by remember { mutableStateOf(value = false) }
     var isOperating by remember { mutableStateOf(value = false) }
     var errorMessage by remember { mutableStateOf<String?>(value = null) }
     var recoveryProject by remember { mutableStateOf<M3EProject?>(value = null) }
@@ -181,6 +198,24 @@ fun App(repository: ProjectRepository) {
                                 statusMessage = "Zoom: 100%"
                                 return@onKeyEvent true
                             }
+                            event.key == Key.LeftBracket -> {
+                                showPalette = !showPalette
+                                statusMessage = if (showPalette) "Palette shown" else "Palette hidden"
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.RightBracket -> {
+                                showInspector = !showInspector
+                                statusMessage = if (showInspector) "Inspector shown" else "Inspector hidden"
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.H -> {
+                                showHistoryDialog = !showHistoryDialog
+                                return@onKeyEvent true
+                            }
+                            event.key == Key.E -> {
+                                showCodeExport = !showCodeExport
+                                return@onKeyEvent true
+                            }
                         }
                     }
 
@@ -217,6 +252,8 @@ fun App(repository: ProjectRepository) {
             TopBar(
                 canUndo = controller.state.canUndo,
                 canRedo = controller.state.canRedo,
+                undoCount = controller.state.undoCount,
+                redoCount = controller.state.redoCount,
                 hasSelection = controller.state.selectedNodeIds.isNotEmpty(),
                 onUndo = {
                     controller.undo()
@@ -225,6 +262,9 @@ fun App(repository: ProjectRepository) {
                 onRedo = {
                     controller.redo()
                     statusMessage = "Redo"
+                },
+                onOpenHistory = {
+                    showHistoryDialog = true
                 },
                 onDelete = {
                     controller.deleteSelected()
@@ -274,51 +314,84 @@ fun App(repository: ProjectRepository) {
                 },
                 isOperating = isOperating,
                 statusMessage = statusMessage,
+                showPalette = showPalette,
+                onTogglePalette = { showPalette = !showPalette },
+                showInspector = showInspector,
+                onToggleInspector = { showInspector = !showInspector },
                 showCodeExport = showCodeExport,
                 onToggleCodeExport = { showCodeExport = !showCodeExport }
             )
             HorizontalDivider()
             Row(modifier = Modifier.weight(weight = 1f)) {
-                ComponentPalette(
-                    onAddComponent = { type ->
-                        val selected = controller.state.selectedNodes.firstOrNull()
-                        if (selected != null && selected.isContainer) {
-                            controller.addChildToContainer(
-                                containerId = selected.id,
-                                type = type
-                            )
-                        } else {
-                            val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
-                            if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
-                                val contentContainer = rootScaffold.children.firstOrNull {
-                                    it.slot == SlotRole.CONTENT && it.isContainer
-                                }
-                                val targetContainerId = if (type.canonicalSlot() == SlotRole.CONTENT && contentContainer != null) {
-                                    contentContainer.id
-                                } else {
-                                    rootScaffold.id
-                                }
+                // Collapsible Palette
+                AnimatedVisibility(
+                    visible = showPalette,
+                    enter = expandHorizontally() + fadeIn(),
+                    exit = shrinkHorizontally() + fadeOut()
+                ) {
+                    ComponentPalette(
+                        onAddComponent = { type ->
+                            val selected = controller.state.selectedNodes.firstOrNull()
+                            if (selected != null && selected.isContainer) {
                                 controller.addChildToContainer(
-                                    containerId = targetContainerId,
+                                    containerId = selected.id,
                                     type = type
                                 )
                             } else {
-                                val count = controller.state.project.nodes.size
-                                controller.addNode(
-                                    type = type,
-                                    position = CanvasPosition(
-                                        x = 40f + count * 24f,
-                                        y = 40f + count * 24f
+                                val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+                                if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
+                                    val contentContainer = rootScaffold.children.firstOrNull {
+                                        it.slot == SlotRole.CONTENT && it.isContainer
+                                    }
+                                    val targetContainerId = if (type.canonicalSlot() == SlotRole.CONTENT && contentContainer != null) {
+                                        contentContainer.id
+                                    } else {
+                                        rootScaffold.id
+                                    }
+                                    controller.addChildToContainer(
+                                        containerId = targetContainerId,
+                                        type = type
                                     )
-                                )
+                                } else {
+                                    val count = controller.state.project.nodes.size
+                                    controller.addNode(
+                                        type = type,
+                                        position = CanvasPosition(
+                                            x = 40f + count * 24f,
+                                            y = 40f + count * 24f
+                                        )
+                                    )
+                                }
                             }
+                        },
+                        modifier = Modifier.width(width = 240.dp),
+                        onCollapse = { showPalette = false }
+                    )
+                }
+
+                // Left Slim Expand Handle when Palette is collapsed
+                if (!showPalette) {
+                    Surface(
+                        onClick = { showPalette = true },
+                        modifier = Modifier.fillMaxHeight().width(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = "Expand Palette",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                    },
-                    modifier = Modifier.width(width = 240.dp)
-                )
+                    }
+                    VerticalDivider()
+                }
+
                 Box(modifier = Modifier.weight(weight = 1f)) {
                     CanvasScreen(controller = controller)
                 }
+
                 if (showCodeExport) {
                     VerticalDivider()
                     Box(modifier = Modifier.width(440.dp)) {
@@ -328,19 +401,137 @@ fun App(repository: ProjectRepository) {
                         )
                     }
                 }
-                VerticalDivider()
-                Column(modifier = Modifier.width(width = 280.dp)) {
-                    LayersPanel(
-                        controller = controller,
-                        modifier = Modifier.weight(weight = 1f)
-                    )
-                    HorizontalDivider()
-                    PropertiesPanel(
-                        controller = controller,
-                        modifier = Modifier.weight(weight = 1f)
-                    )
+
+                // Right Slim Expand Handle when Inspector is collapsed
+                if (!showInspector) {
+                    VerticalDivider()
+                    Surface(
+                        onClick = { showInspector = true },
+                        modifier = Modifier.fillMaxHeight().width(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+                                contentDescription = "Expand Inspector",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Collapsible Inspector (Layers + Properties)
+                AnimatedVisibility(
+                    visible = showInspector,
+                    enter = expandHorizontally() + fadeIn(),
+                    exit = shrinkHorizontally() + fadeOut()
+                ) {
+                    Row(modifier = Modifier.fillMaxHeight()) {
+                        VerticalDivider()
+                        Column(modifier = Modifier.width(width = 280.dp).fillMaxHeight()) {
+                            // Inspector Top Header Bar with collapse icon
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Inspector",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    IconButton(
+                                        onClick = { showInspector = false },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                            contentDescription = "Collapse Inspector",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                            HorizontalDivider()
+
+                            // Layers and Properties collapsible sections
+                            if (layersExpanded && propertiesExpanded) {
+                                LayersPanel(
+                                    controller = controller,
+                                    modifier = Modifier.weight(weight = 1f),
+                                    isExpanded = true,
+                                    onToggleExpand = { layersExpanded = false }
+                                )
+                                HorizontalDivider()
+                                PropertiesPanel(
+                                    controller = controller,
+                                    modifier = Modifier.weight(weight = 1f),
+                                    isExpanded = true,
+                                    onToggleExpand = { propertiesExpanded = false }
+                                )
+                            } else if (layersExpanded && !propertiesExpanded) {
+                                LayersPanel(
+                                    controller = controller,
+                                    modifier = Modifier.weight(weight = 1f),
+                                    isExpanded = true,
+                                    onToggleExpand = { layersExpanded = false }
+                                )
+                                HorizontalDivider()
+                                PropertiesPanel(
+                                    controller = controller,
+                                    modifier = Modifier.wrapContentHeight(),
+                                    isExpanded = false,
+                                    onToggleExpand = { propertiesExpanded = true }
+                                )
+                            } else if (!layersExpanded && propertiesExpanded) {
+                                LayersPanel(
+                                    controller = controller,
+                                    modifier = Modifier.wrapContentHeight(),
+                                    isExpanded = false,
+                                    onToggleExpand = { layersExpanded = true }
+                                )
+                                HorizontalDivider()
+                                PropertiesPanel(
+                                    controller = controller,
+                                    modifier = Modifier.weight(weight = 1f),
+                                    isExpanded = true,
+                                    onToggleExpand = { propertiesExpanded = false }
+                                )
+                            } else {
+                                LayersPanel(
+                                    controller = controller,
+                                    modifier = Modifier.wrapContentHeight(),
+                                    isExpanded = false,
+                                    onToggleExpand = { layersExpanded = true }
+                                )
+                                HorizontalDivider()
+                                PropertiesPanel(
+                                    controller = controller,
+                                    modifier = Modifier.wrapContentHeight(),
+                                    isExpanded = false,
+                                    onToggleExpand = { propertiesExpanded = true }
+                                )
+                                Box(modifier = Modifier.weight(weight = 1f))
+                            }
+                        }
+                    }
                 }
             }
+        }
+
+        if (showHistoryDialog) {
+            HistoryDialog(
+                controller = controller,
+                onDismissRequest = { showHistoryDialog = false }
+            )
         }
 
         if (errorMessage != null) {
@@ -392,28 +583,44 @@ fun App(repository: ProjectRepository) {
 private fun TopBar(
     canUndo: Boolean,
     canRedo: Boolean,
+    undoCount: Int = 0,
+    redoCount: Int = 0,
     hasSelection: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onOpenHistory: () -> Unit,
     onDelete: () -> Unit,
     onSave: () -> Unit,
     onLoad: () -> Unit,
     isOperating: Boolean = false,
     statusMessage: String,
+    showPalette: Boolean,
+    onTogglePalette: () -> Unit,
+    showInspector: Boolean,
+    onToggleInspector: () -> Unit,
     showCodeExport: Boolean,
     onToggleCodeExport: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp),
+            .padding(start = 12.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(
+            onClick = onTogglePalette
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ViewSidebar,
+                contentDescription = if (showPalette) "Hide Palette (Ctrl+[)" else "Show Palette (Ctrl+[)",
+                tint = if (showPalette) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Text(
             text = "M3E Canvas",
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
         )
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         IconButton(
             onClick = onUndo,
             enabled = canUndo
@@ -431,6 +638,31 @@ private fun TopBar(
                 imageVector = Icons.AutoMirrored.Outlined.Redo,
                 contentDescription = "Redo (Ctrl+Shift+Z)"
             )
+        }
+        IconButton(
+            onClick = onOpenHistory
+        ) {
+            val total = undoCount + redoCount
+            if (total > 0) {
+                BadgedBox(
+                    badge = {
+                        Badge {
+                            Text("$undoCount")
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.History,
+                        contentDescription = "History Timeline (Ctrl+H)"
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.History,
+                    contentDescription = "History Timeline (Ctrl+H)",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         IconButton(
             onClick = onDelete,
@@ -477,6 +709,16 @@ private fun TopBar(
         TextButton(onClick = onSave, enabled = !isOperating) {
             Icon(imageVector = Icons.Outlined.Save, contentDescription = "Save")
             Text(text = "Save", modifier = Modifier.padding(start = 6.dp))
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        IconButton(
+            onClick = onToggleInspector
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Tune,
+                contentDescription = if (showInspector) "Hide Inspector (Ctrl+])" else "Show Inspector (Ctrl+])",
+                tint = if (showInspector) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

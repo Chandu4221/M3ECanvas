@@ -7,14 +7,19 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,62 +35,102 @@ import dev.chandradsl.m3ecanvas.editor.state.EditorController
 /**
  * The layers panel. Shows the node tree with indentation, allows selecting
  * any node by click, and exposes reorder/delete actions on the selected row.
+ * Supports collapsing into a compact header row.
  */
 @Composable
 fun LayersPanel(
     controller: EditorController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean = true,
+    onToggleExpand: (() -> Unit)? = null
 ) {
     val nodes = controller.state.project.nodes
+    val allNodesCount = controller.state.project.allNodes().size
 
-    LazyColumn(modifier = modifier.fillMaxHeight()) {
-        item(key = "layers_header") {
-            Text(
-                text = "Layers",
-                style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-            )
-            HorizontalDivider()
-        }
-        item(key = "project_root_row") {
-            val isProjectSelected = controller.state.selectedNodeIds.isEmpty()
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = onToggleExpand != null) { onToggleExpand?.invoke() }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        if (isProjectSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                        else Color.Transparent
-                    )
-                    .clickable { controller.clearSelection() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Smartphone,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = if (isProjectSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 Text(
-                    text = "Project (${controller.state.project.deviceProfile.displayName})",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = if (isProjectSelected) FontWeight.Bold else FontWeight.Medium
-                    ),
-                    color = if (isProjectSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                    text = "Layers",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ) {
+                    Text(
+                        text = "$allNodesCount",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                    )
+                }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            if (onToggleExpand != null) {
+                IconButton(
+                    onClick = onToggleExpand,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse Layers" else "Expand Layers",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
-        items(
-            items = flattenNodes(nodes = nodes),
-            key = { it.first.id }
-        ) { (node, depth) ->
-            LayerRow(node = node, depth = depth, controller = controller)
+        HorizontalDivider()
+
+        if (isExpanded) {
+            LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                item(key = "project_root_row") {
+                    val isProjectSelected = controller.state.selectedNodeIds.isEmpty()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isProjectSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                else Color.Transparent
+                            )
+                            .clickable { controller.clearSelection() }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Smartphone,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isProjectSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Project (${controller.state.project.deviceProfile.displayName})",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = if (isProjectSelected) FontWeight.Bold else FontWeight.Medium
+                            ),
+                            color = if (isProjectSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                }
+                items(
+                    items = flattenNodes(nodes = nodes),
+                    key = { it.first.id }
+                ) { (node, depth) ->
+                    LayerRow(node = node, depth = depth, controller = controller)
+                }
+            }
         }
     }
 }

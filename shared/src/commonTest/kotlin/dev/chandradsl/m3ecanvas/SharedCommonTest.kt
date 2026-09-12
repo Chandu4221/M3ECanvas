@@ -16,6 +16,7 @@ import dev.chandradsl.m3ecanvas.editor.canvas.SnapResult
 import dev.chandradsl.m3ecanvas.editor.codegen.ProjectCodeExporter
 import dev.chandradsl.m3ecanvas.editor.inspector.ContrastCalculator
 import dev.chandradsl.m3ecanvas.editor.inspector.ContrastLevel
+import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
 import dev.chandradsl.m3ecanvas.editor.persistence.AutosaveManager
 import dev.chandradsl.m3ecanvas.editor.persistence.LoadResult
 import dev.chandradsl.m3ecanvas.util.AppLogger
@@ -1538,5 +1539,93 @@ class SharedCommonTest {
         // Clear selection (Project level)
         controller.clearSelection()
         assertTrue(controller.state.selectedNodeIds.isEmpty())
+    }
+
+    @Test
+    fun testHistoryStackMultiStepUndoRedo() {
+        val stack = HistoryStack<String>(maxDepth = 10)
+        assertFalse(stack.canUndo)
+        assertFalse(stack.canRedo)
+        assertEquals(0, stack.getUndoList().size)
+        assertEquals(0, stack.getRedoList().size)
+
+        stack.push("State 1")
+        stack.push("State 2")
+        stack.push("State 3")
+
+        assertTrue(stack.canUndo)
+        assertFalse(stack.canRedo)
+        assertEquals(3, stack.getUndoList().size)
+        assertEquals(listOf("State 1", "State 2", "State 3"), stack.getUndoList())
+
+        // Multi-step undo by 2 steps from "State 4" (active)
+        val afterUndo = stack.undoSteps(steps = 2, currentState = "State 4")
+        assertEquals("State 2", afterUndo)
+        assertEquals(1, stack.getUndoList().size)
+        assertEquals(2, stack.getRedoList().size)
+        assertEquals(listOf("State 3", "State 4"), stack.getRedoList())
+
+        // Multi-step redo by 1 step from "State 2" (active)
+        val afterRedo = stack.redoSteps(steps = 1, currentState = "State 2")
+        assertEquals("State 3", afterRedo)
+        assertEquals(2, stack.getUndoList().size)
+        assertEquals(1, stack.getRedoList().size)
+        assertEquals(listOf("State 4"), stack.getRedoList())
+    }
+
+    @Test
+    fun testEditorControllerHistoryTimelineAndCounts() {
+        val project = EditorController.newProject(name = "TimelineTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+
+        assertEquals(0, controller.state.undoCount)
+        assertEquals(0, controller.state.redoCount)
+        assertFalse(controller.state.canUndo)
+        assertFalse(controller.state.canRedo)
+
+        // Action 1: Add a button
+        controller.addNode(ComponentType.BUTTON, CanvasPosition(100f, 100f))
+        assertEquals(1, controller.state.undoCount)
+        assertEquals(0, controller.state.redoCount)
+        assertTrue(controller.state.canUndo)
+        assertFalse(controller.state.canRedo)
+        assertEquals(1, controller.getUndoSnapshots().size)
+
+        // Action 2: Add a card
+        controller.addNode(ComponentType.CARD, CanvasPosition(200f, 200f))
+        assertEquals(2, controller.state.undoCount)
+        assertEquals(0, controller.state.redoCount)
+        assertEquals(2, controller.getUndoSnapshots().size)
+
+        // Undo 1 step
+        controller.undo()
+        assertEquals(1, controller.state.undoCount)
+        assertEquals(1, controller.state.redoCount)
+        assertTrue(controller.state.canUndo)
+        assertTrue(controller.state.canRedo)
+        assertEquals(1, controller.getRedoSnapshots().size)
+
+        // Multi-step jump via undoSteps
+        controller.undoSteps(1)
+        assertEquals(0, controller.state.undoCount)
+        assertEquals(2, controller.state.redoCount)
+        assertFalse(controller.state.canUndo)
+        assertTrue(controller.state.canRedo)
+
+        // Multi-step jump via redoSteps
+        controller.redoSteps(2)
+        assertEquals(2, controller.state.undoCount)
+        assertEquals(0, controller.state.redoCount)
+        assertTrue(controller.state.canUndo)
+        assertFalse(controller.state.canRedo)
+
+        // Clear history
+        controller.clearHistory()
+        assertEquals(0, controller.state.undoCount)
+        assertEquals(0, controller.state.redoCount)
+        assertFalse(controller.state.canUndo)
+        assertFalse(controller.state.canRedo)
+        assertTrue(controller.getUndoSnapshots().isEmpty())
+        assertTrue(controller.getRedoSnapshots().isEmpty())
     }
 }

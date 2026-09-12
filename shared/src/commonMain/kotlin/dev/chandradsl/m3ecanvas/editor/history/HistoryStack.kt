@@ -61,6 +61,46 @@ class HistoryStack<T>(
         return nextState
     }
 
+    /** Returns a snapshot list of states currently available on the undo stack (oldest first). */
+    fun getUndoList(): List<T> = undoStack.toList()
+
+    /** Returns a snapshot list of states currently available on the redo stack (next redo first). */
+    fun getRedoList(): List<T> = redoStack.toList().reversed()
+
+    /**
+     * Undoes [steps] operations in sequence.
+     * Returns the target state reached, or null if [steps] <= 0 or undo stack is empty.
+     */
+    fun undoSteps(steps: Int, currentState: T): T? {
+        if (steps <= 0 || undoStack.isEmpty()) return null
+        var current = currentState
+        var result: T? = null
+        val count = minOf(steps, undoStack.size)
+        for (i in 0 until count) {
+            val prev = undo(current) ?: break
+            current = prev
+            result = prev
+        }
+        return result
+    }
+
+    /**
+     * Redoes [steps] operations in sequence.
+     * Returns the target state reached, or null if [steps] <= 0 or redo stack is empty.
+     */
+    fun redoSteps(steps: Int, currentState: T): T? {
+        if (steps <= 0 || redoStack.isEmpty()) return null
+        var current = currentState
+        var result: T? = null
+        val count = minOf(steps, redoStack.size)
+        for (i in 0 until count) {
+            val next = redo(current) ?: break
+            current = next
+            result = next
+        }
+        return result
+    }
+
     /**
      * Clears both undo and redo histories.
      */

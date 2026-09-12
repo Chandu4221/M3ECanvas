@@ -18,6 +18,8 @@ data class EditorState(
     val viewport: ViewportState = ViewportState(),
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
+    val undoCount: Int = 0,
+    val redoCount: Int = 0,
     val clipboard: CanvasNode? = null,
     val alignmentGuides: List<AlignmentGuide> = emptyList(),
     val multiDevicePreview: Boolean = false

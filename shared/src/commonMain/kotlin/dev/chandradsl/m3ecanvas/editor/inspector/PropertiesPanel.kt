@@ -4,6 +4,7 @@ package dev.chandradsl.m3ecanvas.editor.inspector
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,6 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,49 +33,80 @@ import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
  * The inspector panel. Shows project-level settings when nothing is
  * selected, editable properties for a single selected node, or group actions
  * when multiple nodes are selected.
+ * Supports collapsing into a compact header row.
  */
 @Composable
 fun PropertiesPanel(
     controller: EditorController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean = true,
+    onToggleExpand: (() -> Unit)? = null
 ) {
     val selectedNodes = controller.state.selectedNodes
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(state = rememberScrollState())
-            .padding(all = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(space = 12.dp)
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = onToggleExpand != null) { onToggleExpand?.invoke() }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Properties",
-                style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.Bold
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Properties",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
-            )
-            if (selectedNodes.isNotEmpty()) {
-                TextButton(
-                    onClick = { controller.clearSelection() },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                if (selectedNodes.isNotEmpty()) {
+                    TextButton(
+                        onClick = { controller.clearSelection() },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.height(26.dp)
+                    ) {
+                        Text(
+                            text = "Project",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    }
+                }
+            }
+            if (onToggleExpand != null) {
+                IconButton(
+                    onClick = onToggleExpand,
+                    modifier = Modifier.size(24.dp)
                 ) {
-                    Text(
-                        text = "Project",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse Properties" else "Expand Properties",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
         HorizontalDivider()
-        when {
-            selectedNodes.isEmpty() -> ProjectSection(controller = controller)
-            selectedNodes.size == 1 -> NodeSection(node = selectedNodes.first(), controller = controller)
-            else -> MultiSelectSection(selectedNodes = selectedNodes, controller = controller)
+
+        if (isExpanded) {
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .fillMaxWidth()
+                    .verticalScroll(state = rememberScrollState())
+                    .padding(all = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(space = 12.dp)
+            ) {
+                when {
+                    selectedNodes.isEmpty() -> ProjectSection(controller = controller)
+                    selectedNodes.size == 1 -> NodeSection(node = selectedNodes.first(), controller = controller)
+                    else -> MultiSelectSection(selectedNodes = selectedNodes, controller = controller)
+                }
+            }
         }
     }
 }

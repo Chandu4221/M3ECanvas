@@ -63,6 +63,12 @@ class EditorController(
     val canRedo: Boolean
         get() = history.canRedo
 
+    val undoCount: Int
+        get() = history.undoCount
+
+    val redoCount: Int
+        get() = history.redoCount
+
     private fun pushState() {
         history.push(state.project)
     }
@@ -75,7 +81,9 @@ class EditorController(
             project = newProject,
             selectedNodeIds = selectedNodeIds,
             canUndo = history.canUndo,
-            canRedo = history.canRedo
+            canRedo = history.canRedo,
+            undoCount = history.undoCount,
+            redoCount = history.redoCount
         )
     }
 
@@ -90,7 +98,9 @@ class EditorController(
             project = restoredProject,
             selectedNodeIds = validSelections,
             canUndo = history.canUndo,
-            canRedo = history.canRedo
+            canRedo = history.canRedo,
+            undoCount = history.undoCount,
+            redoCount = history.redoCount
         )
     }
 
@@ -103,7 +113,52 @@ class EditorController(
             project = restoredProject,
             selectedNodeIds = validSelections,
             canUndo = history.canUndo,
-            canRedo = history.canRedo
+            canRedo = history.canRedo,
+            undoCount = history.undoCount,
+            redoCount = history.redoCount
+        )
+    }
+
+    fun getUndoSnapshots(): List<M3EProject> = history.getUndoList()
+    fun getRedoSnapshots(): List<M3EProject> = history.getRedoList()
+
+    fun undoSteps(steps: Int) {
+        val previous = history.undoSteps(steps, state.project) ?: return
+        val currentDevice = state.project.deviceProfile
+        val restoredProject = adaptProjectToDevice(previous, currentDevice)
+        val validSelections = state.selectedNodeIds.filter { restoredProject.findNode(it) != null }.toSet()
+        state = state.copy(
+            project = restoredProject,
+            selectedNodeIds = validSelections,
+            canUndo = history.canUndo,
+            canRedo = history.canRedo,
+            undoCount = history.undoCount,
+            redoCount = history.redoCount
+        )
+    }
+
+    fun redoSteps(steps: Int) {
+        val next = history.redoSteps(steps, state.project) ?: return
+        val currentDevice = state.project.deviceProfile
+        val restoredProject = adaptProjectToDevice(next, currentDevice)
+        val validSelections = state.selectedNodeIds.filter { restoredProject.findNode(it) != null }.toSet()
+        state = state.copy(
+            project = restoredProject,
+            selectedNodeIds = validSelections,
+            canUndo = history.canUndo,
+            canRedo = history.canRedo,
+            undoCount = history.undoCount,
+            redoCount = history.redoCount
+        )
+    }
+
+    fun clearHistory() {
+        history.clear()
+        state = state.copy(
+            canUndo = false,
+            canRedo = false,
+            undoCount = 0,
+            redoCount = 0
         )
     }
 
@@ -624,7 +679,9 @@ class EditorController(
             drag = null,
             viewport = ViewportState(),
             canUndo = false,
-            canRedo = false
+            canRedo = false,
+            undoCount = 0,
+            redoCount = 0
         )
     }
 
