@@ -506,6 +506,13 @@ private fun SlotContainer(
             .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
+        if (!child.type.isContainer && child.children.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
+            )
+        }
     }
 }
 
@@ -568,6 +575,13 @@ private fun ContainerChild(
             .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
+        if (!child.type.isContainer && child.children.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
+            )
+        }
     }
 }
 
@@ -580,7 +594,8 @@ internal fun Modifier.selectOnPress(
     val focusManager = LocalFocusManager.current
     return this.pointerInput(nodeId) {
         awaitEachGesture {
-            awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+            val down = awaitFirstDown(pass = PointerEventPass.Main, requireUnconsumed = true)
+            down.consume()
             focusManager.clearFocus()
             val isMulti = currentEvent.keyboardModifiers.isShiftPressed ||
                     currentEvent.keyboardModifiers.isCtrlPressed ||

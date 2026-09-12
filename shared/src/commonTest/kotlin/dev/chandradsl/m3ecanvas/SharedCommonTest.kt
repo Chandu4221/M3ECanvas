@@ -1484,4 +1484,59 @@ class SharedCommonTest {
         tempDir.deleteRecursively()
         Unit
     }
+
+    @Test
+    fun testAllNodesTreeFlattening() {
+        val project = EditorController.newProject(name = "FlattenTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+
+        // Scaffold + topBar + Screen Content Column
+        val initialNodes = controller.state.project.allNodes()
+        assertEquals(3, initialNodes.size, "Scaffold, topBar, and contentColumn should make 3 nodes")
+
+        // Add Button into Screen Content Column
+        val column = controller.state.project.allNodes().first { it.type == ComponentType.COLUMN }
+        controller.addChildToContainer(containerId = column.id, type = ComponentType.BUTTON)
+
+        val updatedNodes = controller.state.project.allNodes()
+        assertEquals(4, updatedNodes.size, "Should now contain 4 nodes including the button")
+        assertTrue(updatedNodes.any { it.type == ComponentType.BUTTON }, "Button should be in allNodes()")
+    }
+
+    @Test
+    fun testSelectionStateBehavior() {
+        val project = EditorController.newProject(name = "SelectionTest", withDefaultScaffold = true)
+        val controller = EditorController(initialProject = project)
+        val allNodes = controller.state.project.allNodes()
+        val scaffold = allNodes.first { it.type == ComponentType.SCAFFOLD }
+        val column = allNodes.first { it.type == ComponentType.COLUMN }
+
+        // Initial state has no selection (project level)
+        assertTrue(controller.state.selectedNodeIds.isEmpty())
+        assertFalse(controller.state.isNodeSelected(column.id))
+
+        // Select column (Screen Content)
+        controller.selectNode(column.id)
+        assertEquals(setOf(column.id), controller.state.selectedNodeIds)
+        assertTrue(controller.state.isNodeSelected(column.id))
+        assertFalse(controller.state.isNodeSelected(scaffold.id))
+
+        // Select scaffold
+        controller.selectNode(scaffold.id)
+        assertEquals(setOf(scaffold.id), controller.state.selectedNodeIds)
+        assertTrue(controller.state.isNodeSelected(scaffold.id))
+        assertFalse(controller.state.isNodeSelected(column.id))
+
+        // Toggle multi-selection (Shift/Ctrl-click)
+        controller.toggleSelectNode(column.id)
+        assertEquals(setOf(scaffold.id, column.id), controller.state.selectedNodeIds)
+
+        // Toggle again to deselect scaffold
+        controller.toggleSelectNode(scaffold.id)
+        assertEquals(setOf(column.id), controller.state.selectedNodeIds)
+
+        // Clear selection (Project level)
+        controller.clearSelection()
+        assertTrue(controller.state.selectedNodeIds.isEmpty())
+    }
 }

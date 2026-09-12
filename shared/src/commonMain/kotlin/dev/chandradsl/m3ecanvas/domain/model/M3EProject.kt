@@ -55,6 +55,11 @@ data class M3EProject(
         return null
     }
 
+    /** Returns a flat list of all nodes across every tree in this project. */
+    fun allNodes(): List<CanvasNode> {
+        return nodes.flatMap { it.allNodes() }
+    }
+
     /** Returns a copy with the given node added at the top level. */
     fun withNode(node: CanvasNode): M3EProject {
         return copy(nodes = nodes + node)

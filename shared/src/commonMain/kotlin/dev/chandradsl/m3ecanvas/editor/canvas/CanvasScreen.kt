@@ -6,6 +6,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -105,6 +106,11 @@ fun CanvasScreen(controller: EditorController) {
                 .pointerInput(Unit) {
                     detectDragGestures { _, dragAmount ->
                         controller.pan(dragAmount.x, dragAmount.y)
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        controller.clearSelection()
                     }
                 }
                 .pointerInput(Unit) {
@@ -217,7 +223,13 @@ fun CanvasScreen(controller: EditorController) {
                                         .fillMaxWidth()
                                         .pointerInput(Unit) {
                                             awaitEachGesture {
-                                                val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                                                val down = awaitFirstDown(pass = PointerEventPass.Main, requireUnconsumed = false)
+                                                if (down.isConsumed) {
+                                                    // Node or container was clicked and handled selection!
+                                                    // Do not intercept or clear selection!
+                                                    return@awaitEachGesture
+                                                }
+
                                                 val isModifier = currentEvent.keyboardModifiers.isShiftPressed ||
                                                         currentEvent.keyboardModifiers.isCtrlPressed ||
                                                         currentEvent.keyboardModifiers.isMetaPressed
@@ -227,7 +239,7 @@ fun CanvasScreen(controller: EditorController) {
                                                 marqueeCurrent = current
 
                                                 while (true) {
-                                                    val event = awaitPointerEvent()
+                                                    val event = awaitPointerEvent(pass = PointerEventPass.Main)
                                                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                                     if (change.changedToUp()) {
                                                         change.consume()
@@ -250,7 +262,7 @@ fun CanvasScreen(controller: EditorController) {
                                                         bottom = max(finalStart.y, finalCurrent.y)
                                                     )
                                                     if (rect.width > 5f || rect.height > 5f) {
-                                                        val hits = state.project.nodes.filter { node ->
+                                                        val hits = state.project.allNodes().filter { node ->
                                                             if (node.type == ComponentType.SCAFFOLD) return@filter false
                                                             val leftPx = with(density) { node.position.x.dp.toPx() }
                                                             val topPx = with(density) { node.position.y.dp.toPx() }
@@ -754,5 +766,12 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
             )
     ) {
         CanvasNodeRenderer(node = node, controller = controller)
+        if (!node.type.isContainer && node.children.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .selectOnPress(nodeId = node.id, controller = controller, focusRequester = focusRequester)
+            )
+        }
     }
 }

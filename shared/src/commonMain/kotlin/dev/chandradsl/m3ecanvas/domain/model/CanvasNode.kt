@@ -169,6 +169,17 @@ data class CanvasNode(
         return copy(children = updatedChildren)
     }
 
+    /** Returns a flat list containing this node and all of its recursive descendants. */
+    fun allNodes(): List<CanvasNode> {
+        val list = mutableListOf<CanvasNode>()
+        fun traverse(n: CanvasNode) {
+            list.add(n)
+            n.children.forEach { traverse(it) }
+        }
+        traverse(this)
+        return list
+    }
+
     //endregion
 
     //region Modifier chain
