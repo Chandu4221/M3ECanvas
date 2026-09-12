@@ -188,6 +188,106 @@ enum class ComponentType(
     }
 
     /**
+     * Returns true if this container component type can legally accept [childType]
+     * according to Material 3 guidelines and Compose layout constraints.
+     */
+    fun canAcceptChild(childType: ComponentType): Boolean {
+        if (!this.isContainer) return false
+
+        return when (this) {
+            SCAFFOLD -> when (childType) {
+                // Scaffold cannot be nested inside another Scaffold
+                SCAFFOLD -> false
+                // Dedicated structural slots
+                TOP_APP_BAR, NAVIGATION_BAR, BOTTOM_APP_BAR,
+                NAVIGATION_RAIL, NAVIGATION_DRAWER,
+                FAB, EXTENDED_FAB, SNACKBAR -> true
+                // Dialog is an overlay window, not in-flow content
+                DIALOG -> false
+                else -> true
+            }
+
+            TOP_APP_BAR -> when (childType) {
+                TEXT, ICON, ICON_BUTTON -> true
+                else -> false
+            }
+
+            LISTS -> when (childType) {
+                TEXT, ICON, IMAGE, ICON_BUTTON,
+                CHECKBOX, SWITCH, RADIO_BUTTON, BADGE -> true
+                else -> false
+            }
+
+            DIALOG -> when (childType) {
+                // Dialog header / icon / title / action buttons / content layouts
+                ICON, IMAGE, TEXT, BUTTON, ICON_BUTTON,
+                COLUMN, ROW, BOX -> true
+                else -> false
+            }
+
+            CARD, SURFACE -> when (childType) {
+                // Cannot contain screen-level scaffold or structural scaffold slots
+                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
+                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR,
+                DIALOG, SHEETS -> false
+                else -> true
+            }
+
+            SHEETS -> when (childType) {
+                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
+                NAVIGATION_RAIL, NAVIGATION_DRAWER, DIALOG, SHEETS, SNACKBAR -> false
+                else -> true
+            }
+
+            COLUMN, ROW, BOX, FLOW_ROW, FLOW_COLUMN -> when (childType) {
+                // Cannot contain screen-level scaffold or structural scaffold slots or dialog overlay
+                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
+                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR, DIALOG -> false
+                else -> true
+            }
+
+            LAZY_COLUMN, LAZY_VERTICAL_GRID -> when (childType) {
+                // Compose constraint: Cannot nest vertical lazy layout inside vertical lazy layout (infinite height exception)
+                LAZY_COLUMN, LAZY_VERTICAL_GRID -> false
+                // Cannot contain scaffold, structural slots, or dialog
+                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
+                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR, DIALOG -> false
+                else -> true
+            }
+
+            LAZY_ROW -> when (childType) {
+                // Compose constraint: Cannot nest horizontal lazy layout inside horizontal lazy layout (infinite width exception)
+                LAZY_ROW -> false
+                // Cannot contain scaffold, structural slots, or dialog
+                SCAFFOLD, TOP_APP_BAR, BOTTOM_APP_BAR, NAVIGATION_BAR,
+                NAVIGATION_RAIL, NAVIGATION_DRAWER, SNACKBAR, DIALOG -> false
+                else -> true
+            }
+
+            else -> false
+        }
+    }
+
+    /**
+     * Returns true if this component can be placed as a child of [parentType].
+     */
+    fun canBeChildOf(parentType: ComponentType): Boolean {
+        return parentType.canAcceptChild(this)
+    }
+
+    /**
+     * Determines whether this component type can exist as a top-level root node in the project.
+     * When [hasScaffold] is true, another Scaffold cannot be added at root.
+     */
+    fun isAllowedAtRoot(hasScaffold: Boolean): Boolean {
+        return if (hasScaffold) {
+            this != SCAFFOLD
+        } else {
+            true
+        }
+    }
+
+    /**
      * Returns the valid slots this component type is semantically allowed to occupy inside [parentType].
      * If this returns a list with 1 or 0 elements, no slot selection dropdown should be shown.
      */
@@ -202,30 +302,32 @@ enum class ComponentType(
                 NAVIGATION_DRAWER -> listOf(SlotRole.DRAWER)
                 FAB, EXTENDED_FAB -> listOf(SlotRole.FAB)
                 SNACKBAR -> listOf(SlotRole.SNACKBAR)
-                else -> listOf(SlotRole.CONTENT)
+                else -> if (parentType.canAcceptChild(this)) listOf(SlotRole.CONTENT) else emptyList()
             }
             TOP_APP_BAR -> when (this) {
                 ICON, ICON_BUTTON -> listOf(SlotRole.ACTIONS, SlotRole.NAVIGATION_ICON)
                 TEXT -> listOf(SlotRole.TITLE)
-                else -> listOf(SlotRole.ACTIONS)
+                else -> emptyList()
             }
             LISTS -> when (this) {
                 ICON, IMAGE -> listOf(SlotRole.LEADING, SlotRole.TRAILING)
                 CHECKBOX, SWITCH, RADIO_BUTTON, ICON_BUTTON -> listOf(SlotRole.TRAILING, SlotRole.LEADING)
                 TEXT -> listOf(SlotRole.HEADLINE, SlotRole.SUPPORTING, SlotRole.OVERLINE, SlotRole.TRAILING)
-                else -> listOf(SlotRole.LEADING, SlotRole.TRAILING, SlotRole.HEADLINE, SlotRole.SUPPORTING)
+                BADGE -> listOf(SlotRole.TRAILING)
+                else -> emptyList()
             }
             DIALOG -> when (this) {
                 BUTTON -> listOf(SlotRole.CONFIRM_BUTTON, SlotRole.DISMISS_BUTTON)
                 ICON, IMAGE -> listOf(SlotRole.ICON)
                 TEXT -> listOf(SlotRole.TITLE, SlotRole.CONTENT, SlotRole.SUPPORTING)
-                else -> listOf(SlotRole.CONTENT)
+                COLUMN, ROW, BOX -> listOf(SlotRole.CONTENT)
+                else -> emptyList()
             }
             TEXT_FIELD -> when (this) {
                 ICON, ICON_BUTTON -> listOf(SlotRole.LEADING, SlotRole.TRAILING)
-                else -> listOf(SlotRole.CONTENT)
+                else -> emptyList()
             }
-            else -> listOf(SlotRole.CONTENT)
+            else -> if (parentType.canAcceptChild(this)) listOf(SlotRole.CONTENT) else emptyList()
         }
     }
 }

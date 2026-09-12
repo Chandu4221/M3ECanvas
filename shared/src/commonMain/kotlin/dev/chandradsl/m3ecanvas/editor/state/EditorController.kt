@@ -180,65 +180,36 @@ class EditorController(
     fun paste(sourceNode: CanvasNode? = null): CanvasNode? {
         val nodeToPaste = sourceNode ?: state.clipboard ?: return null
         val clone = nodeToPaste.deepCloneWithNewIds(offsetPosition = true)
-        pushState()
+        val hasScaffold = state.project.nodes.any { it.type == ComponentType.SCAFFOLD }
 
-        val selected = state.selectedNodes.firstOrNull()
-        val updatedProject = when {
-            // 1. If currently selected node is a container
-            selected != null && selected.isContainer -> {
-                if (selected.type == ComponentType.SCAFFOLD) {
-                    val slot = clone.type.canonicalSlot()
-                    if (slot != SlotRole.CONTENT) {
-                        state.project.updateNode(selected.withChildInSlot(clone, slot))
-                    } else {
-                        val content = selected.children.firstOrNull { it.slot == SlotRole.CONTENT && it.isContainer }
-                        if (content != null) {
-                            state.project.updateNode(content.withChild(clone))
-                        } else {
-                            state.project.updateNode(selected.withChild(clone))
-                        }
-                    }
-                } else {
-                    state.project.updateNode(selected.withChild(clone))
-                }
-            }
-            // 2. If selected node has a parent container, insert as sibling
-            selected != null -> {
-                val parent = findParent(selected.id)
-                if (parent != null) {
-                    val index = parent.children.indexOfFirst { it.id == selected.id }
-                    val updatedChildren = parent.children.toMutableList().apply {
-                        if (index >= 0) add(index + 1, clone) else add(clone)
-                    }
-                    state.project.updateNode(parent.copy(children = updatedChildren))
-                } else if (state.project.nodes.any { it.type == ComponentType.SCAFFOLD }) {
-                    val scaffold = state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
-                    val content = scaffold.children.firstOrNull { it.slot == SlotRole.CONTENT && it.isContainer }
-                    if (content != null) {
-                        state.project.updateNode(content.withChild(clone))
-                    } else {
-                        state.project.updateNode(scaffold.withChild(clone))
-                    }
-                } else {
-                    state.project.withNode(clone)
-                }
-            }
-            // 3. If root has a Scaffold with Content container, paste into content
-            state.project.nodes.any { it.type == ComponentType.SCAFFOLD } -> {
-                val scaffold = state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
-                val content = scaffold.children.firstOrNull { it.slot == SlotRole.CONTENT && it.isContainer }
-                if (content != null) {
-                    state.project.updateNode(content.withChild(clone))
-                } else {
-                    state.project.updateNode(scaffold.withChild(clone))
-                }
-            }
-            // 4. Fallback: add to root
-            else -> {
-                state.project.withNode(clone)
-            }
+        // Reject pasting a second Scaffold if one already exists
+        if (clone.type == ComponentType.SCAFFOLD && hasScaffold) {
+            return null
         }
 
+        val selected = state.selectedNodes.firstOrNull()
+        val targetContainer = findValidTargetContainer(forType = clone.type, startingFromNodeId = selected?.id)
+
+        val updatedProject = if (targetContainer != null) {
+            val supported = targetContainer.type.supportedSlots()
+            val targetSlot = if (supported.isNotEmpty()) {
+                clone.type.canonicalSlotFor(targetContainer.type)
+            } else {
+                null
+            }
+            val positionedClone = clone.copy(slot = targetSlot)
+            if (targetSlot != null && !targetSlot.isMultiOccupant) {
+                state.project.updateNode(targetContainer.withChildInSlot(positionedClone, targetSlot))
+            } else {
+                state.project.updateNode(targetContainer.withChild(positionedClone))
+            }
+        } else if (clone.type.isAllowedAtRoot(hasScaffold)) {
+            state.project.withNode(clone)
+        } else {
+            return null
+        }
+
+        pushState()
         updateProject(updatedProject, selectedNodeIds = setOf(clone.id))
         return clone
     }
@@ -249,10 +220,20 @@ class EditorController(
     fun duplicateSelected(): CanvasNode? {
         val selected = state.selectedNodes.firstOrNull() ?: return null
         if (selected.isLockedInSlot) return null // Locked slots cannot be duplicated
+        if (selected.type == ComponentType.SCAFFOLD) return null // Scaffold cannot be duplicated
+        val parent = findParent(selected.id)
+        if (parent != null) {
+            if (!parent.type.canAcceptChild(selected.type)) return null
+            val slot = selected.slot
+            if (slot != null && !slot.isMultiOccupant) return null
+        } else {
+            val hasScaffold = state.project.nodes.any { it.type == ComponentType.SCAFFOLD }
+            if (!selected.type.isAllowedAtRoot(hasScaffold)) return null
+        }
+
         val clone = selected.deepCloneWithNewIds(offsetPosition = true)
         pushState()
 
-        val parent = findParent(selected.id)
         val updatedProject = if (parent != null) {
             val index = parent.children.indexOfFirst { it.id == selected.id }
             val updatedChildren = parent.children.toMutableList().apply {
@@ -306,8 +287,11 @@ class EditorController(
 
     //region Node editing
 
-    /** Adds a new top-level component of [type] at [position] and selects it. */
-    fun addNode(type: ComponentType, position: CanvasPosition) {
+    /** Adds a new top-level component of [type] at [position] and selects it. Returns true if added, false if rejected. */
+    fun addNode(type: ComponentType, position: CanvasPosition): Boolean {
+        val hasScaffold = state.project.nodes.any { it.type == ComponentType.SCAFFOLD }
+        if (!type.isAllowedAtRoot(hasScaffold)) return false
+
         val existingCount = state.project.nodes.count { it.type == type }
         val name = "${type.displayName} ${existingCount + 1}"
 
@@ -324,12 +308,58 @@ class EditorController(
             newProject = state.project.withNode(node = node),
             selectedNodeIds = setOf(node.id)
         )
+        return true
     }
 
-    /** Adds a new child of [type] inside the container with [containerId]. */
-    fun addChildToContainer(containerId: String, type: ComponentType) {
-        val container = state.project.findNode(nodeId = containerId) ?: return
-        if (!container.isContainer) return
+    /**
+     * Finds the nearest legal container for [forType], starting from [startingFromNodeId]
+     * (or the currently selected node) and walking up ancestor containers.
+     * If no ancestor accepts [forType], checks the Scaffold content container, or returns null.
+     */
+    fun findValidTargetContainer(forType: ComponentType, startingFromNodeId: String? = null): CanvasNode? {
+        val rootScaffold = state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+
+        // Scaffold structural slot components (TopAppBar, NavigationBar, BottomAppBar, Rail, Drawer, FAB, Snackbar)
+        // must bind directly to the root Scaffold if one exists.
+        if (rootScaffold != null && forType.canonicalSlot() != SlotRole.CONTENT) {
+            return if (rootScaffold.type.canAcceptChild(forType)) rootScaffold else null
+        }
+
+        val startId = startingFromNodeId ?: state.selectedNodeIds.firstOrNull()
+        var current = if (startId != null) state.project.findNode(startId) else null
+
+        // If the selected node itself is a container and accepts forType, use it
+        if (current != null && current.isContainer && current.type.canAcceptChild(forType)) {
+            return current
+        }
+
+        // Walk up ancestor containers
+        var ancestor = if (current != null) findParent(current.id) else null
+        while (ancestor != null) {
+            if (ancestor.isContainer && ancestor.type.canAcceptChild(forType)) {
+                return ancestor
+            }
+            ancestor = findParent(ancestor.id)
+        }
+
+        // If no ancestor accepts forType, check the Scaffold's main content container
+        if (rootScaffold != null && forType != ComponentType.SCAFFOLD) {
+            val contentContainer = rootScaffold.children.firstOrNull {
+                it.slot == SlotRole.CONTENT && it.isContainer && it.type.canAcceptChild(forType)
+            }
+            if (contentContainer != null) return contentContainer
+            if (rootScaffold.type.canAcceptChild(forType)) return rootScaffold
+        }
+
+        // Finally check any top-level container
+        return state.project.nodes.firstOrNull { it.isContainer && it.type.canAcceptChild(forType) }
+    }
+
+    /** Adds a new child of [type] inside the container with [containerId]. Returns true if successfully added, false if rejected. */
+    fun addChildToContainer(containerId: String, type: ComponentType): Boolean {
+        val container = state.project.findNode(nodeId = containerId) ?: return false
+        if (!container.isContainer) return false
+        if (!container.type.canAcceptChild(type)) return false
 
         val childCount = container.children.count { it.type == type }
         val name = "${type.displayName} ${childCount + 1}"
@@ -360,6 +390,7 @@ class EditorController(
             newProject = state.project.updateNode(node = updatedContainer),
             selectedNodeIds = setOf(child.id)
         )
+        return true
     }
 
     /** Sets the slot role for [nodeId], replacing single-occupant occupants if necessary. */
@@ -829,4 +860,110 @@ class EditorController(
             )
         }
     }
+
+    /**
+     * Scans the current project node tree and returns any violations of Material 3 hierarchy
+     * or Compose layout constraints.
+     */
+    fun validateHierarchy(): List<HierarchyViolation> {
+        val violations = mutableListOf<HierarchyViolation>()
+
+        // 1. Scaffold count check
+        if (state.project.nodes.count { it.type == ComponentType.SCAFFOLD } > 1) {
+            violations.add(
+                HierarchyViolation(
+                    nodeId = "",
+                    nodeName = "Scaffold",
+                    nodeType = ComponentType.SCAFFOLD,
+                    parentId = null,
+                    parentType = null,
+                    description = "Multiple Scaffold instances found at project root"
+                )
+            )
+        }
+
+        // 2. Recursively check nodes
+        fun checkNode(node: CanvasNode, parent: CanvasNode?) {
+            if (parent != null) {
+                if (!parent.type.canAcceptChild(node.type)) {
+                    violations.add(
+                        HierarchyViolation(
+                            nodeId = node.id,
+                            nodeName = node.name,
+                            nodeType = node.type,
+                            parentId = parent.id,
+                            parentType = parent.type,
+                            description = "${parent.type.displayName} cannot contain ${node.type.displayName}"
+                        )
+                    )
+                }
+                if (node.slot != null && !node.type.allowedSlotsIn(parent.type).contains(node.slot)) {
+                    violations.add(
+                        HierarchyViolation(
+                            nodeId = node.id,
+                            nodeName = node.name,
+                            nodeType = node.type,
+                            parentId = parent.id,
+                            parentType = parent.type,
+                            description = "Slot ${node.slot.displayName} is not allowed for ${node.type.displayName} in ${parent.type.displayName}"
+                        )
+                    )
+                }
+            } else {
+                val hasScaffold = state.project.nodes.any { it.type == ComponentType.SCAFFOLD }
+                if (!node.type.isAllowedAtRoot(hasScaffold = hasScaffold && node.type != ComponentType.SCAFFOLD)) {
+                    violations.add(
+                        HierarchyViolation(
+                            nodeId = node.id,
+                            nodeName = node.name,
+                            nodeType = node.type,
+                            parentId = null,
+                            parentType = null,
+                            description = "${node.type.displayName} is not allowed as a root component"
+                        )
+                    )
+                }
+            }
+
+            // Check duplicate single-occupant slots among direct children
+            val seenSingleOccupantSlots = mutableSetOf<SlotRole>()
+            for (child in node.children) {
+                if (child.slot != null && !child.slot.isMultiOccupant) {
+                    if (child.slot in seenSingleOccupantSlots) {
+                        violations.add(
+                            HierarchyViolation(
+                                nodeId = child.id,
+                                nodeName = child.name,
+                                nodeType = child.type,
+                                parentId = node.id,
+                                parentType = node.type,
+                                description = "Duplicate single-occupant slot ${child.slot.displayName} in ${node.type.displayName}"
+                            )
+                        )
+                    } else {
+                        seenSingleOccupantSlots.add(child.slot)
+                    }
+                }
+                checkNode(child, node)
+            }
+        }
+
+        for (root in state.project.nodes) {
+            checkNode(root, null)
+        }
+
+        return violations
+    }
 }
+
+/**
+ * Represents a violation of Material 3 hierarchy rules or Compose layout constraints.
+ */
+data class HierarchyViolation(
+    val nodeId: String,
+    val nodeName: String,
+    val nodeType: ComponentType,
+    val parentId: String?,
+    val parentType: ComponentType?,
+    val description: String
+)

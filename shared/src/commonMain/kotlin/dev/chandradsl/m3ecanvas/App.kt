@@ -338,37 +338,25 @@ fun App(repository: ProjectRepository) {
                     Row(modifier = Modifier.fillMaxHeight()) {
                         ComponentPalette(
                             onAddComponent = { type ->
-                                val rootScaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+                                val selected = controller.state.selectedNodes.firstOrNull()
+                                val targetContainer = controller.findValidTargetContainer(
+                                    forType = type,
+                                    startingFromNodeId = selected?.id
+                                )
 
-                                if (rootScaffold != null && type.canonicalSlot() != SlotRole.CONTENT) {
-                                    // Structural Scaffold slot components (TopAppBar, NavigationBar, BottomAppBar, Rail, Drawer, FAB, Snackbar)
-                                    // always bind directly to the Scaffold.
-                                    controller.addChildToContainer(
-                                        containerId = rootScaffold.id,
+                                if (targetContainer != null) {
+                                    val added = controller.addChildToContainer(
+                                        containerId = targetContainer.id,
                                         type = type
                                     )
-                                } else {
-                                    val selected = controller.state.selectedNodes.firstOrNull()
-                                    val targetContainer = if (selected != null) {
-                                        if (selected.isContainer && selected.type != ComponentType.SCAFFOLD) selected
-                                        else controller.findParent(selected.id)?.takeIf { it.isContainer && it.type != ComponentType.SCAFFOLD }
-                                    } else null
-
-                                    if (targetContainer != null) {
-                                        controller.addChildToContainer(
-                                            containerId = targetContainer.id,
-                                            type = type
-                                        )
-                                    } else if (rootScaffold != null && type != ComponentType.SCAFFOLD) {
-                                        val contentContainer = rootScaffold.children.firstOrNull {
-                                            it.slot == SlotRole.CONTENT && it.isContainer
-                                        }
-                                        val targetContainerId = contentContainer?.id ?: rootScaffold.id
-                                        controller.addChildToContainer(
-                                            containerId = targetContainerId,
-                                            type = type
-                                        )
+                                    if (added) {
+                                        statusMessage = "Added ${type.displayName} into ${targetContainer.name}"
                                     } else {
+                                        statusMessage = "Cannot add ${type.displayName} to ${targetContainer.name}"
+                                    }
+                                } else {
+                                    val hasScaffold = controller.state.project.nodes.any { it.type == ComponentType.SCAFFOLD }
+                                    if (type.isAllowedAtRoot(hasScaffold)) {
                                         val count = controller.state.project.nodes.size
                                         controller.addNode(
                                             type = type,
@@ -377,6 +365,13 @@ fun App(repository: ProjectRepository) {
                                                 y = 40f + count * 24f
                                             )
                                         )
+                                        statusMessage = "Added ${type.displayName} to canvas"
+                                    } else {
+                                        statusMessage = if (type == ComponentType.SCAFFOLD && hasScaffold) {
+                                            "Project already contains a Scaffold"
+                                        } else {
+                                            "Cannot place ${type.displayName} here"
+                                        }
                                     }
                                 }
                             },

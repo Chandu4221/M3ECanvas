@@ -1847,4 +1847,209 @@ class SharedCommonTest {
         val allowed = ComponentType.ICON_BUTTON.allowedSlotsIn(ComponentType.TOP_APP_BAR)
         assertEquals(listOf(SlotRole.ACTIONS, SlotRole.NAVIGATION_ICON), allowed)
     }
+
+    @Test
+    fun testScaffoldRejectsNestedScaffoldAndDialog() {
+        assertFalse(ComponentType.SCAFFOLD.canAcceptChild(ComponentType.SCAFFOLD))
+        assertFalse(ComponentType.SCAFFOLD.canAcceptChild(ComponentType.DIALOG))
+
+        val controller = EditorController(initialProject = EditorController.newProject("ScaffoldTest", withDefaultScaffold = true))
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+
+        val addedScaffold = controller.addChildToContainer(scaffold.id, ComponentType.SCAFFOLD)
+        assertFalse(addedScaffold, "Scaffold must reject adding another Scaffold as child")
+
+        val addedDialog = controller.addChildToContainer(scaffold.id, ComponentType.DIALOG)
+        assertFalse(addedDialog, "Scaffold must reject Dialog as in-flow child")
+    }
+
+    @Test
+    fun testTopAppBarOnlyAcceptsTextIconAndIconButton() {
+        assertTrue(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.TEXT))
+        assertTrue(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.ICON))
+        assertTrue(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.ICON_BUTTON))
+
+        assertFalse(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.CARD))
+        assertFalse(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.BUTTON))
+        assertFalse(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.COLUMN))
+        assertFalse(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.LAZY_COLUMN))
+        assertFalse(ComponentType.TOP_APP_BAR.canAcceptChild(ComponentType.SCAFFOLD))
+
+        val controller = EditorController(initialProject = EditorController.newProject("TopBarTest", withDefaultScaffold = true))
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val topBar = scaffold.children.first { it.type == ComponentType.TOP_APP_BAR }
+
+        val addedCard = controller.addChildToContainer(topBar.id, ComponentType.CARD)
+        assertFalse(addedCard, "TopAppBar must reject Card child")
+
+        val addedText = controller.addChildToContainer(topBar.id, ComponentType.TEXT)
+        assertTrue(addedText, "TopAppBar must accept Text child for Title")
+    }
+
+    @Test
+    fun testListItemRejectsContainersAndRestrictedTypes() {
+        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.TEXT))
+        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.ICON))
+        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.CHECKBOX))
+        assertTrue(ComponentType.LISTS.canAcceptChild(ComponentType.SWITCH))
+
+        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.CARD))
+        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.COLUMN))
+        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.SCAFFOLD))
+        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.LAZY_COLUMN))
+        assertFalse(ComponentType.LISTS.canAcceptChild(ComponentType.DIALOG))
+
+        val controller = EditorController(initialProject = EditorController.newProject("ListItemTest", withDefaultScaffold = false))
+        controller.addNode(ComponentType.LISTS, CanvasPosition.Zero)
+        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LISTS }
+
+        assertFalse(controller.addChildToContainer(listItem.id, ComponentType.CARD))
+        assertFalse(controller.addChildToContainer(listItem.id, ComponentType.COLUMN))
+        assertTrue(controller.addChildToContainer(listItem.id, ComponentType.TEXT))
+    }
+
+    @Test
+    fun testLazyColumnRejectsNestedLazyColumnAndGrid() {
+        assertFalse(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_COLUMN))
+        assertFalse(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_VERTICAL_GRID))
+        assertFalse(ComponentType.LAZY_VERTICAL_GRID.canAcceptChild(ComponentType.LAZY_COLUMN))
+        assertFalse(ComponentType.LAZY_VERTICAL_GRID.canAcceptChild(ComponentType.LAZY_VERTICAL_GRID))
+
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.CARD))
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LISTS))
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.ROW))
+        assertTrue(ComponentType.LAZY_COLUMN.canAcceptChild(ComponentType.LAZY_ROW)) // Cross-axis lazy layout is allowed
+
+        val controller = EditorController(initialProject = EditorController.newProject("LazyTest", withDefaultScaffold = false))
+        controller.addNode(ComponentType.LAZY_COLUMN, CanvasPosition.Zero)
+        val lazyCol = controller.state.project.nodes.first { it.type == ComponentType.LAZY_COLUMN }
+
+        assertFalse(controller.addChildToContainer(lazyCol.id, ComponentType.LAZY_COLUMN))
+        assertFalse(controller.addChildToContainer(lazyCol.id, ComponentType.LAZY_VERTICAL_GRID))
+        assertTrue(controller.addChildToContainer(lazyCol.id, ComponentType.CARD))
+    }
+
+    @Test
+    fun testLazyRowRejectsNestedLazyRow() {
+        assertFalse(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.LAZY_ROW))
+        assertTrue(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.CARD))
+        assertTrue(ComponentType.LAZY_ROW.canAcceptChild(ComponentType.LAZY_COLUMN)) // Cross-axis is allowed
+    }
+
+    @Test
+    fun testCardRejectsScaffoldAndStructuralSlots() {
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.SCAFFOLD))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.TOP_APP_BAR))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.NAVIGATION_BAR))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.BOTTOM_APP_BAR))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.NAVIGATION_RAIL))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.NAVIGATION_DRAWER))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.DIALOG))
+        assertFalse(ComponentType.CARD.canAcceptChild(ComponentType.SNACKBAR))
+
+        assertTrue(ComponentType.CARD.canAcceptChild(ComponentType.BUTTON))
+        assertTrue(ComponentType.CARD.canAcceptChild(ComponentType.TEXT))
+        assertTrue(ComponentType.CARD.canAcceptChild(ComponentType.IMAGE))
+        assertTrue(ComponentType.CARD.canAcceptChild(ComponentType.COLUMN))
+    }
+
+    @Test
+    fun testSmartAncestorContainerTargeting() {
+        val controller = EditorController(initialProject = EditorController.newProject("AncestorTest", withDefaultScaffold = true))
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val contentColumn = scaffold.children.first { it.slot == SlotRole.CONTENT }
+
+        // Add a ListItem to contentColumn
+        assertTrue(controller.addChildToContainer(contentColumn.id, ComponentType.LISTS))
+        val listItem = controller.state.project.findNode(contentColumn.id)!!.children.first { it.type == ComponentType.LISTS }
+
+        // When ListItem is selected and user wants to add a Card, ListItem cannot accept Card,
+        // so findValidTargetContainer must climb to contentColumn!
+        val target = controller.findValidTargetContainer(forType = ComponentType.CARD, startingFromNodeId = listItem.id)
+        assertNotNull(target)
+        assertEquals(contentColumn.id, target.id)
+    }
+
+    @Test
+    fun testSmartAncestorRoutingForScaffoldStructuralSlots() {
+        val controller = EditorController(initialProject = EditorController.newProject("ScaffoldRoutingTest", withDefaultScaffold = true))
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val contentColumn = scaffold.children.first { it.slot == SlotRole.CONTENT }
+
+        // Even with contentColumn selected, FAB and TopAppBar route to root Scaffold
+        val fabTarget = controller.findValidTargetContainer(forType = ComponentType.FAB, startingFromNodeId = contentColumn.id)
+        assertNotNull(fabTarget)
+        assertEquals(scaffold.id, fabTarget.id)
+
+        val navBarTarget = controller.findValidTargetContainer(forType = ComponentType.NAVIGATION_BAR, startingFromNodeId = contentColumn.id)
+        assertNotNull(navBarTarget)
+        assertEquals(scaffold.id, navBarTarget.id)
+    }
+
+    @Test
+    fun testPasteHierarchyValidationAndClimbing() {
+        val controller = EditorController(initialProject = EditorController.newProject("PasteHierarchyTest", withDefaultScaffold = true))
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val contentColumn = scaffold.children.first { it.slot == SlotRole.CONTENT }
+
+        // Add a ListItem
+        assertTrue(controller.addChildToContainer(contentColumn.id, ComponentType.LISTS))
+        val listItem = controller.state.project.findNode(contentColumn.id)!!.children.first { it.type == ComponentType.LISTS }
+
+        // Select the ListItem
+        controller.selectNode(listItem.id)
+
+        // Copy a Card
+        val cardNode = CanvasNode(
+            type = ComponentType.CARD,
+            name = "Copied Card",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(200f, 100f)
+        )
+
+        // Paste while ListItem is selected: paste must climb to contentColumn and not corrupt ListItem
+        val pasted = controller.paste(sourceNode = cardNode)
+        assertNotNull(pasted)
+
+        val updatedListItem = controller.state.project.findNode(listItem.id)!!
+        assertEquals(0, updatedListItem.children.size, "ListItem must not have the pasted Card as child")
+
+        val updatedContent = controller.state.project.findNode(contentColumn.id)!!
+        assertTrue(updatedContent.children.any { it.type == ComponentType.CARD }, "Content Column must contain the pasted Card")
+    }
+
+    @Test
+    fun testDuplicateSingleOccupantBlocked() {
+        val controller = EditorController(initialProject = EditorController.newProject("DuplicateTest", withDefaultScaffold = true))
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val topBar = scaffold.children.first { it.type == ComponentType.TOP_APP_BAR }
+
+        controller.selectNode(topBar.id)
+        val duplicate = controller.duplicateSelected()
+        assertNull(duplicate, "Duplicating single-occupant TopAppBar must be blocked")
+    }
+
+    @Test
+    fun testProjectValidateHierarchyDetectsViolations() {
+        val controller = EditorController(initialProject = EditorController.newProject("ValidationTest", withDefaultScaffold = true))
+        val cleanViolations = controller.validateHierarchy()
+        assertTrue(cleanViolations.isEmpty(), "Initial standard project must have 0 hierarchy violations")
+
+        // Manually introduce an illegal child: Card inside TopAppBar
+        val scaffold = controller.state.project.nodes.first { it.type == ComponentType.SCAFFOLD }
+        val topBar = scaffold.children.first { it.type == ComponentType.TOP_APP_BAR }
+        val illegalCard = CanvasNode(
+            type = ComponentType.CARD,
+            name = "Illegal Card",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(100f, 50f)
+        )
+        val corruptedTopBar = topBar.copy(children = listOf(illegalCard))
+        controller.replaceProject(controller.state.project.updateNode(corruptedTopBar))
+
+        val violations = controller.validateHierarchy()
+        assertEquals(1, violations.size, "validateHierarchy must detect 1 violation")
+        assertEquals(illegalCard.id, violations.first().nodeId)
+        assertTrue(violations.first().description.contains("Top App Bar cannot contain Card"))
+    }
 }
