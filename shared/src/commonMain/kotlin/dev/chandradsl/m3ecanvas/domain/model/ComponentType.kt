@@ -138,6 +138,15 @@ enum class ComponentType(
     }
 
     /**
+     * Determines whether this component is a screen-level modal overlay
+     * (dialog or modal bottom sheet) that snaps to canonical screen positions with a backdrop scrim.
+     */
+    fun isOverlay(): Boolean = when (this) {
+        ALERT_DIALOG, BASIC_ALERT_DIALOG, MODAL_BOTTOM_SHEET -> true
+        else -> false
+    }
+
+    /**
      * Determines the canonical structural slot role this component type binds to
      * when added to a Scaffold.
      */
@@ -273,8 +282,8 @@ enum class ComponentType(
         // Cannot nest screen-level scaffolds
         if (childType == SCAFFOLD || childType == BOTTOM_SHEET_SCAFFOLD) return false
 
-        // Overlay dialogs cannot be in-flow children
-        if (childType == ALERT_DIALOG || childType == BASIC_ALERT_DIALOG) return false
+        // Overlay dialogs and sheets cannot be in-flow children
+        if (childType.isOverlay()) return false
 
         // Scaffold-specific structural bars & snackbars belong only to Scaffolds
         when (childType) {

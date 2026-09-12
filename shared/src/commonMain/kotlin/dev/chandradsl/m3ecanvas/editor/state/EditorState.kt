@@ -5,6 +5,16 @@ import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
 import dev.chandradsl.m3ecanvas.domain.model.M3EProject
 
 /**
+ * Operating mode of the editor canvas.
+ */
+enum class EditorMode {
+    /** Layout and design mode: selection borders, inspector editing, free canvas manipulation. */
+    DESIGN,
+    /** Live prototype mode: canvas locked, native scrolling, live controls and dismissible dialogs. */
+    INTERACTIVE
+}
+
+/**
  * Immutable snapshot of the editor's current state.
  *
  * This is a pure data class with no Compose dependencies, so state
@@ -22,8 +32,13 @@ data class EditorState(
     val redoCount: Int = 0,
     val clipboard: CanvasNode? = null,
     val alignmentGuides: List<AlignmentGuide> = emptyList(),
-    val multiDevicePreview: Boolean = false
+    val multiDevicePreview: Boolean = false,
+    val mode: EditorMode = EditorMode.DESIGN,
+    val dismissedOverlayIds: Set<String> = emptySet()
 ) {
+
+    /** Returns true if the editor is in interactive preview mode. */
+    val isInteractiveMode: Boolean get() = mode == EditorMode.INTERACTIVE
 
     /** Returns true if the node with [nodeId] is currently selected. */
     fun isNodeSelected(nodeId: String): Boolean {

@@ -31,7 +31,12 @@ import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -180,8 +185,8 @@ fun CanvasNodeRenderer(
         ComponentType.BOTTOM_SHEET_SCAFFOLD -> RenderBottomSheetScaffold(node = node, controller = controller)
 
         // Action
-        ComponentType.BUTTON -> RenderButton(node = node)
-        ComponentType.ICON_BUTTON -> RenderIconButton(node = node)
+        ComponentType.BUTTON -> RenderButton(node = node, controller = controller)
+        ComponentType.ICON_BUTTON -> RenderIconButton(node = node, controller = controller)
         ComponentType.FAB -> RenderFab(node = node)
         ComponentType.EXTENDED_FAB -> RenderExtendedFab(node = node)
         ComponentType.SEGMENTED_BUTTON -> RenderSegmentedButton(node = node)
@@ -220,19 +225,19 @@ fun CanvasNodeRenderer(
         ComponentType.SEARCH -> RenderSearch(node = node)
 
         // Selection
-        ComponentType.CHECKBOX -> RenderCheckbox(node = node)
-        ComponentType.RADIO_BUTTON -> RenderRadioButton(node = node)
-        ComponentType.SWITCH -> RenderSwitch(node = node)
-        ComponentType.SLIDER -> RenderSlider(node = node)
-        ComponentType.RANGE_SLIDER -> RenderRangeSlider(node = node)
-        ComponentType.CHIPS -> RenderChip(node = node)
+        ComponentType.CHECKBOX -> RenderCheckbox(node = node, controller = controller)
+        ComponentType.RADIO_BUTTON -> RenderRadioButton(node = node, controller = controller)
+        ComponentType.SWITCH -> RenderSwitch(node = node, controller = controller)
+        ComponentType.SLIDER -> RenderSlider(node = node, controller = controller)
+        ComponentType.RANGE_SLIDER -> RenderRangeSlider(node = node, controller = controller)
+        ComponentType.CHIPS -> RenderChip(node = node, controller = controller)
         ComponentType.DATE_PICKER -> RenderDatePicker(node = node)
         ComponentType.TIME_PICKER -> RenderTimePicker(node = node)
         ComponentType.MENUS -> RenderMenu(node = node, controller = controller)
         ComponentType.DROPDOWN_MENU_ITEM -> RenderDropdownMenuItem(node = node)
 
         // Text input
-        ComponentType.TEXT_FIELD -> RenderTextField(node = node)
+        ComponentType.TEXT_FIELD -> RenderTextField(node = node, controller = controller)
 
         // Typography
         ComponentType.TEXT -> RenderText(node = node)
@@ -245,12 +250,25 @@ fun CanvasNodeRenderer(
     }
 }
 
+private fun handleInteractiveButtonClick(node: CanvasNode, controller: EditorController) {
+    if (controller.state.isInteractiveMode) {
+        var ancestor = controller.findParent(node.id)
+        while (ancestor != null) {
+            if (ancestor.type.isOverlay()) {
+                controller.dismissOverlay(ancestor.id)
+                break
+            }
+            ancestor = controller.findParent(ancestor.id)
+        }
+    }
+}
+
 @Composable
-private fun RenderButton(node: CanvasNode) {
+private fun RenderButton(node: CanvasNode, controller: EditorController) {
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Button
         ?: MaterialVariant.Button.FILLED
     val text = node.textOrDefault(default = "Button")
-    val onClick = {}
+    val onClick = { handleInteractiveButtonClick(node, controller) }
     val modifier = node.modifiers.toModifier().fillMaxSize()
 
     when (variant) {
@@ -315,11 +333,11 @@ private fun RenderCard(
 }
 
 @Composable
-private fun RenderIconButton(node: CanvasNode) {
+private fun RenderIconButton(node: CanvasNode, controller: EditorController) {
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.IconButton
         ?: MaterialVariant.IconButton.STANDARD
     val iconName = node.iconProperty(key = "icon", default = "Add")
-    val onClick = {}
+    val onClick = { handleInteractiveButtonClick(node, controller) }
     val modifier = node.modifiers.toModifier().fillMaxSize()
     val icon = @Composable { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) }
 
@@ -332,16 +350,23 @@ private fun RenderIconButton(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderChip(node: CanvasNode) {
+private fun RenderChip(node: CanvasNode, controller: EditorController) {
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Chip
         ?: MaterialVariant.Chip.ASSIST
     val label = @Composable { Text(text = node.textOrDefault(default = "Chip")) }
-    val onClick = {}
+    val initialSelected = node.booleanProperty(key = "selected", default = true)
+    var selected by remember(node.id, controller.state.isInteractiveMode) { mutableStateOf(initialSelected) }
+    val isInteractive = controller.state.isInteractiveMode
+    val onClick = {
+        if (isInteractive) {
+            selected = !selected
+        }
+    }
 
     when (variant) {
         MaterialVariant.Chip.ASSIST -> AssistChip(onClick = onClick, label = label)
-        MaterialVariant.Chip.FILTER -> FilterChip(selected = false, onClick = onClick, label = label)
-        MaterialVariant.Chip.INPUT -> InputChip(selected = false, onClick = onClick, label = label)
+        MaterialVariant.Chip.FILTER -> FilterChip(selected = if (isInteractive) selected else false, onClick = onClick, label = label)
+        MaterialVariant.Chip.INPUT -> InputChip(selected = if (isInteractive) selected else false, onClick = onClick, label = label)
         MaterialVariant.Chip.SUGGESTION -> SuggestionChip(onClick = onClick, label = label)
     }
 }
@@ -543,33 +568,39 @@ private fun RenderTopAppBar(node: CanvasNode, controller: EditorController) {
 
 @Composable
 private fun RenderNavigationBar(node: CanvasNode, controller: EditorController) {
+    val isInteractive = controller.state.isInteractiveMode
+    var selectedIndex by remember(node.id, isInteractive) { mutableIntStateOf(0) }
     NavigationBar(
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
         if (node.children.isNotEmpty()) {
-            node.children.forEach { child ->
+            node.children.forEachIndexed { index, child ->
                 if (child.type == ComponentType.NAVIGATION_BAR_ITEM) {
-                    RenderNavigationBarItem(node = child)
+                    RenderNavigationBarItem(
+                        node = child,
+                        isSelected = if (isInteractive) index == selectedIndex else child.booleanProperty(key = "selected", default = index == 0),
+                        onClick = { if (isInteractive) selectedIndex = index }
+                    )
                 } else {
                     ContainerChild(child = child, controller = controller)
                 }
             }
         } else {
             NavigationBarItem(
-                selected = true,
-                onClick = {},
+                selected = if (isInteractive) selectedIndex == 0 else true,
+                onClick = { if (isInteractive) selectedIndex = 0 },
                 icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
                 label = { Text(text = "Home") }
             )
             NavigationBarItem(
-                selected = false,
-                onClick = {},
+                selected = if (isInteractive) selectedIndex == 1 else false,
+                onClick = { if (isInteractive) selectedIndex = 1 },
                 icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Explore") },
                 label = { Text(text = "Explore") }
             )
             NavigationBarItem(
-                selected = false,
-                onClick = {},
+                selected = if (isInteractive) selectedIndex == 2 else false,
+                onClick = { if (isInteractive) selectedIndex = 2 },
                 icon = { Icon(imageVector = Icons.Outlined.Person, contentDescription = "Profile") },
                 label = { Text(text = "Profile") }
             )
@@ -578,15 +609,18 @@ private fun RenderNavigationBar(node: CanvasNode, controller: EditorController) 
 }
 
 @Composable
-private fun RowScope.RenderNavigationBarItem(node: CanvasNode) {
+private fun RowScope.RenderNavigationBarItem(
+    node: CanvasNode,
+    isSelected: Boolean = node.booleanProperty(key = "selected", default = true),
+    onClick: () -> Unit = {}
+) {
     val label = (node.property("label") as? ComponentProperty.Text)?.value
         ?: (node.property("text") as? ComponentProperty.Text)?.value
         ?: node.name
     val iconName = node.iconProperty(key = "icon", default = "Home")
-    val selected = node.booleanProperty(key = "selected", default = true)
     NavigationBarItem(
-        selected = selected,
-        onClick = {},
+        selected = isSelected,
+        onClick = onClick,
         icon = { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = label) },
         label = { Text(text = label) }
     )
@@ -678,7 +712,8 @@ private fun SlotContainer(
     child: CanvasNode,
     controller: EditorController
 ) {
-    val isSelected = controller.state.isNodeSelected(nodeId = child.id)
+    val isInteractive = controller.state.isInteractiveMode
+    val isSelected = !isInteractive && controller.state.isNodeSelected(nodeId = child.id)
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(isSelected) {
@@ -703,20 +738,25 @@ private fun SlotContainer(
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(4.dp)
             )
-            .focusRequester(focusRequester)
-            .focusable()
-            .onKeyEvent { event ->
-                if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.deleteSelected()
-                    true
-                } else {
-                    false
-                }
-            }
-            .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
+            .then(
+                if (!isInteractive) {
+                    Modifier
+                        .focusRequester(focusRequester)
+                        .focusable()
+                        .onKeyEvent { event ->
+                            if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                                controller.deleteSelected()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
+                } else Modifier
+            )
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
-        if (!child.type.isContainer && child.children.isEmpty()) {
+        if (!isInteractive && !child.type.isContainer && child.children.isEmpty()) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -732,7 +772,8 @@ private fun ContainerChild(
     controller: EditorController,
     modifier: Modifier = Modifier
 ) {
-    val isSelected = controller.state.isNodeSelected(nodeId = child.id)
+    val isInteractive = controller.state.isInteractiveMode
+    val isSelected = !isInteractive && controller.state.isNodeSelected(nodeId = child.id)
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(isSelected) {
@@ -772,20 +813,25 @@ private fun ContainerChild(
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(4.dp)
             )
-            .focusRequester(focusRequester)
-            .focusable()
-            .onKeyEvent { event ->
-                if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                    controller.deleteSelected()
-                    true
-                } else {
-                    false
-                }
-            }
-            .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
+            .then(
+                if (!isInteractive) {
+                    Modifier
+                        .focusRequester(focusRequester)
+                        .focusable()
+                        .onKeyEvent { event ->
+                            if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                                controller.deleteSelected()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
+                } else Modifier
+            )
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
-        if (!child.type.isContainer && child.children.isEmpty()) {
+        if (!isInteractive && !child.type.isContainer && child.children.isEmpty()) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -801,6 +847,7 @@ internal fun Modifier.selectOnPress(
     controller: EditorController,
     focusRequester: FocusRequester? = null
 ): Modifier {
+    if (controller.state.isInteractiveMode) return this
     val focusManager = LocalFocusManager.current
     return this.pointerInput(nodeId) {
         awaitEachGesture {
@@ -823,27 +870,29 @@ internal fun Modifier.selectOnPress(
 }
 
 @Composable
-private fun RenderTextField(node: CanvasNode) {
-    val text = node.textOrDefault(default = "")
+private fun RenderTextField(node: CanvasNode, controller: EditorController) {
+    val initialText = node.textOrDefault(default = "")
+    var text by remember(node.id, controller.state.isInteractiveMode) { mutableStateOf(initialText) }
+    val isInteractive = controller.state.isInteractiveMode
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.TextField
         ?: MaterialVariant.TextField.OUTLINED
     val modifier = node.modifiers.toModifier().fillMaxSize()
 
     when (variant) {
         MaterialVariant.TextField.OUTLINED -> OutlinedTextField(
-            value = text,
-            onValueChange = {},
+            value = if (isInteractive) text else initialText,
+            onValueChange = { if (isInteractive) text = it },
             label = { Text(node.name) },
             placeholder = { Text("Enter text...") },
-            readOnly = true,
+            readOnly = !isInteractive,
             modifier = modifier
         )
         MaterialVariant.TextField.FILLED -> TextField(
-            value = text,
-            onValueChange = {},
+            value = if (isInteractive) text else initialText,
+            onValueChange = { if (isInteractive) text = it },
             label = { Text(node.name) },
             placeholder = { Text("Enter text...") },
-            readOnly = true,
+            readOnly = !isInteractive,
             modifier = modifier
         )
     }
@@ -1056,7 +1105,14 @@ private fun RenderBottomSheet(node: CanvasNode, controller: EditorController) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        if (controller.state.isInteractiveMode) {
+                            controller.dismissOverlay(node.id)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Action Button")
                 }
             }
@@ -1125,7 +1181,11 @@ private fun RenderDialog(node: CanvasNode, controller: EditorController) {
                 if (dismissChild != null) {
                     ContainerChild(child = dismissChild, controller = controller)
                 } else if (node.children.isEmpty()) {
-                    TextButton(onClick = {}) { Text("Cancel") }
+                    TextButton(onClick = {
+                        if (controller.state.isInteractiveMode) {
+                            controller.dismissOverlay(node.id)
+                        }
+                    }) { Text("Cancel") }
                 }
                 if (dismissChild != null && confirmChild != null) {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -1135,7 +1195,11 @@ private fun RenderDialog(node: CanvasNode, controller: EditorController) {
                 if (confirmChild != null) {
                     ContainerChild(child = confirmChild, controller = controller)
                 } else if (node.children.isEmpty()) {
-                    Button(onClick = {}) { Text("Confirm") }
+                    Button(onClick = {
+                        if (controller.state.isInteractiveMode) {
+                            controller.dismissOverlay(node.id)
+                        }
+                    }) { Text("Confirm") }
                 }
             }
         }
@@ -1379,34 +1443,40 @@ private fun RenderNavigationDrawer(node: CanvasNode) {
 
 @Composable
 private fun RenderTabs(node: CanvasNode, controller: EditorController) {
+    val isInteractive = controller.state.isInteractiveMode
+    var selectedTab by remember(node.id, isInteractive) { mutableIntStateOf(0) }
     PrimaryTabRow(
-        selectedTabIndex = 0,
+        selectedTabIndex = selectedTab,
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
         if (node.children.isNotEmpty()) {
-            node.children.forEach { child ->
+            node.children.forEachIndexed { index, child ->
                 if (child.type == ComponentType.TAB) {
-                    RenderTab(node = child)
+                    RenderTab(
+                        node = child,
+                        isSelected = if (isInteractive) index == selectedTab else child.booleanProperty(key = "selected", default = index == 0),
+                        onClick = { if (isInteractive) selectedTab = index }
+                    )
                 } else {
                     ContainerChild(child = child, controller = controller)
                 }
             }
         } else {
             Tab(
-                selected = true,
-                onClick = {},
+                selected = selectedTab == 0,
+                onClick = { if (isInteractive) selectedTab = 0 },
                 text = { Text("Overview") },
                 icon = { Icon(imageVector = Icons.Outlined.Dashboard, contentDescription = null) }
             )
             Tab(
-                selected = false,
-                onClick = {},
+                selected = selectedTab == 1,
+                onClick = { if (isInteractive) selectedTab = 1 },
                 text = { Text("Analytics") },
                 icon = { Icon(imageVector = Icons.Outlined.Analytics, contentDescription = null) }
             )
             Tab(
-                selected = false,
-                onClick = {},
+                selected = selectedTab == 2,
+                onClick = { if (isInteractive) selectedTab = 2 },
                 text = { Text("Settings") },
                 icon = { Icon(imageVector = Icons.Outlined.Tune, contentDescription = null) }
             )
@@ -1415,13 +1485,16 @@ private fun RenderTabs(node: CanvasNode, controller: EditorController) {
 }
 
 @Composable
-private fun RenderTab(node: CanvasNode) {
+private fun RenderTab(
+    node: CanvasNode,
+    isSelected: Boolean = node.booleanProperty(key = "selected", default = false),
+    onClick: () -> Unit = {}
+) {
     val text = node.textOrDefault(default = "Tab")
     val iconName = node.iconProperty(key = "icon", default = "Dashboard")
-    val selected = node.booleanProperty(key = "selected", default = false)
     Tab(
-        selected = selected,
-        onClick = {},
+        selected = isSelected,
+        onClick = onClick,
         text = { Text(text) },
         icon = { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) }
     )
@@ -1460,13 +1533,18 @@ private fun RenderSearch(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderCheckbox(node: CanvasNode) {
-    val checked = node.booleanProperty(key = "checked", default = true)
+private fun RenderCheckbox(node: CanvasNode, controller: EditorController) {
+    val initialChecked = node.booleanProperty(key = "checked", default = true)
+    var checked by remember(node.id, controller.state.isInteractiveMode) { mutableStateOf(initialChecked) }
+    val isInteractive = controller.state.isInteractiveMode
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = node.modifiers.toModifier().wrapContentSize()
     ) {
-        Checkbox(checked = checked, onCheckedChange = {})
+        Checkbox(
+            checked = if (isInteractive) checked else initialChecked,
+            onCheckedChange = { if (isInteractive) checked = it }
+        )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = node.textOrDefault(default = "Checkbox Option"),
@@ -1476,13 +1554,18 @@ private fun RenderCheckbox(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderRadioButton(node: CanvasNode) {
-    val selected = node.booleanProperty(key = "selected", default = true)
+private fun RenderRadioButton(node: CanvasNode, controller: EditorController) {
+    val initialSelected = node.booleanProperty(key = "selected", default = true)
+    var selected by remember(node.id, controller.state.isInteractiveMode) { mutableStateOf(initialSelected) }
+    val isInteractive = controller.state.isInteractiveMode
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = node.modifiers.toModifier().wrapContentSize()
     ) {
-        RadioButton(selected = selected, onClick = {})
+        RadioButton(
+            selected = if (isInteractive) selected else initialSelected,
+            onClick = { if (isInteractive) selected = !selected }
+        )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = node.textOrDefault(default = "Radio Option"),
@@ -1492,8 +1575,10 @@ private fun RenderRadioButton(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderSwitch(node: CanvasNode) {
-    val checked = node.booleanProperty(key = "checked", default = true)
+private fun RenderSwitch(node: CanvasNode, controller: EditorController) {
+    val initialChecked = node.booleanProperty(key = "checked", default = true)
+    var checked by remember(node.id, controller.state.isInteractiveMode) { mutableStateOf(initialChecked) }
+    val isInteractive = controller.state.isInteractiveMode
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1504,16 +1589,21 @@ private fun RenderSwitch(node: CanvasNode) {
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(modifier = Modifier.width(16.dp))
-        Switch(checked = checked, onCheckedChange = {})
+        Switch(
+            checked = if (isInteractive) checked else initialChecked,
+            onCheckedChange = { if (isInteractive) checked = it }
+        )
     }
 }
 
 @Composable
-private fun RenderSlider(node: CanvasNode) {
-    val value = node.numericProperty(key = "value", default = 0.6f).coerceIn(0f, 1f)
+private fun RenderSlider(node: CanvasNode, controller: EditorController) {
+    val initialValue = node.numericProperty(key = "value", default = 0.6f).coerceIn(0f, 1f)
+    var sliderValue by remember(node.id, controller.state.isInteractiveMode) { mutableFloatStateOf(initialValue) }
+    val isInteractive = controller.state.isInteractiveMode
     Slider(
-        value = value,
-        onValueChange = {},
+        value = if (isInteractive) sliderValue else initialValue,
+        onValueChange = { if (isInteractive) sliderValue = it },
         modifier = node.modifiers.toModifier().fillMaxWidth()
     )
 }
@@ -1832,13 +1922,15 @@ private fun RenderBottomAppBar(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderRangeSlider(node: CanvasNode) {
+private fun RenderRangeSlider(node: CanvasNode, controller: EditorController) {
     val start = node.numericProperty("startValue", default = 0.2f).coerceIn(0f, 1f)
     val end = node.numericProperty("endValue", default = 0.8f).coerceIn(0f, 1f)
-    val range = if (start <= end) start..end else end..start
+    val initialRange = if (start <= end) start..end else end..start
+    var rangeValue by remember(node.id, controller.state.isInteractiveMode) { mutableStateOf(initialRange) }
+    val isInteractive = controller.state.isInteractiveMode
     RangeSlider(
-        value = range,
-        onValueChange = {},
+        value = if (isInteractive) rangeValue else initialRange,
+        onValueChange = { if (isInteractive) rangeValue = it },
         modifier = node.modifiers.toModifier().fillMaxWidth()
     )
 }

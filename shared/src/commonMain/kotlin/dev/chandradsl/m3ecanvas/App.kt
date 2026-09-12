@@ -15,11 +15,14 @@ import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.automirrored.outlined.ViewSidebar
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
+import dev.chandradsl.m3ecanvas.editor.state.EditorMode
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -222,6 +225,11 @@ fun App(repository: ProjectRepository) {
                                 showCodeExport = !showCodeExport
                                 return@onKeyEvent true
                             }
+                            event.key == Key.P -> {
+                                controller.toggleInteractiveMode()
+                                statusMessage = if (controller.state.isInteractiveMode) "Interactive Preview Mode" else "Design Mode"
+                                return@onKeyEvent true
+                            }
                         }
                     }
 
@@ -232,7 +240,12 @@ fun App(repository: ProjectRepository) {
                             true
                         }
                         Key.Escape -> {
-                            controller.clearSelection()
+                            if (controller.state.isInteractiveMode) {
+                                controller.setMode(EditorMode.DESIGN)
+                                statusMessage = "Design Mode"
+                            } else {
+                                controller.clearSelection()
+                            }
                             true
                         }
                         Key.DirectionUp -> {
@@ -325,7 +338,12 @@ fun App(repository: ProjectRepository) {
                 showInspector = showInspector,
                 onToggleInspector = { showInspector = !showInspector },
                 showCodeExport = showCodeExport,
-                onToggleCodeExport = { showCodeExport = !showCodeExport }
+                onToggleCodeExport = { showCodeExport = !showCodeExport },
+                isInteractiveMode = controller.state.isInteractiveMode,
+                onToggleInteractiveMode = {
+                    controller.toggleInteractiveMode()
+                    statusMessage = if (controller.state.isInteractiveMode) "Interactive Preview Mode" else "Design Mode"
+                }
             )
             HorizontalDivider()
             Row(modifier = Modifier.weight(weight = 1f)) {
@@ -663,7 +681,9 @@ private fun TopBar(
     showInspector: Boolean,
     onToggleInspector: () -> Unit,
     showCodeExport: Boolean,
-    onToggleCodeExport: () -> Unit
+    onToggleCodeExport: () -> Unit,
+    isInteractiveMode: Boolean = false,
+    onToggleInteractiveMode: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -687,7 +707,7 @@ private fun TopBar(
         Spacer(modifier = Modifier.width(12.dp))
         IconButton(
             onClick = onUndo,
-            enabled = canUndo
+            enabled = canUndo && !isInteractiveMode
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.Undo,
@@ -696,7 +716,7 @@ private fun TopBar(
         }
         IconButton(
             onClick = onRedo,
-            enabled = canRedo
+            enabled = canRedo && !isInteractiveMode
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.Redo,
@@ -704,7 +724,8 @@ private fun TopBar(
             )
         }
         IconButton(
-            onClick = onOpenHistory
+            onClick = onOpenHistory,
+            enabled = !isInteractiveMode
         ) {
             val total = undoCount + redoCount
             if (total > 0) {
@@ -730,12 +751,54 @@ private fun TopBar(
         }
         IconButton(
             onClick = onDelete,
-            enabled = hasSelection
+            enabled = hasSelection && !isInteractiveMode
         ) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
                 contentDescription = "Delete Selected (Del / Backspace)"
             )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Mode Switcher: Design (✏️) vs Interactive Preview (▶️)
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(
+                modifier = Modifier.padding(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    selected = !isInteractiveMode,
+                    onClick = { if (isInteractiveMode) onToggleInteractiveMode() },
+                    label = { Text("Design", style = MaterialTheme.typography.labelMedium) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                FilterChip(
+                    selected = isInteractiveMode,
+                    onClick = { if (!isInteractiveMode) onToggleInteractiveMode() },
+                    label = { Text("Preview", style = MaterialTheme.typography.labelMedium) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.weight(weight = 1f))
         if (isOperating) {

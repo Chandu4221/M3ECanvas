@@ -80,10 +80,20 @@ open class ComposeCodeGenerator(
                     } else {
                         append(generateScaffoldCode(scaffold, indent = "    "))
                     }
+                    val overlays = project.nodes.filter { it.type.isOverlay() }
+                    overlays.forEach { overlay ->
+                        appendLine()
+                        append(generateNodeCode(overlay, indent = "    ", isRootFloating = false))
+                    }
                 } else {
                     appendLine("    Box(modifier = modifier.fillMaxSize()) {")
-                    project.nodes.forEach { node ->
+                    val nonOverlays = project.nodes.filter { !it.type.isOverlay() }
+                    val overlays = project.nodes.filter { it.type.isOverlay() }
+                    nonOverlays.forEach { node ->
                         append(generateNodeCode(node, indent = "        ", isRootFloating = true))
+                    }
+                    overlays.forEach { overlay ->
+                        append(generateNodeCode(overlay, indent = "        ", isRootFloating = false))
                     }
                     appendLine("    }")
                 }
@@ -1452,7 +1462,7 @@ open class ComposeCodeGenerator(
     ): String {
         val parts = mutableListOf<String>()
 
-        if (isRootFloating) {
+        if (isRootFloating && !node.type.isOverlay()) {
             parts.add("offset(x = ${node.position.x.toInt()}.dp, y = ${node.position.y.toInt()}.dp)")
             if (!node.hasExplicitWidth() && !node.hasExplicitHeight()) {
                 parts.add("size(width = ${node.size.width.toInt()}.dp, height = ${node.size.height.toInt()}.dp)")

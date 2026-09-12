@@ -9,6 +9,7 @@ import dev.chandradsl.m3ecanvas.editor.component.ComponentDefinition
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
 import dev.chandradsl.m3ecanvas.editor.persistence.M3EJson
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
+import dev.chandradsl.m3ecanvas.editor.state.EditorMode
 import dev.chandradsl.m3ecanvas.editor.state.GuideOrientation
 import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
 import dev.chandradsl.m3ecanvas.editor.canvas.AlignmentSnapper
@@ -2321,5 +2322,164 @@ class SharedCommonTest {
             properties = listOf(ComponentProperty.Variant("variant", MaterialVariant.ToggleButton.ELEVATED))
         )
         assertTrue(generator.generateNodeCode(toggleBtn).contains("ElevatedToggleButton("))
+    }
+
+    @Test
+    fun testIsOverlayProperty() {
+        assertTrue(ComponentType.ALERT_DIALOG.isOverlay())
+        assertTrue(ComponentType.BASIC_ALERT_DIALOG.isOverlay())
+        assertTrue(ComponentType.MODAL_BOTTOM_SHEET.isOverlay())
+
+        assertFalse(ComponentType.BUTTON.isOverlay())
+        assertFalse(ComponentType.CARD.isOverlay())
+        assertFalse(ComponentType.SCAFFOLD.isOverlay())
+        assertFalse(ComponentType.BOTTOM_SHEET_SCAFFOLD.isOverlay())
+        assertFalse(ComponentType.COLUMN.isOverlay())
+        assertFalse(ComponentType.ROW.isOverlay())
+        assertFalse(ComponentType.LIST_ITEM.isOverlay())
+    }
+
+    @Test
+    fun testContainersRejectOverlaysAsInFlowChildren() {
+        val containers = listOf(
+            ComponentType.SCAFFOLD,
+            ComponentType.BOTTOM_SHEET_SCAFFOLD,
+            ComponentType.COLUMN,
+            ComponentType.ROW,
+            ComponentType.BOX,
+            ComponentType.CARD,
+            ComponentType.LIST_ITEM
+        )
+        for (c in containers) {
+            assertFalse(c.canAcceptChild(ComponentType.ALERT_DIALOG), "$c must reject ALERT_DIALOG")
+            assertFalse(c.canAcceptChild(ComponentType.BASIC_ALERT_DIALOG), "$c must reject BASIC_ALERT_DIALOG")
+            assertFalse(c.canAcceptChild(ComponentType.MODAL_BOTTOM_SHEET), "$c must reject MODAL_BOTTOM_SHEET")
+        }
+    }
+
+    @Test
+    fun testOverlayNodesCannotBeDraggedOrMoved() {
+        val controller = EditorController(initialProject = EditorController.newProject("OverlayDragTest", withDefaultScaffold = false))
+
+        // AlertDialog
+        assertTrue(controller.addNode(ComponentType.ALERT_DIALOG, CanvasPosition(150f, 250f)))
+        val dialog = controller.state.project.nodes.first { it.type == ComponentType.ALERT_DIALOG }
+        assertEquals(CanvasPosition.Zero, dialog.position)
+
+        controller.startDrag(dialog.id)
+        assertNull(controller.state.drag)
+
+        controller.updateDrag(100f, 100f)
+        val currentDialog = controller.state.project.findNode(dialog.id)!!
+        assertEquals(CanvasPosition.Zero, currentDialog.position)
+
+        // BasicAlertDialog
+        assertTrue(controller.addNode(ComponentType.BASIC_ALERT_DIALOG, CanvasPosition(80f, 120f)))
+        val basicDialog = controller.state.project.nodes.first { it.type == ComponentType.BASIC_ALERT_DIALOG }
+        assertEquals(CanvasPosition.Zero, basicDialog.position)
+
+        controller.startDrag(basicDialog.id)
+        assertNull(controller.state.drag)
+
+        // ModalBottomSheet
+        assertTrue(controller.addNode(ComponentType.MODAL_BOTTOM_SHEET, CanvasPosition(50f, 500f)))
+        val sheet = controller.state.project.nodes.first { it.type == ComponentType.MODAL_BOTTOM_SHEET }
+        assertEquals(CanvasPosition.Zero, sheet.position)
+
+        controller.startDrag(sheet.id)
+        assertNull(controller.state.drag)
+    }
+
+    @Test
+    fun testOverlayCodeGenerationWithScaffold() {
+        val controller = EditorController(initialProject = EditorController.newProject("OverlayProject", withDefaultScaffold = true))
+        assertTrue(controller.addNode(ComponentType.ALERT_DIALOG, CanvasPosition.Zero))
+        val code = ComposeCodeGenerator.generateFile(controller.state.project)
+        assertTrue(code.contains("Scaffold("))
+        assertTrue(code.contains("AlertDialog("))
+        assertFalse(code.contains("offset("))
+    }
+
+    @Test
+    fun testEditorModeDefaultsAndToggle() {
+        val controller = EditorController(initialProject = EditorController.newProject("ModeProject", withDefaultScaffold = true))
+        assertEquals(EditorMode.DESIGN, controller.state.mode)
+        assertFalse(controller.state.isInteractiveMode)
+
+        controller.toggleInteractiveMode()
+        assertEquals(EditorMode.INTERACTIVE, controller.state.mode)
+        assertTrue(controller.state.isInteractiveMode)
+
+        controller.toggleInteractiveMode()
+        assertEquals(EditorMode.DESIGN, controller.state.mode)
+        assertFalse(controller.state.isInteractiveMode)
+
+        controller.setMode(EditorMode.INTERACTIVE)
+        assertEquals(EditorMode.INTERACTIVE, controller.state.mode)
+        assertTrue(controller.state.isInteractiveMode)
+    }
+
+    @Test
+    fun testInteractiveModeBlocksSelectionAndDragging() {
+        val controller = EditorController(initialProject = EditorController.newProject("ModeProject", withDefaultScaffold = true))
+        assertTrue(controller.addNode(ComponentType.BUTTON, CanvasPosition(20f, 20f)))
+        val btn = controller.state.project.nodes.first { it.type == ComponentType.BUTTON }
+
+        // In DESIGN mode, selecting works
+        controller.selectNode(btn.id)
+        assertTrue(controller.state.isNodeSelected(btn.id))
+
+        // Entering INTERACTIVE mode clears selection
+        controller.setMode(EditorMode.INTERACTIVE)
+        assertTrue(controller.state.isInteractiveMode)
+        assertTrue(controller.state.selectedNodeIds.isEmpty())
+
+        // In INTERACTIVE mode, selection methods are no-ops
+        controller.selectNode(btn.id)
+        assertFalse(controller.state.isNodeSelected(btn.id))
+
+        controller.selectNodes(listOf(btn.id))
+        assertTrue(controller.state.selectedNodeIds.isEmpty())
+
+        controller.toggleSelectNode(btn.id)
+        assertFalse(controller.state.isNodeSelected(btn.id))
+
+        controller.selectAll()
+        assertTrue(controller.state.selectedNodeIds.isEmpty())
+
+        // Dragging is also blocked in INTERACTIVE mode
+        controller.startDrag(btn.id)
+        assertNull(controller.state.drag)
+
+        // Switching back to DESIGN mode allows selecting and dragging again
+        controller.setMode(EditorMode.DESIGN)
+        controller.selectNode(btn.id)
+        assertTrue(controller.state.isNodeSelected(btn.id))
+    }
+
+    @Test
+    fun testInteractiveModeOverlayDismissAndReset() {
+        val controller = EditorController(initialProject = EditorController.newProject("OverlayModeProject", withDefaultScaffold = true))
+        assertTrue(controller.addNode(ComponentType.ALERT_DIALOG, CanvasPosition.Zero))
+        val dialog = controller.state.project.nodes.first { it.type == ComponentType.ALERT_DIALOG }
+
+        controller.setMode(EditorMode.INTERACTIVE)
+        assertTrue(controller.state.dismissedOverlayIds.isEmpty())
+
+        // Dismiss the dialog in interactive mode
+        controller.dismissOverlay(dialog.id)
+        assertTrue(controller.state.dismissedOverlayIds.contains(dialog.id))
+
+        // Reset interactive state restores dismissed overlays
+        controller.resetInteractiveState()
+        assertTrue(controller.state.dismissedOverlayIds.isEmpty())
+
+        // Dismiss again, then switch back to DESIGN mode
+        controller.dismissOverlay(dialog.id)
+        assertTrue(controller.state.dismissedOverlayIds.contains(dialog.id))
+
+        // Switching back to DESIGN mode automatically restores dismissed overlays for editing
+        controller.setMode(EditorMode.DESIGN)
+        assertTrue(controller.state.dismissedOverlayIds.isEmpty())
     }
 }

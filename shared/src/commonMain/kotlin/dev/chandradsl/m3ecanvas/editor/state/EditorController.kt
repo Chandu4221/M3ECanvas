@@ -234,7 +234,7 @@ class EditorController(
             if (!selected.type.isAllowedAtRoot(hasScaffold)) return null
         }
 
-        val clone = selected.deepCloneWithNewIds(offsetPosition = true)
+        val clone = selected.deepCloneWithNewIds(offsetPosition = !selected.type.isOverlay())
         pushState()
 
         val updatedProject = if (parent != null) {
@@ -260,30 +260,67 @@ class EditorController(
     //region Selection
 
     fun selectNode(nodeId: String) {
+        if (state.isInteractiveMode) return
         state = state.copy(selectedNodeIds = setOf(nodeId))
     }
 
     fun toggleSelectNode(nodeId: String) {
+        if (state.isInteractiveMode) return
         val current = state.selectedNodeIds
         val updated = if (nodeId in current) current - nodeId else current + nodeId
         state = state.copy(selectedNodeIds = updated)
     }
 
     fun selectAdditionalNode(nodeId: String) {
+        if (state.isInteractiveMode) return
         state = state.copy(selectedNodeIds = state.selectedNodeIds + nodeId)
     }
 
     fun selectNodes(nodeIds: Collection<String>) {
+        if (state.isInteractiveMode) return
         state = state.copy(selectedNodeIds = nodeIds.toSet())
     }
 
     fun selectAll() {
+        if (state.isInteractiveMode) return
         val allTopLevelIds = state.project.nodes.map { it.id }.toSet()
         state = state.copy(selectedNodeIds = allTopLevelIds)
     }
 
     fun clearSelection() {
         state = state.copy(selectedNodeIds = emptySet())
+    }
+
+    //endregion
+
+    //region Editor Mode (Design vs Interactive Preview)
+
+    /** Sets the editor operating mode. Entering INTERACTIVE mode clears selection and drag state. */
+    fun setMode(mode: EditorMode) {
+        if (state.mode == mode) return
+        state = state.copy(
+            mode = mode,
+            selectedNodeIds = if (mode == EditorMode.INTERACTIVE) emptySet() else state.selectedNodeIds,
+            dismissedOverlayIds = if (mode == EditorMode.DESIGN) emptySet() else state.dismissedOverlayIds,
+            drag = null,
+            alignmentGuides = emptyList()
+        )
+    }
+
+    /** Toggles between DESIGN mode and INTERACTIVE preview mode. */
+    fun toggleInteractiveMode() {
+        val next = if (state.mode == EditorMode.INTERACTIVE) EditorMode.DESIGN else EditorMode.INTERACTIVE
+        setMode(next)
+    }
+
+    /** Dismisses a modal overlay dialog or sheet in interactive mode. */
+    fun dismissOverlay(nodeId: String) {
+        state = state.copy(dismissedOverlayIds = state.dismissedOverlayIds + nodeId)
+    }
+
+    /** Resets all dismissed overlays and transient interactive preview states. */
+    fun resetInteractiveState() {
+        state = state.copy(dismissedOverlayIds = emptySet())
     }
 
     //endregion
@@ -298,7 +335,7 @@ class EditorController(
         val existingCount = state.project.nodes.count { it.type == type }
         val name = "${type.displayName} ${existingCount + 1}"
 
-        val targetPosition = if (type == ComponentType.SCAFFOLD) CanvasPosition.Zero else position
+        val targetPosition = if (type == ComponentType.SCAFFOLD || type.isOverlay()) CanvasPosition.Zero else position
         val node = CanvasNode(
             type = type,
             name = name,
@@ -604,14 +641,15 @@ class EditorController(
 
     /** Begins a drag on the node with [nodeId]. If multiple nodes are selected, all non-locked selected nodes move together. */
     fun startDrag(nodeId: String) {
+        if (state.isInteractiveMode) return
         val node = state.project.findNode(nodeId = nodeId) ?: return
-        if (node.isLockedInSlot) return // Locked slot nodes cannot be moved arbitrarily
+        if (node.isLockedInSlot || node.type == ComponentType.SCAFFOLD || node.type.isOverlay()) return // Locked slots, Scaffolds, and modal overlays cannot be moved arbitrarily
         preDragProject = state.project
 
         val targetNodeIds = if (nodeId in state.selectedNodeIds && state.selectedNodeIds.size > 1) {
             state.selectedNodeIds.filter { id ->
                 val n = state.project.findNode(id)
-                n != null && !n.isLockedInSlot
+                n != null && !n.isLockedInSlot && n.type != ComponentType.SCAFFOLD && !n.type.isOverlay()
             }.toSet()
         } else {
             setOf(nodeId)
@@ -637,7 +675,7 @@ class EditorController(
         val primaryNode = state.project.findNode(drag.nodeId) ?: return
 
         val candidatePos = primaryNode.position.offset(deltaX, deltaY)
-        val otherNodes = state.project.nodes.filter { it.id !in drag.nodeIds && it.type != ComponentType.SCAFFOLD }
+        val otherNodes = state.project.nodes.filter { it.id !in drag.nodeIds && it.type != ComponentType.SCAFFOLD && !it.type.isOverlay() }
         val snapResult = if (snappingEnabled && drag.nodeIds.size == 1) {
             alignmentSnapper.computeSnap(
                 node = primaryNode,
@@ -657,7 +695,7 @@ class EditorController(
         var updatedProject = state.project
         for (id in drag.nodeIds) {
             val n = updatedProject.findNode(nodeId = id) ?: continue
-            if (!n.isLockedInSlot) {
+            if (!n.isLockedInSlot && n.type != ComponentType.SCAFFOLD && !n.type.isOverlay()) {
                 updatedProject = updatedProject.updateNode(node = n.movedBy(dx = effectiveDeltaX, dy = effectiveDeltaY))
             }
         }
