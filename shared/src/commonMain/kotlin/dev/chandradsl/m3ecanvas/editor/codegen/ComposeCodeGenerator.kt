@@ -166,7 +166,7 @@ open class ComposeCodeGenerator(
 
     open fun generateNodeCode(
         node: CanvasNode,
-        indent: String,
+        indent: String = "",
         isRootFloating: Boolean = false,
         extraModifier: String? = null
     ): String {
@@ -255,22 +255,50 @@ open class ComposeCodeGenerator(
             }
 
             ComponentType.TOP_APP_BAR -> buildString {
+                val titleChild = node.childInSlot(SlotRole.TITLE)
+                val navChild = node.childInSlot(SlotRole.NAVIGATION_ICON)
+                val actionChildren = node.childrenInSlot(SlotRole.ACTIONS)
                 val title = (node.property("title") as? ComponentProperty.Text)?.value
                     ?: (node.property("text") as? ComponentProperty.Text)?.value
                     ?: "Dashboard"
                 val mod = buildModifierString(node, isRootFloating = false, "fillMaxWidth()")
                 appendLine("${indent}TopAppBar(")
-                appendLine("${indent}    title = { Text(text = \"$title\") },")
-                appendLine("${indent}    navigationIcon = {")
-                appendLine("${indent}        IconButton(onClick = { /* TODO: Open navigation */ }) {")
-                appendLine("${indent}            Icon(Icons.Outlined.Menu, contentDescription = \"Menu\")")
-                appendLine("${indent}        }")
-                appendLine("${indent}    },")
-                appendLine("${indent}    actions = {")
-                appendLine("${indent}        IconButton(onClick = { /* TODO: Search */ }) {")
-                appendLine("${indent}            Icon(Icons.Outlined.Search, contentDescription = \"Search\")")
-                appendLine("${indent}        }")
-                appendLine("${indent}    },")
+                if (titleChild != null) {
+                    appendLine("${indent}    title = {")
+                    append(generateNodeCode(titleChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    title = { Text(text = \"$title\") },")
+                }
+
+                if (navChild != null) {
+                    appendLine("${indent}    navigationIcon = {")
+                    append(generateNodeCode(navChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    navigationIcon = {")
+                    appendLine("${indent}        IconButton(onClick = { /* TODO: Open navigation */ }) {")
+                    appendLine("${indent}            Icon(Icons.Outlined.Menu, contentDescription = \"Menu\")")
+                    appendLine("${indent}        }")
+                    appendLine("${indent}    },")
+                }
+
+                if (actionChildren.isNotEmpty()) {
+                    appendLine("${indent}    actions = {")
+                    actionChildren.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent        "))
+                    }
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    actions = {")
+                    appendLine("${indent}        IconButton(onClick = { /* TODO: Search */ }) {")
+                    appendLine("${indent}            Icon(Icons.Outlined.Search, contentDescription = \"Search\")")
+                    appendLine("${indent}        }")
+                    appendLine("${indent}        IconButton(onClick = { /* TODO: More options */ }) {")
+                    appendLine("${indent}            Icon(Icons.Outlined.MoreVert, contentDescription = \"More\")")
+                    appendLine("${indent}        }")
+                    appendLine("${indent}    },")
+                }
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
             }
@@ -499,13 +527,52 @@ open class ComposeCodeGenerator(
             }
 
             ComponentType.LISTS -> buildString {
+                val headlineChild = node.childInSlot(SlotRole.HEADLINE)
+                val supportingChild = node.childInSlot(SlotRole.SUPPORTING)
+                val leadingChild = node.childInSlot(SlotRole.LEADING)
+                val trailingChild = node.childInSlot(SlotRole.TRAILING)
+                val overlineChild = node.childInSlot(SlotRole.OVERLINE)
                 val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "List Item Headline"
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}ListItem(")
-                appendLine("${indent}    headlineContent = { Text(\"$text\") },")
-                appendLine("${indent}    supportingContent = { Text(\"Supporting secondary description\") },")
-                appendLine("${indent}    leadingContent = { Icon(Icons.Outlined.Star, contentDescription = null) },")
-                appendLine("${indent}    trailingContent = { Text(\"10:30\", style = MaterialTheme.typography.labelSmall) },")
+                if (headlineChild != null) {
+                    appendLine("${indent}    headlineContent = {")
+                    append(generateNodeCode(headlineChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    headlineContent = { Text(\"$text\") },")
+                }
+
+                if (supportingChild != null) {
+                    appendLine("${indent}    supportingContent = {")
+                    append(generateNodeCode(supportingChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else if (node.children.isEmpty()) {
+                    appendLine("${indent}    supportingContent = { Text(\"Supporting secondary description\") },")
+                }
+
+                if (leadingChild != null) {
+                    appendLine("${indent}    leadingContent = {")
+                    append(generateNodeCode(leadingChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else if (node.children.isEmpty()) {
+                    appendLine("${indent}    leadingContent = { Icon(Icons.Outlined.Star, contentDescription = null) },")
+                }
+
+                if (trailingChild != null) {
+                    appendLine("${indent}    trailingContent = {")
+                    append(generateNodeCode(trailingChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else if (node.children.isEmpty()) {
+                    appendLine("${indent}    trailingContent = { Text(\"10:30\", style = MaterialTheme.typography.labelSmall) },")
+                }
+
+                if (overlineChild != null) {
+                    appendLine("${indent}    overlineContent = {")
+                    append(generateNodeCode(overlineChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                }
+
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
             }
@@ -520,31 +587,83 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 appendLine("${indent}    Column(modifier = Modifier.padding(16.dp)) {")
-                appendLine("${indent}        Text(\"$title\", style = MaterialTheme.typography.titleMedium)")
-                appendLine("${indent}        Spacer(modifier = Modifier.height(8.dp))")
-                appendLine("${indent}        Text(\"Supplementary modal bottom sheet content.\", style = MaterialTheme.typography.bodyMedium)")
-                appendLine("${indent}        Spacer(modifier = Modifier.height(16.dp))")
-                appendLine("${indent}        Button(onClick = { /* TODO */ }, modifier = Modifier.fillMaxWidth()) {")
-                appendLine("${indent}            Text(\"Confirm\")")
-                appendLine("${indent}        }")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent        "))
+                    }
+                } else {
+                    appendLine("${indent}        Text(\"$title\", style = MaterialTheme.typography.titleMedium)")
+                    appendLine("${indent}        Spacer(modifier = Modifier.height(8.dp))")
+                    appendLine("${indent}        Text(\"Supplementary modal bottom sheet content.\", style = MaterialTheme.typography.bodyMedium)")
+                    appendLine("${indent}        Spacer(modifier = Modifier.height(16.dp))")
+                    appendLine("${indent}        Button(onClick = { /* TODO */ }, modifier = Modifier.fillMaxWidth()) {")
+                    appendLine("${indent}            Text(\"Confirm\")")
+                    appendLine("${indent}        }")
+                }
                 appendLine("${indent}    }")
                 appendLine("${indent}}")
             }
 
             ComponentType.DIALOG -> buildString {
+                val iconChild = node.childInSlot(SlotRole.ICON)
+                val titleChild = node.childInSlot(SlotRole.TITLE)
+                val confirmChild = node.childInSlot(SlotRole.CONFIRM_BUTTON)
+                val dismissChild = node.childInSlot(SlotRole.DISMISS_BUTTON)
+                val contentChildren = node.children.filter {
+                    it.slot == null || it.slot == SlotRole.CONTENT || it.slot == SlotRole.SUPPORTING
+                }
                 val title = (node.property("text") as? ComponentProperty.Text)?.value ?: "Dialog Title"
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}AlertDialog(")
                 appendLine("${indent}    onDismissRequest = { /* TODO */ },")
-                appendLine("${indent}    icon = { Icon(Icons.Outlined.Info, contentDescription = null) },")
-                appendLine("${indent}    title = { Text(\"$title\") },")
-                appendLine("${indent}    text = { Text(\"Dialogs inform users about a task and can contain critical information.\") },")
-                appendLine("${indent}    confirmButton = {")
-                appendLine("${indent}        Button(onClick = { /* TODO */ }) { Text(\"Confirm\") }")
-                appendLine("${indent}    },")
-                appendLine("${indent}    dismissButton = {")
-                appendLine("${indent}        TextButton(onClick = { /* TODO */ }) { Text(\"Cancel\") }")
-                appendLine("${indent}    },")
+                if (iconChild != null) {
+                    appendLine("${indent}    icon = {")
+                    append(generateNodeCode(iconChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else if (node.children.isEmpty()) {
+                    appendLine("${indent}    icon = { Icon(Icons.Outlined.Info, contentDescription = null) },")
+                }
+
+                if (titleChild != null) {
+                    appendLine("${indent}    title = {")
+                    append(generateNodeCode(titleChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    title = { Text(\"$title\") },")
+                }
+
+                if (contentChildren.isNotEmpty()) {
+                    appendLine("${indent}    text = {")
+                    appendLine("${indent}        Column {")
+                    contentChildren.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent            "))
+                    }
+                    appendLine("${indent}        }")
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    text = { Text(\"Dialogs inform users about a task and can contain critical information.\") },")
+                }
+
+                if (confirmChild != null) {
+                    appendLine("${indent}    confirmButton = {")
+                    append(generateNodeCode(confirmChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    confirmButton = {")
+                    appendLine("${indent}        Button(onClick = { /* TODO */ }) { Text(\"Confirm\") }")
+                    appendLine("${indent}    },")
+                }
+
+                if (dismissChild != null) {
+                    appendLine("${indent}    dismissButton = {")
+                    append(generateNodeCode(dismissChild, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                } else {
+                    appendLine("${indent}    dismissButton = {")
+                    appendLine("${indent}        TextButton(onClick = { /* TODO */ }) { Text(\"Cancel\") }")
+                    appendLine("${indent}    },")
+                }
+
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
             }
@@ -1197,7 +1316,7 @@ open class ComposeCodeGenerator(
 
         fun generateNodeCode(
             node: CanvasNode,
-            indent: String,
+            indent: String = "",
             isRootFloating: Boolean = false,
             extraModifier: String? = null
         ): String = default.generateNodeCode(node, indent, isRootFloating, extraModifier)

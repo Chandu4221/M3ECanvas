@@ -1690,4 +1690,126 @@ class SharedCommonTest {
         layersRatio = (0.5f + 0.6f).coerceIn(0.15f, 0.85f)
         assertEquals(0.85f, layersRatio, 0.001f)
     }
+
+    @Test
+    fun testCardIsContainerAndAcceptsChildren() {
+        val controller = EditorController(initialProject = EditorController.newProject("CardProject", withDefaultScaffold = false))
+        controller.addNode(ComponentType.CARD, CanvasPosition(20f, 20f))
+        val card = controller.state.project.nodes.first { it.type == ComponentType.CARD }
+        assertTrue(card.isContainer, "Card should be a container")
+
+        controller.addChildToContainer(card.id, ComponentType.IMAGE)
+        controller.addChildToContainer(card.id, ComponentType.TEXT)
+
+        val updatedCard = controller.state.project.findNode(card.id)!!
+        assertEquals(2, updatedCard.children.size)
+        assertEquals(ComponentType.IMAGE, updatedCard.children[0].type)
+        assertEquals(ComponentType.TEXT, updatedCard.children[1].type)
+        assertEquals(updatedCard.id, controller.findParent(updatedCard.children[0].id)?.id)
+    }
+
+    @Test
+    fun testSlotRoleMultiOccupancy() {
+        var topBar = CanvasNode(
+            type = ComponentType.TOP_APP_BAR,
+            name = "TopBar",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(412f, 64f)
+        )
+
+        val action1 = CanvasNode(type = ComponentType.ICON_BUTTON, name = "Action 1", position = CanvasPosition.Zero, size = CanvasSize(48f, 48f))
+        val action2 = CanvasNode(type = ComponentType.ICON_BUTTON, name = "Action 2", position = CanvasPosition.Zero, size = CanvasSize(48f, 48f))
+
+        topBar = topBar.withChildInSlot(action1, SlotRole.ACTIONS)
+        topBar = topBar.withChildInSlot(action2, SlotRole.ACTIONS)
+        assertEquals(2, topBar.childrenInSlot(SlotRole.ACTIONS).size, "ACTIONS should allow multiple occupants")
+
+        val title1 = CanvasNode(type = ComponentType.TEXT, name = "Title 1", position = CanvasPosition.Zero, size = CanvasSize(100f, 24f))
+        val title2 = CanvasNode(type = ComponentType.TEXT, name = "Title 2", position = CanvasPosition.Zero, size = CanvasSize(100f, 24f))
+
+        topBar = topBar.withChildInSlot(title1, SlotRole.TITLE)
+        assertEquals("Title 1", topBar.childInSlot(SlotRole.TITLE)?.name)
+
+        topBar = topBar.withChildInSlot(title2, SlotRole.TITLE)
+        assertEquals("Title 2", topBar.childInSlot(SlotRole.TITLE)?.name)
+        assertEquals(1, topBar.childrenInSlot(SlotRole.TITLE).size, "TITLE should replace single occupant")
+    }
+
+    @Test
+    fun testTopAppBarSlots() {
+        val controller = EditorController(initialProject = EditorController.newProject("TopBarProject", withDefaultScaffold = false))
+        controller.addNode(ComponentType.TOP_APP_BAR, CanvasPosition.Zero)
+        val topBar = controller.state.project.nodes.first { it.type == ComponentType.TOP_APP_BAR }
+
+        controller.addChildToContainer(topBar.id, ComponentType.TEXT)
+        controller.addChildToContainer(topBar.id, ComponentType.ICON_BUTTON)
+
+        val updatedTopBar = controller.state.project.findNode(topBar.id)!!
+        assertEquals(SlotRole.TITLE, updatedTopBar.children[0].slot)
+        assertEquals(SlotRole.ACTIONS, updatedTopBar.children[1].slot)
+    }
+
+    @Test
+    fun testListItemSlots() {
+        val controller = EditorController(initialProject = EditorController.newProject("ListProject", withDefaultScaffold = false))
+        controller.addNode(ComponentType.LISTS, CanvasPosition.Zero)
+        val listItem = controller.state.project.nodes.first { it.type == ComponentType.LISTS }
+
+        controller.addChildToContainer(listItem.id, ComponentType.ICON)
+        controller.addChildToContainer(listItem.id, ComponentType.TEXT)
+        controller.addChildToContainer(listItem.id, ComponentType.CHECKBOX)
+
+        val updatedListItem = controller.state.project.findNode(listItem.id)!!
+        assertEquals(SlotRole.LEADING, updatedListItem.children[0].slot)
+        assertEquals(SlotRole.HEADLINE, updatedListItem.children[1].slot)
+        assertEquals(SlotRole.TRAILING, updatedListItem.children[2].slot)
+    }
+
+    @Test
+    fun testSetNodeSlot() {
+        val controller = EditorController(initialProject = EditorController.newProject("SlotSwitchProject", withDefaultScaffold = false))
+        controller.addNode(ComponentType.TOP_APP_BAR, CanvasPosition.Zero)
+        val topBar = controller.state.project.nodes.first { it.type == ComponentType.TOP_APP_BAR }
+
+        controller.addChildToContainer(topBar.id, ComponentType.ICON_BUTTON)
+        val actionButton = controller.state.project.findNode(topBar.id)!!.children.first()
+        assertEquals(SlotRole.ACTIONS, actionButton.slot)
+
+        // Switch to NAVIGATION_ICON
+        controller.setNodeSlot(actionButton.id, SlotRole.NAVIGATION_ICON)
+        val switchedButton = controller.state.project.findNode(actionButton.id)!!
+        assertEquals(SlotRole.NAVIGATION_ICON, switchedButton.slot)
+    }
+
+    @Test
+    fun testComposeCodeGeneratorSlottedTopAppBarAndCard() {
+        val generator = ComposeCodeGenerator.default
+        val cardNode = CanvasNode(
+            type = ComponentType.CARD,
+            name = "MyCard",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(300f, 200f),
+            children = listOf(
+                CanvasNode(type = ComponentType.TEXT, name = "Card Title", position = CanvasPosition.Zero, size = CanvasSize(100f, 20f))
+            )
+        )
+        val cardCode = generator.generateNodeCode(cardNode)
+        assertTrue(cardCode.contains("Card("))
+        assertTrue(cardCode.contains("Text("))
+
+        val topBarNode = CanvasNode(
+            type = ComponentType.TOP_APP_BAR,
+            name = "MyTopBar",
+            position = CanvasPosition.Zero,
+            size = CanvasSize(412f, 64f),
+            children = listOf(
+                CanvasNode(type = ComponentType.TEXT, name = "App Header", position = CanvasPosition.Zero, size = CanvasSize(120f, 24f), slot = SlotRole.TITLE),
+                CanvasNode(type = ComponentType.ICON_BUTTON, name = "SearchBtn", position = CanvasPosition.Zero, size = CanvasSize(48f, 48f), slot = SlotRole.ACTIONS)
+            )
+        )
+        val topBarCode = generator.generateNodeCode(topBarNode)
+        assertTrue(topBarCode.contains("TopAppBar("))
+        assertTrue(topBarCode.contains("title = {"))
+        assertTrue(topBarCode.contains("actions = {"))
+    }
 }

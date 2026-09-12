@@ -204,7 +204,7 @@ class EditorController(
             }
             // 2. If selected node has a parent container, insert as sibling
             selected != null -> {
-                val parent = findParentInProject(selected.id)
+                val parent = findParent(selected.id)
                 if (parent != null) {
                     val index = parent.children.indexOfFirst { it.id == selected.id }
                     val updatedChildren = parent.children.toMutableList().apply {
@@ -252,7 +252,7 @@ class EditorController(
         val clone = selected.deepCloneWithNewIds(offsetPosition = true)
         pushState()
 
-        val parent = findParentInProject(selected.id)
+        val parent = findParent(selected.id)
         val updatedProject = if (parent != null) {
             val index = parent.children.indexOfFirst { it.id == selected.id }
             val updatedChildren = parent.children.toMutableList().apply {
@@ -334,8 +334,9 @@ class EditorController(
         val childCount = container.children.count { it.type == type }
         val name = "${type.displayName} ${childCount + 1}"
 
-        val targetSlot = if (container.type == ComponentType.SCAFFOLD) {
-            type.canonicalSlot()
+        val supported = container.type.supportedSlots()
+        val targetSlot = if (supported.isNotEmpty()) {
+            type.canonicalSlotFor(container.type)
         } else {
             null
         }
@@ -348,7 +349,7 @@ class EditorController(
             slot = targetSlot
         )
 
-        val updatedContainer = if (container.type == ComponentType.SCAFFOLD && targetSlot != null && targetSlot != SlotRole.CONTENT) {
+        val updatedContainer = if (targetSlot != null && !targetSlot.isMultiOccupant) {
             container.withChildInSlot(child = child, slotRole = targetSlot)
         } else {
             container.withChild(child = child)
@@ -359,6 +360,30 @@ class EditorController(
             newProject = state.project.updateNode(node = updatedContainer),
             selectedNodeIds = setOf(child.id)
         )
+    }
+
+    /** Sets the slot role for [nodeId], replacing single-occupant occupants if necessary. */
+    fun setNodeSlot(nodeId: String, slotRole: SlotRole?) {
+        val node = state.project.findNode(nodeId = nodeId) ?: return
+        if (node.slot == slotRole) return
+
+        val parent = findParent(nodeId = nodeId)
+        if (parent != null && slotRole != null) {
+            val cleanedChildren = if (!slotRole.isMultiOccupant) {
+                parent.children.filterNot { it.id != nodeId && it.slot == slotRole }
+            } else {
+                parent.children
+            }
+            val updatedChildren = cleanedChildren.map {
+                if (it.id == nodeId) it.copy(slot = slotRole) else it
+            }
+            val updatedParent = parent.copy(children = updatedChildren)
+            pushState()
+            updateProject(newProject = state.project.updateNode(node = updatedParent))
+        } else {
+            pushState()
+            updateProject(newProject = state.project.updateNode(node = node.copy(slot = slotRole)))
+        }
     }
 
     /** Removes the node with [nodeId] from anywhere in the tree. */
@@ -489,7 +514,7 @@ class EditorController(
     }
 
     private fun reorderNode(nodeId: String, delta: Int) {
-        val parent = findParentInProject(nodeId = nodeId)
+        val parent = findParent(nodeId = nodeId)
 
         if (parent == null) {
             val nodes = state.project.nodes
@@ -517,18 +542,19 @@ class EditorController(
         }
     }
 
-    private fun findParentInProject(nodeId: String): CanvasNode? {
+    /** Finds the parent container node of [nodeId], or null if it is a root node. */
+    fun findParent(nodeId: String): CanvasNode? {
         for (root in state.project.nodes) {
-            val found = findParent(node = root, targetId = nodeId)
+            val found = findParentInternal(node = root, targetId = nodeId)
             if (found != null) return found
         }
         return null
     }
 
-    private fun findParent(node: CanvasNode, targetId: String): CanvasNode? {
+    private fun findParentInternal(node: CanvasNode, targetId: String): CanvasNode? {
         for (child in node.children) {
             if (child.id == targetId) return node
-            val deeper = findParent(node = child, targetId = targetId)
+            val deeper = findParentInternal(node = child, targetId = targetId)
             if (deeper != null) return deeper
         }
         return null

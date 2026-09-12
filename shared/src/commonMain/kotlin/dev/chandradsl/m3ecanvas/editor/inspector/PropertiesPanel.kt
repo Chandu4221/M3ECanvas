@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -115,18 +117,74 @@ fun PropertiesPanel(
 private fun NodeSection(node: CanvasNode, controller: EditorController) {
     SectionLabel(text = node.type.displayName)
 
-    if (node.slot != null) {
-        Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    val parent = controller.findParent(node.id)
+    val availableSlots = parent?.type?.supportedSlots() ?: emptyList()
+
+    if (node.slot != null || availableSlots.size > 1) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                text = "Snapped to Scaffold: ${node.slot.displayName}",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-            )
+            if (node.slot != null) {
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (parent?.type == ComponentType.SCAFFOLD) {
+                            "Snapped to Scaffold: ${node.slot.displayName}"
+                        } else {
+                            "Slot: ${node.slot.displayName}"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+            if (availableSlots.size > 1) {
+                var expanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Slot: ${node.slot?.displayName ?: "None"}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Icon(
+                                imageVector = Icons.Outlined.ArrowDropDown,
+                                contentDescription = "Select Slot"
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        availableSlots.forEach { slotRole ->
+                            DropdownMenuItem(
+                                text = { Text(slotRole.displayName) },
+                                onClick = {
+                                    controller.setNodeSlot(node.id, slotRole)
+                                    expanded = false
+                                },
+                                leadingIcon = if (node.slot == slotRole) {
+                                    { Icon(Icons.Outlined.Check, contentDescription = null) }
+                                } else null
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -49,7 +49,7 @@ data class CanvasNode(
     /** Returns a copy with the child added into [slotRole], replacing any existing single-slot occupant. */
     fun withChildInSlot(child: CanvasNode, slotRole: SlotRole): CanvasNode {
         val slottedChild = child.copy(slot = slotRole)
-        val updatedChildren = if (slotRole != SlotRole.CONTENT) {
+        val updatedChildren = if (!slotRole.isMultiOccupant) {
             children.filterNot { it.slot == slotRole } + slottedChild
         } else {
             children + slottedChild

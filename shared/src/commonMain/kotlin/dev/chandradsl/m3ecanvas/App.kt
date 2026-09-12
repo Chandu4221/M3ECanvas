@@ -339,9 +339,14 @@ fun App(repository: ProjectRepository) {
                         ComponentPalette(
                             onAddComponent = { type ->
                                 val selected = controller.state.selectedNodes.firstOrNull()
-                                if (selected != null && selected.isContainer) {
+                                val targetContainer = if (selected != null) {
+                                    if (selected.isContainer) selected
+                                    else controller.findParent(selected.id)?.takeIf { it.isContainer }
+                                } else null
+
+                                if (targetContainer != null) {
                                     controller.addChildToContainer(
-                                        containerId = selected.id,
+                                        containerId = targetContainer.id,
                                         type = type
                                     )
                                 } else {

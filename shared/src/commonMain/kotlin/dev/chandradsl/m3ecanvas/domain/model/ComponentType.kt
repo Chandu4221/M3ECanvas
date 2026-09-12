@@ -38,10 +38,10 @@ enum class ComponentType(
     BUTTON_GROUP(displayName = "Button Group", category = ComponentCategory.ACTION),
 
     // Containment
-    CARD(displayName = "Card", category = ComponentCategory.CONTAINMENT),
-    LISTS(displayName = "Lists", category = ComponentCategory.CONTAINMENT),
-    SHEETS(displayName = "Sheets", category = ComponentCategory.CONTAINMENT),
-    DIALOG(displayName = "Dialog", category = ComponentCategory.CONTAINMENT),
+    CARD(displayName = "Card", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    LISTS(displayName = "Lists", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    SHEETS(displayName = "Sheets", category = ComponentCategory.CONTAINMENT, isContainer = true),
+    DIALOG(displayName = "Dialog", category = ComponentCategory.CONTAINMENT, isContainer = true),
     SURFACE(displayName = "Surface", category = ComponentCategory.CONTAINMENT, isContainer = true),
 
     // Communication
@@ -52,7 +52,7 @@ enum class ComponentType(
     LOADING_INDICATOR(displayName = "Loading Indicator", category = ComponentCategory.COMMUNICATION),
 
     // Navigation
-    TOP_APP_BAR(displayName = "Top App Bar", category = ComponentCategory.NAVIGATION),
+    TOP_APP_BAR(displayName = "Top App Bar", category = ComponentCategory.NAVIGATION, isContainer = true),
     NAVIGATION_BAR(displayName = "Navigation Bar", category = ComponentCategory.NAVIGATION),
     BOTTOM_APP_BAR(displayName = "Bottom App Bar", category = ComponentCategory.NAVIGATION),
     NAVIGATION_RAIL(displayName = "Navigation Rail", category = ComponentCategory.NAVIGATION),
@@ -107,6 +107,82 @@ enum class ComponentType(
             NAVIGATION_DRAWER -> SlotRole.DRAWER
             FAB, EXTENDED_FAB -> SlotRole.FAB
             SNACKBAR -> SlotRole.SNACKBAR
+            else -> SlotRole.CONTENT
+        }
+    }
+
+    /**
+     * Returns the list of named slots supported by this component type.
+     */
+    fun supportedSlots(): List<SlotRole> {
+        return when (this) {
+            SCAFFOLD -> listOf(
+                SlotRole.TOP_BAR,
+                SlotRole.BOTTOM_BAR,
+                SlotRole.RAIL,
+                SlotRole.DRAWER,
+                SlotRole.FAB,
+                SlotRole.SNACKBAR,
+                SlotRole.CONTENT
+            )
+            TOP_APP_BAR -> listOf(
+                SlotRole.NAVIGATION_ICON,
+                SlotRole.TITLE,
+                SlotRole.ACTIONS
+            )
+            LISTS -> listOf(
+                SlotRole.LEADING,
+                SlotRole.HEADLINE,
+                SlotRole.SUPPORTING,
+                SlotRole.TRAILING,
+                SlotRole.OVERLINE
+            )
+            DIALOG -> listOf(
+                SlotRole.ICON,
+                SlotRole.TITLE,
+                SlotRole.CONTENT,
+                SlotRole.CONFIRM_BUTTON,
+                SlotRole.DISMISS_BUTTON
+            )
+            TEXT_FIELD -> listOf(
+                SlotRole.LEADING,
+                SlotRole.TRAILING
+            )
+            CARD, SHEETS, SURFACE,
+            COLUMN, ROW, BOX,
+            LAZY_COLUMN, LAZY_ROW, LAZY_VERTICAL_GRID,
+            FLOW_ROW, FLOW_COLUMN -> listOf(SlotRole.CONTENT)
+            else -> emptyList()
+        }
+    }
+
+    /**
+     * Determines the canonical slot when this component is placed inside [parentType].
+     */
+    fun canonicalSlotFor(parentType: ComponentType): SlotRole {
+        return when (parentType) {
+            SCAFFOLD -> canonicalSlot()
+            TOP_APP_BAR -> when (this) {
+                TEXT -> SlotRole.TITLE
+                ICON, ICON_BUTTON -> SlotRole.ACTIONS
+                else -> SlotRole.ACTIONS
+            }
+            LISTS -> when (this) {
+                ICON, IMAGE -> SlotRole.LEADING
+                CHECKBOX, SWITCH, RADIO_BUTTON, ICON_BUTTON -> SlotRole.TRAILING
+                TEXT -> SlotRole.HEADLINE
+                else -> SlotRole.CONTENT
+            }
+            DIALOG -> when (this) {
+                ICON, IMAGE -> SlotRole.ICON
+                TEXT -> SlotRole.CONTENT
+                BUTTON -> SlotRole.CONFIRM_BUTTON
+                else -> SlotRole.CONTENT
+            }
+            TEXT_FIELD -> when (this) {
+                ICON, ICON_BUTTON -> SlotRole.LEADING
+                else -> SlotRole.CONTENT
+            }
             else -> SlotRole.CONTENT
         }
     }

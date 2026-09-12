@@ -161,10 +161,10 @@ fun CanvasNodeRenderer(
         ComponentType.BUTTON_GROUP -> RenderButtonGroup(node = node)
 
         // Containment
-        ComponentType.CARD -> RenderCard(node = node)
-        ComponentType.LISTS -> RenderListItem(node = node)
-        ComponentType.SHEETS -> RenderBottomSheet(node = node)
-        ComponentType.DIALOG -> RenderDialog(node = node)
+        ComponentType.CARD -> RenderCard(node = node, controller = controller)
+        ComponentType.LISTS -> RenderListItem(node = node, controller = controller)
+        ComponentType.SHEETS -> RenderBottomSheet(node = node, controller = controller)
+        ComponentType.DIALOG -> RenderDialog(node = node, controller = controller)
 
         // Communication
         ComponentType.SNACKBAR -> RenderSnackbar(node = node)
@@ -174,7 +174,7 @@ fun CanvasNodeRenderer(
         ComponentType.LOADING_INDICATOR -> RenderLoadingIndicator(node = node)
 
         // Navigation
-        ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node)
+        ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node, controller = controller)
         ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node)
         ComponentType.BOTTOM_APP_BAR -> RenderBottomAppBar(node = node)
         ComponentType.NAVIGATION_RAIL -> RenderNavigationRail(node = node)
@@ -225,15 +225,49 @@ private fun RenderButton(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderCard(node: CanvasNode) {
+private fun RenderCard(node: CanvasNode, controller: EditorController) {
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Card
         ?: MaterialVariant.Card.FILLED
     val modifier = node.modifiers.toModifier().fillMaxSize()
 
+    val cardContent: @Composable ColumnScope.() -> Unit = {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(all = node.layoutConfig.padding.dp),
+            verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig),
+            horizontalAlignment = resolveHorizontalAlignment(config = node.layoutConfig)
+        ) {
+            if (node.children.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Card (${node.name})\nDrop components here",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            } else {
+                node.children.forEach { child ->
+                    val weightSpec = child.modifiers.filterIsInstance<ModifierSpec.Weight>().firstOrNull()
+                    val scopeModifier = if (weightSpec != null) {
+                        Modifier.weight(weight = weightSpec.weight)
+                    } else {
+                        Modifier
+                    }
+                    ContainerChild(child = child, controller = controller, modifier = scopeModifier)
+                }
+            }
+        }
+    }
+
     when (variant) {
-        MaterialVariant.Card.FILLED -> Card(modifier = modifier) { Box(modifier = Modifier.fillMaxSize()) }
-        MaterialVariant.Card.ELEVATED -> ElevatedCard(modifier = modifier) { Box(modifier = Modifier.fillMaxSize()) }
-        MaterialVariant.Card.OUTLINED -> OutlinedCard(modifier = modifier) { Box(modifier = Modifier.fillMaxSize()) }
+        MaterialVariant.Card.FILLED -> Card(modifier = modifier, content = cardContent)
+        MaterialVariant.Card.ELEVATED -> ElevatedCard(modifier = modifier, content = cardContent)
+        MaterialVariant.Card.OUTLINED -> OutlinedCard(modifier = modifier, content = cardContent)
     }
 }
 
@@ -353,33 +387,53 @@ private fun RenderScaffold(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RenderTopAppBar(node: CanvasNode) {
+private fun RenderTopAppBar(node: CanvasNode, controller: EditorController) {
     val titleText = (node.property("title") as? ComponentProperty.Text)?.value
         ?: (node.property("text") as? ComponentProperty.Text)?.value
         ?: node.name
 
+    val titleChild = node.childInSlot(SlotRole.TITLE)
+    val navChild = node.childInSlot(SlotRole.NAVIGATION_ICON)
+    val actionChildren = node.childrenInSlot(SlotRole.ACTIONS)
+
     TopAppBar(
-        title = { Text(text = titleText, maxLines = 1) },
+        title = {
+            if (titleChild != null) {
+                ContainerChild(child = titleChild, controller = controller)
+            } else {
+                Text(text = titleText, maxLines = 1)
+            }
+        },
         navigationIcon = {
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Outlined.Menu,
-                    contentDescription = "Navigation"
-                )
+            if (navChild != null) {
+                ContainerChild(child = navChild, controller = controller)
+            } else {
+                IconButton(onClick = {}) {
+                    Icon(
+                        imageVector = Icons.Outlined.Menu,
+                        contentDescription = "Navigation"
+                    )
+                }
             }
         },
         actions = {
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = "Search"
-                )
-            }
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Outlined.MoreVert,
-                    contentDescription = "More"
-                )
+            if (actionChildren.isNotEmpty()) {
+                actionChildren.forEach { child ->
+                    ContainerChild(child = child, controller = controller)
+                }
+            } else {
+                IconButton(onClick = {}) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Search"
+                    )
+                }
+                IconButton(onClick = {}) {
+                    Icon(
+                        imageVector = Icons.Outlined.MoreVert,
+                        contentDescription = "More"
+                    )
+                }
             }
         },
         modifier = node.modifiers.toModifier().fillMaxWidth()
@@ -694,24 +748,61 @@ private fun RenderButtonGroup(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderListItem(node: CanvasNode) {
-    ListItem(
-        headlineContent = { Text(text = node.textOrDefault(default = "Headline text")) },
-        supportingContent = { Text(text = "Secondary supporting description") },
-        leadingContent = {
+private fun RenderListItem(node: CanvasNode, controller: EditorController) {
+    val headlineChild = node.childInSlot(SlotRole.HEADLINE)
+    val supportingChild = node.childInSlot(SlotRole.SUPPORTING)
+    val leadingChild = node.childInSlot(SlotRole.LEADING)
+    val trailingChild = node.childInSlot(SlotRole.TRAILING)
+    val overlineChild = node.childInSlot(SlotRole.OVERLINE)
+
+    val headlineComposable: @Composable () -> Unit = {
+        if (headlineChild != null) {
+            ContainerChild(child = headlineChild, controller = controller)
+        } else {
+            Text(text = node.textOrDefault(default = "Headline text"))
+        }
+    }
+
+    val supportingComposable: (@Composable () -> Unit)? = if (supportingChild != null) {
+        { ContainerChild(child = supportingChild, controller = controller) }
+    } else if (node.children.isEmpty()) {
+        { Text(text = "Secondary supporting description") }
+    } else null
+
+    val leadingComposable: (@Composable () -> Unit)? = if (leadingChild != null) {
+        { ContainerChild(child = leadingChild, controller = controller) }
+    } else if (node.children.isEmpty()) {
+        {
             Icon(
                 imageVector = Icons.Outlined.Star,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )
-        },
-        trailingContent = {
+        }
+    } else null
+
+    val trailingComposable: (@Composable () -> Unit)? = if (trailingChild != null) {
+        { ContainerChild(child = trailingChild, controller = controller) }
+    } else if (node.children.isEmpty()) {
+        {
             Text(
                 text = "10:30",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
-        },
+        }
+    } else null
+
+    val overlineComposable: (@Composable () -> Unit)? = if (overlineChild != null) {
+        { ContainerChild(child = overlineChild, controller = controller) }
+    } else null
+
+    ListItem(
+        headlineContent = headlineComposable,
+        supportingContent = supportingComposable,
+        leadingContent = leadingComposable,
+        trailingContent = trailingComposable,
+        overlineContent = overlineComposable,
         colors = ListItemDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         ),
@@ -720,7 +811,7 @@ private fun RenderListItem(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderBottomSheet(node: CanvasNode) {
+private fun RenderBottomSheet(node: CanvasNode, controller: EditorController) {
     Surface(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -738,27 +829,41 @@ private fun RenderBottomSheet(node: CanvasNode) {
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = node.textOrDefault(default = "Bottom Sheet Title"),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Expressive bottom sheet preview anchored to the viewport.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Text("Action Button")
+            if (node.children.isNotEmpty()) {
+                node.children.forEach { child ->
+                    ContainerChild(child = child, controller = controller)
+                }
+            } else {
+                Text(
+                    text = node.textOrDefault(default = "Bottom Sheet Title"),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Expressive bottom sheet preview anchored to the viewport.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                    Text("Action Button")
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RenderDialog(node: CanvasNode) {
+private fun RenderDialog(node: CanvasNode, controller: EditorController) {
+    val iconChild = node.childInSlot(SlotRole.ICON)
+    val titleChild = node.childInSlot(SlotRole.TITLE)
+    val confirmChild = node.childInSlot(SlotRole.CONFIRM_BUTTON)
+    val dismissChild = node.childInSlot(SlotRole.DISMISS_BUTTON)
+    val contentChildren = node.children.filter {
+        it.slot == null || it.slot == SlotRole.CONTENT || it.slot == SlotRole.SUPPORTING
+    }
+
     Surface(
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -766,31 +871,62 @@ private fun RenderDialog(node: CanvasNode) {
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            Text(
-                text = node.textOrDefault(default = "Dialog Title"),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            if (iconChild != null) {
+                ContainerChild(child = iconChild, controller = controller)
+                Spacer(modifier = Modifier.height(16.dp))
+            } else if (node.children.isEmpty()) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            }
+
+            if (titleChild != null) {
+                ContainerChild(child = titleChild, controller = controller)
+            } else {
+                Text(
+                    text = node.textOrDefault(default = "Dialog Title"),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Dialogs inform users about a task and can contain critical information.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+
+            if (contentChildren.isNotEmpty()) {
+                contentChildren.forEach { child ->
+                    ContainerChild(child = child, controller = controller)
+                }
+            } else {
+                Text(
+                    text = "Dialogs inform users about a task and can contain critical information.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(modifier = Modifier.height(24.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = {}) { Text("Cancel") }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {}) { Text("Confirm") }
+                if (dismissChild != null) {
+                    ContainerChild(child = dismissChild, controller = controller)
+                } else if (node.children.isEmpty()) {
+                    TextButton(onClick = {}) { Text("Cancel") }
+                }
+                if (dismissChild != null && confirmChild != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                } else if (node.children.isEmpty()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                if (confirmChild != null) {
+                    ContainerChild(child = confirmChild, controller = controller)
+                } else if (node.children.isEmpty()) {
+                    Button(onClick = {}) { Text("Confirm") }
+                }
             }
         }
     }

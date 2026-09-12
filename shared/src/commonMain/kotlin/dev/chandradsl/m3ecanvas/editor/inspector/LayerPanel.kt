@@ -30,6 +30,7 @@ import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
+import dev.chandradsl.m3ecanvas.domain.model.SlotRole
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 /**
@@ -189,13 +190,32 @@ private fun LayerRow(
             .padding(start = (16 + depth * 16).dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = node.name,
-            style = MaterialTheme.typography.bodyMedium,
+        Row(
             modifier = Modifier
                 .weight(weight = 1f)
-                .padding(start = 0.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
-        )
+                .padding(start = 0.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = node.name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
+            )
+            if (node.slot != null && node.slot != SlotRole.CONTENT) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    contentColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Text(
+                        text = node.slot.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
+            }
+        }
         if (isSelected) {
             LayerActionIcon(
                 imageVector = Icons.Outlined.KeyboardArrowUp,
