@@ -15,7 +15,9 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import dev.chandradsl.m3ecanvas.domain.model.DeviceCategory
+import dev.chandradsl.m3ecanvas.domain.model.DeviceOrientation
 import dev.chandradsl.m3ecanvas.domain.model.DeviceProfile
+import dev.chandradsl.m3ecanvas.domain.model.WindowWidthSizeClass
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -73,8 +75,8 @@ fun CanvasScreen(controller: EditorController) {
 
         // Auto-fit to screen on device profile change if it exceeds available bounds
         LaunchedEffect(deviceProfile) {
-            val deviceWidth = deviceProfile.size.width + 48f
-            val deviceHeight = deviceProfile.size.height + 96f
+            val deviceWidth = deviceProfile.effectiveWidth + 48f
+            val deviceHeight = deviceProfile.effectiveHeight + 96f
             if (deviceWidth > availableWidth || deviceHeight > availableHeight) {
                 controller.fitToScreen(availableWidth, availableHeight)
             }
@@ -171,84 +173,116 @@ fun CanvasScreen(controller: EditorController) {
                     onClick = { controller.clearSelection() }
                 )
 
-                // Outer Device Hardware Frame with Bezel & Drop Shadow
-                Surface(
-                    modifier = Modifier
-                        .size(
-                            width = (deviceProfile.size.width + 16f).dp,
-                            height = (deviceProfile.size.height + 16f).dp
-                        )
-                        .shadow(
-                            elevation = 20.dp,
-                            shape = RoundedCornerShape(36.dp),
-                            spotColor = Color.Black.copy(alpha = 0.35f)
-                        ),
-                    shape = RoundedCornerShape(36.dp),
-                    color = Color(0xFF1C1D22),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF383A42))
-                ) {
-                    val canvasColorScheme = remember(state.project.themeConfig) {
-                        CanvasThemeGenerator.generateColorScheme(state.project.themeConfig)
-                    }
-
-                    // Inner Screen Display
-                    MaterialTheme(
-                        colorScheme = canvasColorScheme,
-                        typography = Typography()
+                // Outer Container with Hardware Frame and Draggable Viewport Resize Handles
+                Box(contentAlignment = Alignment.TopStart) {
+                    // Outer Device Hardware Frame with Bezel & Drop Shadow
+                    Surface(
+                        modifier = Modifier
+                            .size(
+                                width = (deviceProfile.effectiveWidth + 16f).dp,
+                                height = (deviceProfile.effectiveHeight + 16f).dp
+                            )
+                            .shadow(
+                                elevation = 20.dp,
+                                shape = RoundedCornerShape(36.dp),
+                                spotColor = Color.Black.copy(alpha = 0.35f)
+                            ),
+                        shape = RoundedCornerShape(36.dp),
+                        color = Color(0xFF1C1D22),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF383A42))
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(all = 8.dp)
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .focusable()
+                        val canvasColorScheme = remember(state.project.themeConfig) {
+                            CanvasThemeGenerator.generateColorScheme(state.project.themeConfig)
+                        }
+                        val deviceDensity = remember(deviceProfile.density, deviceProfile.fontScale) {
+                            androidx.compose.ui.unit.Density(
+                                density = deviceProfile.density,
+                                fontScale = deviceProfile.fontScale
+                            )
+                        }
+
+                        // Inner Screen Display with isolated device density
+                        MaterialTheme(
+                            colorScheme = canvasColorScheme,
+                            typography = Typography()
                         ) {
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                // Simulated Android Status Bar
-                                SimulatedStatusBar()
-
-                                // Screen Content Area with Decoupled Two-Layer Architecture
-                                var canvasCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-                                var marqueeRect by remember { mutableStateOf<Rect?>(null) }
-
+                            CompositionLocalProvider(
+                                androidx.compose.ui.platform.LocalDensity provides deviceDensity
+                            ) {
                                 Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
+                                        .fillMaxSize()
+                                        .padding(all = 8.dp)
+                                        .clip(RoundedCornerShape(28.dp))
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .focusable()
                                 ) {
-                                    // LAYER 1: Component Content Layer (pure Compose components)
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .onGloballyPositioned { coords ->
-                                                canvasCoordinates = coords
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        // Simulated Android Status Bar
+                                        if (state.showSystemInsets) {
+                                            SimulatedStatusBar()
+                                        }
+
+                                        // Screen Content Area with Decoupled Two-Layer Architecture
+                                        var canvasCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                                        var marqueeRect by remember { mutableStateOf<Rect?>(null) }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxWidth()
+                                        ) {
+                                            // LAYER 1: Component Content Layer (pure Compose components)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .onGloballyPositioned { coords ->
+                                                        canvasCoordinates = coords
+                                                    }
+                                            ) {
+                                                CompositionLocalProvider(LocalCanvasCoordinates provides canvasCoordinates) {
+                                                    state.project.nodes.forEach { node ->
+                                                        CanvasNodePlacement(node = node, controller = controller)
+                                                    }
+                                                }
                                             }
-                                    ) {
-                                        CompositionLocalProvider(LocalCanvasCoordinates provides canvasCoordinates) {
-                                            state.project.nodes.forEach { node ->
-                                                CanvasNodePlacement(node = node, controller = controller)
+
+                                            // LAYER 2: Editor Overlay Layer (decoupled overlay above content)
+                                            if (!state.isInteractiveMode) {
+                                                EditorOverlayLayer(
+                                                    controller = controller,
+                                                    geometryStore = controller.geometryStore,
+                                                    alignmentGuides = state.alignmentGuides,
+                                                    marqueeRect = marqueeRect,
+                                                    onMarqueeChange = { marqueeRect = it },
+                                                    modifier = Modifier.fillMaxSize()
+                                                )
                                             }
                                         }
-                                    }
 
-                                    // LAYER 2: Editor Overlay Layer (decoupled overlay above content)
-                                    if (!state.isInteractiveMode) {
-                                        EditorOverlayLayer(
-                                            controller = controller,
-                                            geometryStore = controller.geometryStore,
-                                            alignmentGuides = state.alignmentGuides,
-                                            marqueeRect = marqueeRect,
-                                            onMarqueeChange = { marqueeRect = it },
-                                            modifier = Modifier.fillMaxSize()
-                                        )
+                                        // Simulated Android Gesture Navigation Bar
+                                        if (state.showSystemInsets) {
+                                            SimulatedNavigationBar()
+                                        }
                                     }
                                 }
-
-                                // Simulated Android Gesture Navigation Bar
-                                SimulatedNavigationBar()
                             }
                         }
+                    }
+
+                    // Viewport Drag Resizing Handles (Right edge, Bottom edge, Corner)
+                    if (!state.isInteractiveMode) {
+                        ViewportResizeHandles(
+                            widthDp = deviceProfile.effectiveWidth,
+                            heightDp = deviceProfile.effectiveHeight,
+                            onResize = { newW, newH, isDragging ->
+                                controller.resizeViewport(newW, newH, isDragging)
+                            },
+                            onResizeEnd = {
+                                controller.setViewportResizing(false)
+                            },
+                            modifier = Modifier.matchParentSize()
+                        )
                     }
                 }
             }
@@ -366,7 +400,7 @@ fun CanvasScreen(controller: EditorController) {
                 .padding(20.dp)
         )
 
-        // Floating Interactive Preview Mode Bar (Top Center)
+        // Floating Top Center Bars: Responsive Device Control Bar (in Design Mode) OR Interactive Preview Bar (in Interactive Mode)
         if (state.isInteractiveMode) {
             Surface(
                 shape = RoundedCornerShape(24.dp),
@@ -420,6 +454,17 @@ fun CanvasScreen(controller: EditorController) {
                     }
                 }
             }
+        } else {
+            ResponsiveDeviceControlBar(
+                deviceProfile = deviceProfile,
+                showSystemInsets = state.showSystemInsets,
+                onSelectPreset = { controller.setWindowSizePreset(it) },
+                onToggleOrientation = { controller.toggleDeviceOrientation() },
+                onToggleInsets = { controller.toggleSystemInsets() },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+            )
         }
     }
 }
@@ -589,7 +634,7 @@ private fun DeviceHeaderBadge(
                 tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "${currentProfile.displayName} • ${currentProfile.size.width.toInt()} × ${currentProfile.size.height.toInt()} dp",
+                text = "${currentProfile.displayName} • ${currentProfile.effectiveWidth.toInt()} × ${currentProfile.effectiveHeight.toInt()} dp • ${currentProfile.widthSizeClass.displayName}",
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                 )
@@ -788,5 +833,252 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
             }
     ) {
         CanvasNodeRenderer(node = node, controller = controller)
+    }
+}
+
+@Composable
+private fun ViewportResizeHandles(
+    widthDp: Float,
+    heightDp: Float,
+    onResize: (newWidthDp: Float, newHeightDp: Float, isDragging: Boolean) -> Unit,
+    onResizeEnd: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    var isDraggingRight by remember { mutableStateOf(false) }
+    var isDraggingBottom by remember { mutableStateOf(false) }
+    var isDraggingCorner by remember { mutableStateOf(false) }
+
+    val isResizing = isDraggingRight || isDraggingBottom || isDraggingCorner
+
+    Box(modifier = modifier) {
+        // Right Edge Handle
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = 12.dp)
+                .width(20.dp)
+                .height(64.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { isDraggingRight = true },
+                        onDragEnd = {
+                            isDraggingRight = false
+                            onResizeEnd()
+                        },
+                        onDragCancel = {
+                            isDraggingRight = false
+                            onResizeEnd()
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            with(density) {
+                                val deltaDp = dragAmount.x.toDp().value
+                                onResize(widthDp + deltaDp, heightDp, true)
+                            }
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier.width(5.dp).height(36.dp),
+                shape = RoundedCornerShape(3.dp),
+                color = if (isDraggingRight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+            ) {}
+        }
+
+        // Bottom Edge Handle
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = 12.dp)
+                .width(64.dp)
+                .height(20.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { isDraggingBottom = true },
+                        onDragEnd = {
+                            isDraggingBottom = false
+                            onResizeEnd()
+                        },
+                        onDragCancel = {
+                            isDraggingBottom = false
+                            onResizeEnd()
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            with(density) {
+                                val deltaDp = dragAmount.y.toDp().value
+                                onResize(widthDp, heightDp + deltaDp, true)
+                            }
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier.width(36.dp).height(5.dp),
+                shape = RoundedCornerShape(3.dp),
+                color = if (isDraggingBottom) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+            ) {}
+        }
+
+        // Bottom-Right Corner Handle
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 10.dp, y = 10.dp)
+                .size(24.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { isDraggingCorner = true },
+                        onDragEnd = {
+                            isDraggingCorner = false
+                            onResizeEnd()
+                        },
+                        onDragCancel = {
+                            isDraggingCorner = false
+                            onResizeEnd()
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            with(density) {
+                                val deltaXDp = dragAmount.x.toDp().value
+                                val deltaYDp = dragAmount.y.toDp().value
+                                onResize(widthDp + deltaXDp, heightDp + deltaYDp, true)
+                            }
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier.size(10.dp),
+                shape = CircleShape,
+                color = if (isDraggingCorner) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.8f)
+            ) {}
+        }
+
+        // Floating Dimensions Tooltip Badge while Resizing
+        if (isResizing) {
+            val widthClass = WindowWidthSizeClass.fromWidth(widthDp)
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 16.dp, y = 36.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                shadowElevation = 6.dp
+            ) {
+                Text(
+                    text = "${widthDp.toInt()} × ${heightDp.toInt()} dp • ${widthClass.displayName}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResponsiveDeviceControlBar(
+    deviceProfile: DeviceProfile,
+    showSystemInsets: Boolean,
+    onSelectPreset: (WindowWidthSizeClass) -> Unit,
+    onToggleOrientation: () -> Unit,
+    onToggleInsets: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shadowElevation = 4.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Compact (<600dp)
+            val isCompact = deviceProfile.widthSizeClass == WindowWidthSizeClass.COMPACT
+            FilterChip(
+                selected = isCompact,
+                onClick = { onSelectPreset(WindowWidthSizeClass.COMPACT) },
+                label = { Text("Compact (<600)", style = MaterialTheme.typography.labelSmall) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Smartphone,
+                        contentDescription = "Compact",
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                modifier = Modifier.height(28.dp)
+            )
+
+            // Medium (600–840dp)
+            val isMedium = deviceProfile.widthSizeClass == WindowWidthSizeClass.MEDIUM
+            FilterChip(
+                selected = isMedium,
+                onClick = { onSelectPreset(WindowWidthSizeClass.MEDIUM) },
+                label = { Text("Medium (600–840)", style = MaterialTheme.typography.labelSmall) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.DevicesFold,
+                        contentDescription = "Medium",
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                modifier = Modifier.height(28.dp)
+            )
+
+            // Expanded (>840dp)
+            val isExpanded = deviceProfile.widthSizeClass == WindowWidthSizeClass.EXPANDED
+            FilterChip(
+                selected = isExpanded,
+                onClick = { onSelectPreset(WindowWidthSizeClass.EXPANDED) },
+                label = { Text("Expanded (>840)", style = MaterialTheme.typography.labelSmall) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Computer,
+                        contentDescription = "Expanded",
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                modifier = Modifier.height(28.dp)
+            )
+
+            VerticalDivider(modifier = Modifier.height(20.dp).padding(horizontal = 4.dp))
+
+            // Orientation Toggle
+            IconButton(
+                onClick = onToggleOrientation,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ScreenRotation,
+                    contentDescription = "Rotate Orientation (${deviceProfile.orientation.displayName})",
+                    modifier = Modifier.size(16.dp),
+                    tint = if (deviceProfile.orientation == DeviceOrientation.LANDSCAPE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // System Insets Toggle
+            IconButton(
+                onClick = onToggleInsets,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = if (showSystemInsets) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen,
+                    contentDescription = if (showSystemInsets) "Hide System Insets" else "Show System Insets",
+                    modifier = Modifier.size(16.dp),
+                    tint = if (showSystemInsets) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }

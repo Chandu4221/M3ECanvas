@@ -529,6 +529,86 @@ class EditorController(
         }
     }
 
+    /**
+     * Resizes the device viewport to a custom width and height (clamped between 300dp-1200dp width and 400dp-1400dp height).
+     * Automatically adapts the project nodes and sets the profile category to CUSTOM.
+     */
+    fun resizeViewport(widthDp: Float, heightDp: Float, isDragging: Boolean = false) {
+        val clampedWidth = widthDp.coerceIn(300f, 1200f)
+        val clampedHeight = heightDp.coerceIn(400f, 1400f)
+        val currentProfile = state.project.deviceProfile
+        val newProfile = currentProfile.copy(
+            id = "custom_${clampedWidth.toInt()}x${clampedHeight.toInt()}",
+            displayName = "Custom (${clampedWidth.toInt()} × ${clampedHeight.toInt()})",
+            size = CanvasSize(width = clampedWidth, height = clampedHeight),
+            category = DeviceCategory.CUSTOM
+        )
+        val adaptedProject = HistoryService.adaptProjectToDevice(state.project, newProfile)
+        state = state.copy(
+            project = adaptedProject,
+            isViewportResizing = isDragging
+        )
+    }
+
+    fun setViewportResizing(resizing: Boolean) {
+        state = state.copy(isViewportResizing = resizing)
+    }
+
+    /**
+     * Toggles between Portrait and Landscape orientation.
+     */
+    fun toggleDeviceOrientation() {
+        val current = state.project.deviceProfile
+        val nextOrientation = if (current.orientation == DeviceOrientation.PORTRAIT) {
+            DeviceOrientation.LANDSCAPE
+        } else {
+            DeviceOrientation.PORTRAIT
+        }
+        val swappedSize = CanvasSize(width = current.size.height, height = current.size.width)
+        val updated = current.copy(
+            orientation = nextOrientation,
+            size = swappedSize
+        )
+        setDeviceProfile(updated)
+    }
+
+    /**
+     * Configures the device screen density (e.g. 1.0f, 2.0f, 2.75f, 3.5f).
+     */
+    fun setDeviceDensity(density: Float) {
+        val current = state.project.deviceProfile
+        val updated = current.copy(density = density.coerceIn(0.5f, 5.0f))
+        setDeviceProfile(updated)
+    }
+
+    /**
+     * Configures the device font scale (e.g. 0.85f, 1.0f, 1.15f, 1.3f).
+     */
+    fun setDeviceFontScale(fontScale: Float) {
+        val current = state.project.deviceProfile
+        val updated = current.copy(fontScale = fontScale.coerceIn(0.5f, 2.5f))
+        setDeviceProfile(updated)
+    }
+
+    /**
+     * Applies a quick window size class preset (Compact: 412x915, Medium: 600x840, Expanded: 1200x800).
+     */
+    fun setWindowSizePreset(widthClass: WindowWidthSizeClass) {
+        val targetProfile = when (widthClass) {
+            WindowWidthSizeClass.COMPACT -> DeviceProfile.presets.first { it.id == "pixel_8" }
+            WindowWidthSizeClass.MEDIUM -> DeviceProfile.presets.first { it.id == "pixel_fold" }
+            WindowWidthSizeClass.EXPANDED -> DeviceProfile.presets.first { it.id == "desktop_window" }
+        }
+        setDeviceProfile(targetProfile)
+    }
+
+    /**
+     * Toggles visibility of simulated system insets (status bar & gesture navigation bar).
+     */
+    fun toggleSystemInsets() {
+        state = state.copy(showSystemInsets = !state.showSystemInsets)
+    }
+
     /** Replaces the entire project and resets transient UI state (used by Load). */
     fun replaceProject(project: M3EProject) {
         historyService.clear()

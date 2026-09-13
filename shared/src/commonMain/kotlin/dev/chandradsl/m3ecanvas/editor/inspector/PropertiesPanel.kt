@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -310,13 +311,37 @@ private fun ProjectSection(controller: EditorController) {
         ) {
             DeviceProfile.presets.forEach { profile ->
                 DropdownMenuItem(
-                    text = { Text(text = profile.displayName) },
+                    text = { Text(text = "${profile.displayName} (${profile.size.width.toInt()} × ${profile.size.height.toInt()} dp)") },
                     onClick = {
                         controller.setDeviceProfile(profile = profile)
                         expanded = false
                     }
                 )
             }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "${current.effectiveWidth.toInt()} × ${current.effectiveHeight.toInt()} dp • ${current.widthSizeClass.displayName}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        IconButton(
+            onClick = { controller.toggleDeviceOrientation() },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.ScreenRotation,
+                contentDescription = "Rotate Device Orientation",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 

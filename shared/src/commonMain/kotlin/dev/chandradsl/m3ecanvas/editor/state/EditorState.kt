@@ -34,7 +34,9 @@ data class EditorState(
     val alignmentGuides: List<AlignmentGuide> = emptyList(),
     val multiDevicePreview: Boolean = false,
     val mode: EditorMode = EditorMode.DESIGN,
-    val dismissedOverlayIds: Set<String> = emptySet()
+    val dismissedOverlayIds: Set<String> = emptySet(),
+    val showSystemInsets: Boolean = true,
+    val isViewportResizing: Boolean = false
 ) {
 
     /** Returns true if the editor is in interactive preview mode. */
