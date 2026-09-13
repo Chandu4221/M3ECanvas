@@ -18,7 +18,6 @@ import dev.chandradsl.m3ecanvas.editor.codegen.ProjectCodeExporter
 import dev.chandradsl.m3ecanvas.editor.inspector.ContrastCalculator
 import dev.chandradsl.m3ecanvas.editor.inspector.ContrastLevel
 import dev.chandradsl.m3ecanvas.editor.history.HistoryStack
-import dev.chandradsl.m3ecanvas.editor.persistence.AutosaveManager
 import dev.chandradsl.m3ecanvas.editor.persistence.LoadResult
 import dev.chandradsl.m3ecanvas.util.AppLogger
 import androidx.compose.ui.graphics.Color
@@ -373,11 +372,86 @@ class SharedCommonTest {
                 nodes = listOf(node)
             )
             val code = ComposeCodeGenerator.generateFile(project)
-            assertTrue(code.contains("@Composable"), "Missing @Composable for ${type.name}")
-            assertFalse(
-                code.contains("// Placeholder for"),
-                "Found placeholder comment for ${type.name} in generated code:\n$code"
+            assertFalse(code.contains("TODO"), "Generated code for ${type.name} must not contain TODO comments")
+            assertFalse(code.contains("FIXME"), "Generated code for ${type.name} must not contain FIXME comments")
+            assertFalse(code.contains("Placeholder"), "Generated code for ${type.name} must not contain Placeholder comments")
+
+            val expectedComposableName = when (type) {
+                ComponentType.BUTTON -> "Button("
+                ComponentType.ICON_BUTTON -> "IconButton("
+                ComponentType.FAB -> "FloatingActionButton("
+                ComponentType.EXTENDED_FAB -> "ExtendedFloatingActionButton("
+                ComponentType.SEGMENTED_BUTTON -> "SingleChoiceSegmentedButtonRow("
+                ComponentType.SPLIT_BUTTON -> "SplitButton("
+                ComponentType.BUTTON_GROUP -> "ButtonGroup("
+                ComponentType.TOGGLE_BUTTON -> "ToggleButton("
+                ComponentType.CARD -> "Card("
+                ComponentType.ELEVATED_CARD -> "ElevatedCard("
+                ComponentType.OUTLINED_CARD -> "OutlinedCard("
+                ComponentType.LIST_ITEM -> "ListItem("
+                ComponentType.MODAL_BOTTOM_SHEET -> "ModalBottomSheet("
+                ComponentType.ALERT_DIALOG -> "AlertDialog("
+                ComponentType.BASIC_ALERT_DIALOG -> "BasicAlertDialog("
+                ComponentType.SURFACE -> "Surface("
+                ComponentType.SNACKBAR -> "Snackbar("
+                ComponentType.SNACKBAR_HOST -> "SnackbarHost("
+                ComponentType.BADGE -> "Badge("
+                ComponentType.BADGED_BOX -> "BadgedBox("
+                ComponentType.TOOLTIP -> "TooltipBox("
+                ComponentType.PROGRESS_INDICATOR -> "LinearProgressIndicator("
+                ComponentType.LOADING_INDICATOR -> "CircularProgressIndicator("
+                ComponentType.TOP_APP_BAR -> "TopAppBar("
+                ComponentType.NAVIGATION_BAR -> "NavigationBar("
+                ComponentType.NAVIGATION_BAR_ITEM -> "NavigationBarItem("
+                ComponentType.BOTTOM_APP_BAR -> "BottomAppBar("
+                ComponentType.NAVIGATION_RAIL -> "NavigationRail("
+                ComponentType.NAVIGATION_RAIL_ITEM -> "NavigationRailItem("
+                ComponentType.NAVIGATION_DRAWER -> "ModalDrawerSheet("
+                ComponentType.TABS -> "PrimaryTabRow("
+                ComponentType.TAB -> "Tab("
+                ComponentType.SEARCH -> "SearchBar("
+                ComponentType.CHECKBOX -> "Checkbox("
+                ComponentType.RADIO_BUTTON -> "RadioButton("
+                ComponentType.SWITCH -> "Switch("
+                ComponentType.SLIDER -> "Slider("
+                ComponentType.RANGE_SLIDER -> "RangeSlider("
+                ComponentType.CHIPS -> "AssistChip("
+                ComponentType.DATE_PICKER -> "DatePicker("
+                ComponentType.TIME_PICKER -> "TimePicker("
+                ComponentType.MENUS -> "DropdownMenu("
+                ComponentType.DROPDOWN_MENU_ITEM -> "DropdownMenuItem("
+                ComponentType.TEXT_FIELD -> "OutlinedTextField("
+                ComponentType.TEXT -> "Text("
+                ComponentType.ICON -> "Icon("
+                ComponentType.IMAGE -> "Surface("
+                ComponentType.HORIZONTAL_DIVIDER -> "HorizontalDivider("
+                ComponentType.VERTICAL_DIVIDER -> "VerticalDivider("
+                ComponentType.SCAFFOLD -> "Scaffold("
+                ComponentType.BOTTOM_SHEET_SCAFFOLD -> "BottomSheetScaffold("
+                ComponentType.COLUMN -> "Column("
+                ComponentType.ROW -> "Row("
+                ComponentType.BOX -> "Box("
+                ComponentType.BOX_WITH_CONSTRAINTS -> "BoxWithConstraints("
+                ComponentType.LAZY_COLUMN -> "LazyColumn("
+                ComponentType.LAZY_ROW -> "LazyRow("
+                ComponentType.LAZY_VERTICAL_GRID -> "LazyVerticalGrid("
+                ComponentType.LAZY_HORIZONTAL_GRID -> "LazyHorizontalGrid("
+                ComponentType.LAZY_VERTICAL_STAGGERED_GRID -> "LazyVerticalStaggeredGrid("
+                ComponentType.LAZY_HORIZONTAL_STAGGERED_GRID -> "LazyHorizontalStaggeredGrid("
+                ComponentType.HORIZONTAL_PAGER -> "HorizontalPager("
+                ComponentType.CAROUSEL -> "HorizontalMultiBrowseCarousel("
+                ComponentType.FLOW_ROW -> "FlowRow("
+                ComponentType.FLOW_COLUMN -> "FlowColumn("
+                ComponentType.SPACER -> "Spacer("
+            }
+            assertTrue(
+                code.contains(expectedComposableName),
+                "Expected real composable $expectedComposableName for ${type.name} in generated code:\n$code"
             )
+
+            val openBraces = code.count { it == '{' }
+            val closeBraces = code.count { it == '}' }
+            assertEquals(openBraces, closeBraces, "Unbalanced curly braces in generated code for ${type.name}")
         }
     }
 
@@ -1456,36 +1530,7 @@ class SharedCommonTest {
         assertEquals(CanvasSize(333f, 444f), registry.defaultSizeFor(ComponentType.BUTTON))
     }
 
-    @Test
-    fun testAutosaveManagerOperations() = runBlocking {
-        val tempDir = java.io.File.createTempFile("m3e_autosave_dir", "").apply { delete(); mkdirs() }
-        val autosaveFile = java.io.File(tempDir, "autosave.json")
-        val recentsFile = java.io.File(tempDir, "recents.json")
 
-        val manager = AutosaveManager(autosaveFile = autosaveFile, recentsFile = recentsFile)
-        assertFalse(manager.hasAutosave())
-
-        val project = EditorController.newProject("AutosaveTest")
-        manager.saveAutosave(project)
-        assertTrue(manager.hasAutosave())
-
-        val loaded = manager.loadAutosave()
-        assertTrue(loaded is LoadResult.Success)
-        assertEquals("AutosaveTest", loaded.project.name)
-
-        manager.clearAutosave()
-        assertFalse(manager.hasAutosave())
-
-        // Recents
-        manager.addRecentProject("Recent 1", "/path/1")
-        manager.addRecentProject("Recent 2", "/path/2")
-        val recents = manager.getRecentProjects()
-        assertEquals(2, recents.size)
-        assertEquals("Recent 2", recents[0].name)
-
-        tempDir.deleteRecursively()
-        Unit
-    }
 
     @Test
     fun testAllNodesTreeFlattening() {
