@@ -38,7 +38,8 @@ data class EditorState(
     val showSystemInsets: Boolean = true,
     val isViewportResizing: Boolean = false,
     val showRulers: Boolean = true,
-    val showMeasurements: Boolean = true
+    val showMeasurements: Boolean = true,
+    val collapsedNodeIds: Set<String> = emptySet()
 ) {
 
     /** Returns true if the editor is in interactive preview mode. */

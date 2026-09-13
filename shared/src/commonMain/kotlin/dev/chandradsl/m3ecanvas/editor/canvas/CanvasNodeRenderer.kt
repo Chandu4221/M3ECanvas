@@ -70,6 +70,7 @@ fun CanvasNodeRenderer(
     node: CanvasNode,
     controller: EditorController
 ) {
+    if (!node.isVisible) return
     when (node.type) {
         ComponentType.COLUMN -> {
             val scrollState = rememberScrollState()
@@ -754,6 +755,7 @@ private fun ContainerChild(
     controller: EditorController,
     modifier: Modifier = Modifier
 ) {
+    if (!child.isVisible) return
     val canvasCoords = LocalCanvasCoordinates.current
     val fillMaxSize = child.modifiers.filterIsInstance<ModifierSpec.FillMaxSize>().firstOrNull()
     val fillMaxWidth = child.modifiers.filterIsInstance<ModifierSpec.FillMaxWidth>().firstOrNull()
@@ -818,6 +820,8 @@ internal fun Modifier.selectOnPress(
     focusRequester: FocusRequester? = null
 ): Modifier {
     if (controller.state.isInteractiveMode) return this
+    val node = controller.state.project.findNode(nodeId)
+    if (node == null || !node.isVisible || node.isLocked) return this
     val focusManager = LocalFocusManager.current
     return this.pointerInput(nodeId) {
         awaitEachGesture {

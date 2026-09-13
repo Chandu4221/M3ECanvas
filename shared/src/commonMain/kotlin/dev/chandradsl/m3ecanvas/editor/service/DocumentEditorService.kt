@@ -150,11 +150,13 @@ class DocumentEditorService {
     }
 
     /**
-     * Deletes all nodes identified by [nodeIds].
+     * Deletes all nodes identified by [nodeIds], excluding locked nodes.
      */
     fun deleteNodes(project: M3EProject, nodeIds: Set<String>): M3EProject {
         var current = project
         for (id in nodeIds) {
+            val node = current.findNode(id)
+            if (node != null && node.isLocked) continue
             current = current.removeNode(id)
         }
         return current
@@ -162,6 +164,7 @@ class DocumentEditorService {
 
     /**
      * Nudges selected top-level nodes by [dx] and [dy].
+     * Nodes locked in slots or with isLocked == true are skipped.
      */
     fun nudgeNodes(project: M3EProject, nodeIds: Set<String>, dx: Float, dy: Float): Pair<M3EProject, Boolean> {
         var current = project
@@ -170,11 +173,27 @@ class DocumentEditorService {
             val isTopLevel = current.nodes.any { it.id == id }
             if (!isTopLevel) continue
             val node = current.findNode(id) ?: continue
-            if (node.isLockedInSlot) continue
+            if (node.isLockedInSlot || node.isLocked) continue
             current = current.updateNode(node.movedBy(dx = dx, dy = dy))
             movedAny = true
         }
         return Pair(current, movedAny)
+    }
+
+    /**
+     * Toggles visibility of the node identified by [nodeId].
+     */
+    fun toggleNodeVisibility(project: M3EProject, nodeId: String): M3EProject {
+        val node = project.findNode(nodeId) ?: return project
+        return project.updateNode(node.withVisibility(!node.isVisible))
+    }
+
+    /**
+     * Toggles lock state of the node identified by [nodeId].
+     */
+    fun toggleNodeLock(project: M3EProject, nodeId: String): M3EProject {
+        val node = project.findNode(nodeId) ?: return project
+        return project.updateNode(node.withLocked(!node.isLocked))
     }
 
     fun updateNodeProperty(project: M3EProject, nodeId: String, property: ComponentProperty): M3EProject {
@@ -363,7 +382,7 @@ class DocumentEditorService {
         alignment: AlignmentType
     ): M3EProject {
         if (nodeIds.size < 2) return project
-        val selectedNodes = nodeIds.mapNotNull { project.findNode(it) }
+        val selectedNodes = nodeIds.mapNotNull { project.findNode(it) }.filterNot { it.isLocked }
         if (selectedNodes.size < 2) return project
 
         // Check if all selected nodes share the same parent container
@@ -461,7 +480,7 @@ class DocumentEditorService {
         distribution: DistributionType
     ): M3EProject {
         if (nodeIds.size < 3) return project
-        val selectedNodes = nodeIds.mapNotNull { project.findNode(it) }
+        val selectedNodes = nodeIds.mapNotNull { project.findNode(it) }.filterNot { it.isLocked }
         if (selectedNodes.size < 3) return project
 
         val parents = selectedNodes.map { findParent(project, it.id) }

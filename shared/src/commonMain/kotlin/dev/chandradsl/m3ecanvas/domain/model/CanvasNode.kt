@@ -23,8 +23,13 @@ data class CanvasNode(
     val children: List<CanvasNode> = emptyList(),
     val layoutConfig: LayoutConfig = LayoutConfig.default,
     val modifiers: List<ModifierSpec> = emptyList(),
-    val slot: SlotRole? = null
+    val slot: SlotRole? = null,
+    val isVisible: Boolean = true,
+    val isLocked: Boolean = false
 ) {
+
+    fun withVisibility(visible: Boolean): CanvasNode = copy(isVisible = visible)
+    fun withLocked(locked: Boolean): CanvasNode = copy(isLocked = locked)
 
     /** Whether this node can hold children, based on its type. */
     val isContainer: Boolean

@@ -105,6 +105,7 @@ fun EditorOverlayLayer(
 
                         // Check if node is movable (floating root node)
                         val isFloating = !hitNode.isLockedInSlot &&
+                                !hitNode.isLocked &&
                                 hitNode.type != ComponentType.SCAFFOLD &&
                                 !hitNode.type.isOverlay() &&
                                 state.project.nodes.any { it.id == hitNode.id }
@@ -172,7 +173,7 @@ fun EditorOverlayLayer(
 
                         if (finalRect.width > 4f || finalRect.height > 4f) {
                             val hits = geometryStore.findNodesIn(finalRect, state.project)
-                                .filter { it.type != ComponentType.SCAFFOLD && !it.type.isOverlay() }
+                                .filter { it.type != ComponentType.SCAFFOLD && !it.type.isOverlay() && !it.isLocked }
                                 .map { it.id }
                                 .toSet()
 
@@ -199,19 +200,39 @@ fun EditorOverlayLayer(
             for (selectedId in state.selectedNodeIds) {
                 val bounds = geometryStore.getBounds(selectedId) ?: continue
                 val rect = bounds.boundsInCanvas
+                val node = state.project.findNode(selectedId)
+                val isLocked = node?.isLocked == true
 
                 // Selection border
+                val borderColor = if (isLocked) Color(0xFFFF9800) else primaryColor
                 drawRect(
-                    color = primaryColor,
+                    color = borderColor,
                     topLeft = rect.topLeft,
                     size = rect.size,
-                    style = Stroke(width = strokeWidth)
+                    style = Stroke(
+                        width = strokeWidth,
+                        pathEffect = if (isLocked) PathEffect.dashPathEffect(floatArrayOf(6f, 6f)) else null
+                    )
                 )
 
-                // If single floating node is selected, draw corner resize handles
+                if (isLocked) {
+                    val lockText = "LOCKED"
+                    val lockLayout = textMeasurer.measure(
+                        text = lockText,
+                        style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    )
+                    val badgeTop = Offset(rect.right - lockLayout.size.width - 10f, rect.top + 4f)
+                    drawRect(
+                        color = Color(0xFFFF9800),
+                        topLeft = Offset(badgeTop.x - 4f, badgeTop.y - 2f),
+                        size = Size(lockLayout.size.width + 8f, lockLayout.size.height + 4f)
+                    )
+                    drawText(textLayoutResult = lockLayout, topLeft = badgeTop)
+                }
+
+                // If single floating node is selected and not locked, draw corner resize handles
                 val isSingle = state.selectedNodeIds.size == 1
-                val node = state.project.findNode(selectedId)
-                val isFloating = node != null && !node.isLockedInSlot &&
+                val isFloating = node != null && !node.isLockedInSlot && !isLocked &&
                         node.type != ComponentType.SCAFFOLD &&
                         !node.type.isOverlay() &&
                         state.project.nodes.any { it.id == node.id }

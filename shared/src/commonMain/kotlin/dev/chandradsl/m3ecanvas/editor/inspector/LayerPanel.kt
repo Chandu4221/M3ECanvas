@@ -8,29 +8,31 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.KeyboardArrowUp
-import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.SlotRole
+import dev.chandradsl.m3ecanvas.editor.palette.icon
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 /**
@@ -126,7 +128,7 @@ fun LayersPanel(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
                 items(
-                    items = flattenNodes(nodes = nodes),
+                    items = flattenNodes(nodes = nodes, collapsedIds = controller.state.collapsedNodeIds),
                     key = { it.first.id }
                 ) { (node, depth) ->
                     LayerRow(node = node, depth = depth, controller = controller)
@@ -138,23 +140,27 @@ fun LayersPanel(
 
 /**
  * Flattens the node tree into (node, depth) pairs for lazy rendering
- * while preserving hierarchy order and indentation.
+ * while preserving hierarchy order, indentation, and respecting collapsed containers.
  */
 private fun flattenNodes(
     nodes: List<CanvasNode>,
+    collapsedIds: Set<String>,
     depth: Int = 0
 ): List<Pair<CanvasNode, Int>> {
     val result = mutableListOf<Pair<CanvasNode, Int>>()
     for (node in nodes) {
         result.add(element = node to depth)
-        result.addAll(elements = flattenNodes(nodes = node.children, depth = depth + 1))
+        if (node.children.isNotEmpty() && node.id !in collapsedIds) {
+            result.addAll(elements = flattenNodes(nodes = node.children, collapsedIds = collapsedIds, depth = depth + 1))
+        }
     }
     return result
 }
 
 /**
  * A single row in the layers tree. Indented by [depth], highlighted when
- * selected, and showing reorder/delete icons while selected.
+ * selected, and exposing visibility toggles, locking, inline renaming,
+ * and reorder/delete actions.
  */
 @Composable
 private fun LayerRow(
@@ -163,6 +169,17 @@ private fun LayerRow(
     controller: EditorController
 ) {
     val isSelected = controller.state.isNodeSelected(nodeId = node.id)
+    val hasChildren = node.children.isNotEmpty()
+    val isCollapsed = node.id in controller.state.collapsedNodeIds
+    var isEditing by remember { mutableStateOf(false) }
+    var tempName by remember(node.name) { mutableStateOf(node.name) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(isEditing) {
+        if (isEditing) {
+            try { focusRequester.requestFocus() } catch (_: Throwable) {}
+        }
+    }
 
     Row(
         modifier = Modifier
@@ -187,21 +204,88 @@ private fun LayerRow(
                     Color.Transparent
                 }
             )
-            .padding(start = (16 + depth * 16).dp, end = 8.dp),
+            .padding(start = (8 + depth * 16).dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 1. Expand / Collapse chevron for container nodes with children
+        if (hasChildren) {
+            Icon(
+                imageVector = if (isCollapsed) Icons.AutoMirrored.Outlined.KeyboardArrowRight else Icons.Outlined.KeyboardArrowDown,
+                contentDescription = if (isCollapsed) "Expand" else "Collapse",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable { controller.toggleCollapseNode(node.id) }
+                    .padding(2.dp)
+            )
+        } else {
+            Spacer(modifier = Modifier.width(20.dp))
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // 2. Component type icon
+        Icon(
+            imageVector = node.type.icon(),
+            contentDescription = node.type.displayName,
+            tint = if (node.isVisible) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            modifier = Modifier.size(16.dp)
+        )
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        // 3. Node name / Inline editor & slot role badge
         Row(
             modifier = Modifier
-                .weight(weight = 1f)
-                .padding(start = 0.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                .weight(1f)
+                .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = node.name,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1
-            )
+            if (isEditing) {
+                BasicTextField(
+                    value = tempName,
+                    onValueChange = { tempName = it },
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { focusState ->
+                            if (!focusState.isFocused && isEditing) {
+                                if (tempName.isNotBlank()) {
+                                    controller.renameNode(node.id, tempName)
+                                }
+                                isEditing = false
+                            }
+                        }
+                        .onKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown) {
+                                if (event.key == Key.Enter) {
+                                    if (tempName.isNotBlank()) {
+                                        controller.renameNode(node.id, tempName)
+                                    }
+                                    isEditing = false
+                                    true
+                                } else if (event.key == Key.Escape) {
+                                    tempName = node.name
+                                    isEditing = false
+                                    true
+                                } else false
+                            } else false
+                        }
+                )
+            } else {
+                Text(
+                    text = node.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (node.isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                    maxLines = 1
+                )
+            }
+
             if (node.slot != null && node.slot != SlotRole.CONTENT) {
                 Surface(
                     shape = RoundedCornerShape(4.dp),
@@ -216,22 +300,46 @@ private fun LayerRow(
                 }
             }
         }
+
+        // 4. Quick Actions: Visibility and Lock toggles
+        LayerActionIcon(
+            imageVector = if (node.isVisible) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+            contentDescription = if (node.isVisible) "Hide layer" else "Show layer",
+            tint = if (node.isVisible) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            onClick = { controller.toggleNodeVisibility(node.id) }
+        )
+
+        LayerActionIcon(
+            imageVector = if (node.isLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+            contentDescription = if (node.isLocked) "Unlock layer" else "Lock layer",
+            tint = if (node.isLocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            onClick = { controller.toggleNodeLock(node.id) }
+        )
+
+        // 5. Selected row actions: Rename, Reorder, Delete
         if (isSelected) {
             LayerActionIcon(
-                imageVector = Icons.Outlined.KeyboardArrowUp,
-                contentDescription = "Move up",
-                onClick = { controller.moveNodeUp(nodeId = node.id) }
+                imageVector = Icons.Outlined.Edit,
+                contentDescription = "Rename",
+                onClick = { isEditing = true }
             )
-            LayerActionIcon(
-                imageVector = Icons.Outlined.KeyboardArrowDown,
-                contentDescription = "Move down",
-                onClick = { controller.moveNodeDown(nodeId = node.id) }
-            )
-            LayerActionIcon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = "Delete",
-                onClick = { controller.removeNode(nodeId = node.id) }
-            )
+            if (!node.isLocked) {
+                LayerActionIcon(
+                    imageVector = Icons.Outlined.KeyboardArrowUp,
+                    contentDescription = "Move up",
+                    onClick = { controller.moveNodeUp(nodeId = node.id) }
+                )
+                LayerActionIcon(
+                    imageVector = Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = "Move down",
+                    onClick = { controller.moveNodeDown(nodeId = node.id) }
+                )
+                LayerActionIcon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = "Delete",
+                    onClick = { controller.removeNode(nodeId = node.id) }
+                )
+            }
         }
     }
 }
@@ -243,12 +351,13 @@ private fun LayerRow(
 private fun LayerActionIcon(
     imageVector: ImageVector,
     contentDescription: String,
+    tint: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit
 ) {
     Icon(
         imageVector = imageVector,
         contentDescription = contentDescription,
-        tint = MaterialTheme.colorScheme.primary,
+        tint = tint,
         modifier = Modifier
             .clickable { onClick() }
             .padding(all = 4.dp)

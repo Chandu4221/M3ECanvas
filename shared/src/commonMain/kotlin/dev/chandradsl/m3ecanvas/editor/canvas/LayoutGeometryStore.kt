@@ -84,6 +84,7 @@ class InMemoryLayoutGeometryStore : LayoutGeometryStore {
     override fun findNodeAt(offset: Offset, project: M3EProject): CanvasNode? {
         val allNodes = project.allNodes()
         val candidates = allNodes.filter { node ->
+            if (!node.isVisible || node.isLocked) return@filter false
             val b = _bounds[node.id] ?: return@filter false
             b.contains(offset.x, offset.y)
         }
@@ -104,6 +105,7 @@ class InMemoryLayoutGeometryStore : LayoutGeometryStore {
     override fun findNodesIn(rect: Rect, project: M3EProject): List<CanvasNode> {
         val allNodes = project.allNodes()
         return allNodes.filter { node ->
+            if (!node.isVisible || node.isLocked) return@filter false
             val b = _bounds[node.id] ?: return@filter false
             !(rect.right < b.boundsInCanvas.left || rect.left > b.boundsInCanvas.right ||
               rect.bottom < b.boundsInCanvas.top || rect.top > b.boundsInCanvas.bottom)

@@ -788,6 +788,7 @@ private fun SimulatedNavigationBar() {
 
 @Composable
 private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) {
+    if (!node.isVisible) return
     val isInteractive = controller.state.isInteractiveMode
     val isScaffold = node.type == ComponentType.SCAFFOLD
     val isOverlay = node.type.isOverlay()

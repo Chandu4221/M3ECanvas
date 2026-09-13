@@ -332,13 +332,39 @@ class EditorController(
         )
     }
 
-    /** Deletes all currently selected nodes and clears the selection. */
+    /** Deletes all currently selected nodes and clears the selection (excluding locked nodes). */
     fun deleteSelected() {
-        val ids = state.selectedNodeIds
-        if (ids.isEmpty()) return
+        val deletableIds = state.selectedNodeIds.filterNot { state.project.findNode(it)?.isLocked == true }
+        if (deletableIds.isEmpty()) return
         pushState()
-        val updated = documentEditor.deleteNodes(state.project, ids)
-        updateProject(newProject = updated, selectedNodeIds = emptySet())
+        val updated = documentEditor.deleteNodes(state.project, deletableIds.toSet())
+        updateProject(newProject = updated, selectedNodeIds = state.selectedNodeIds - deletableIds.toSet())
+    }
+
+    /** Toggles collapse state of a container node in the Layers panel. */
+    fun toggleCollapseNode(nodeId: String) {
+        val collapsed = state.collapsedNodeIds
+        state = state.copy(
+            collapsedNodeIds = if (nodeId in collapsed) collapsed - nodeId else collapsed + nodeId
+        )
+    }
+
+    /** Toggles visibility of the node with [nodeId]. */
+    fun toggleNodeVisibility(nodeId: String) {
+        val updated = documentEditor.toggleNodeVisibility(state.project, nodeId)
+        if (updated != state.project) {
+            pushState()
+            updateProject(newProject = updated)
+        }
+    }
+
+    /** Toggles lock state of the node with [nodeId]. */
+    fun toggleNodeLock(nodeId: String) {
+        val updated = documentEditor.toggleNodeLock(state.project, nodeId)
+        if (updated != state.project) {
+            pushState()
+            updateProject(newProject = updated)
+        }
     }
 
     /**
