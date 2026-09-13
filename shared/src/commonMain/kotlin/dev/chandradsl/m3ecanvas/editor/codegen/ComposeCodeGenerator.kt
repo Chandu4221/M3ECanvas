@@ -1,7 +1,9 @@
 package dev.chandradsl.m3ecanvas.editor.codegen
 
+import androidx.compose.ui.graphics.Color
 import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
+import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
 
 /**
  * Deterministic compiler that translates an [M3EProject] AST into
@@ -1532,6 +1534,150 @@ open class ComposeCodeGenerator(
         }
     }
 
+    /**
+     * Generates an idiomatic Material 3 Theme.kt file for the project's [CanvasThemeConfig].
+     */
+    open fun generateThemeFile(project: M3EProject, themeName: String = "AppTheme"): String {
+        val config = project.themeConfig
+        val lightScheme = CanvasThemeGenerator.generateColorScheme(config.copy(isDark = false))
+        val darkScheme = CanvasThemeGenerator.generateColorScheme(config.copy(isDark = true))
+        val shapes = config.shapes
+        val typo = config.typography
+
+        fun Color.toHexLiteral(): String {
+            val a = (alpha * 255f).toInt().coerceIn(0, 255)
+            val r = (red * 255f).toInt().coerceIn(0, 255)
+            val g = (green * 255f).toInt().coerceIn(0, 255)
+            val b = (blue * 255f).toInt().coerceIn(0, 255)
+            val hex = ((a shl 24) or (r shl 16) or (g shl 8) or b).toUInt().toString(16).uppercase().padStart(8, '0')
+            return "Color(0x$hex)"
+        }
+
+        return buildString {
+            appendLine("package com.example.app.ui.theme")
+            appendLine()
+            appendLine("import androidx.compose.foundation.isSystemInDarkTheme")
+            appendLine("import androidx.compose.foundation.shape.RoundedCornerShape")
+            appendLine("import androidx.compose.material3.*")
+            appendLine("import androidx.compose.runtime.Composable")
+            appendLine("import androidx.compose.ui.graphics.Color")
+            appendLine("import androidx.compose.ui.text.TextStyle")
+            appendLine("import androidx.compose.ui.text.font.FontFamily")
+            appendLine("import androidx.compose.ui.text.font.FontWeight")
+            appendLine("import androidx.compose.ui.unit.dp")
+            appendLine("import androidx.compose.ui.unit.sp")
+            appendLine()
+            appendLine("// Material 3 Light Color Scheme")
+            appendLine("val LightColorScheme = lightColorScheme(")
+            appendLine("    primary = ${lightScheme.primary.toHexLiteral()},")
+            appendLine("    onPrimary = ${lightScheme.onPrimary.toHexLiteral()},")
+            appendLine("    primaryContainer = ${lightScheme.primaryContainer.toHexLiteral()},")
+            appendLine("    onPrimaryContainer = ${lightScheme.onPrimaryContainer.toHexLiteral()},")
+            appendLine("    secondary = ${lightScheme.secondary.toHexLiteral()},")
+            appendLine("    onSecondary = ${lightScheme.onSecondary.toHexLiteral()},")
+            appendLine("    secondaryContainer = ${lightScheme.secondaryContainer.toHexLiteral()},")
+            appendLine("    onSecondaryContainer = ${lightScheme.onSecondaryContainer.toHexLiteral()},")
+            appendLine("    tertiary = ${lightScheme.tertiary.toHexLiteral()},")
+            appendLine("    onTertiary = ${lightScheme.onTertiary.toHexLiteral()},")
+            appendLine("    tertiaryContainer = ${lightScheme.tertiaryContainer.toHexLiteral()},")
+            appendLine("    onTertiaryContainer = ${lightScheme.onTertiaryContainer.toHexLiteral()},")
+            appendLine("    surface = ${lightScheme.surface.toHexLiteral()},")
+            appendLine("    onSurface = ${lightScheme.onSurface.toHexLiteral()},")
+            appendLine("    surfaceVariant = ${lightScheme.surfaceVariant.toHexLiteral()},")
+            appendLine("    onSurfaceVariant = ${lightScheme.onSurfaceVariant.toHexLiteral()},")
+            appendLine("    background = ${lightScheme.background.toHexLiteral()},")
+            appendLine("    onBackground = ${lightScheme.onBackground.toHexLiteral()},")
+            appendLine("    outline = ${lightScheme.outline.toHexLiteral()},")
+            appendLine("    outlineVariant = ${lightScheme.outlineVariant.toHexLiteral()}")
+            appendLine(")")
+            appendLine()
+            appendLine("// Material 3 Dark Color Scheme")
+            appendLine("val DarkColorScheme = darkColorScheme(")
+            appendLine("    primary = ${darkScheme.primary.toHexLiteral()},")
+            appendLine("    onPrimary = ${darkScheme.onPrimary.toHexLiteral()},")
+            appendLine("    primaryContainer = ${darkScheme.primaryContainer.toHexLiteral()},")
+            appendLine("    onPrimaryContainer = ${darkScheme.onPrimaryContainer.toHexLiteral()},")
+            appendLine("    secondary = ${darkScheme.secondary.toHexLiteral()},")
+            appendLine("    onSecondary = ${darkScheme.onSecondary.toHexLiteral()},")
+            appendLine("    secondaryContainer = ${darkScheme.secondaryContainer.toHexLiteral()},")
+            appendLine("    onSecondaryContainer = ${darkScheme.onSecondaryContainer.toHexLiteral()},")
+            appendLine("    tertiary = ${darkScheme.tertiary.toHexLiteral()},")
+            appendLine("    onTertiary = ${darkScheme.onTertiary.toHexLiteral()},")
+            appendLine("    tertiaryContainer = ${darkScheme.tertiaryContainer.toHexLiteral()},")
+            appendLine("    onTertiaryContainer = ${darkScheme.onTertiaryContainer.toHexLiteral()},")
+            appendLine("    surface = ${darkScheme.surface.toHexLiteral()},")
+            appendLine("    onSurface = ${darkScheme.onSurface.toHexLiteral()},")
+            appendLine("    surfaceVariant = ${darkScheme.surfaceVariant.toHexLiteral()},")
+            appendLine("    onSurfaceVariant = ${darkScheme.onSurfaceVariant.toHexLiteral()},")
+            appendLine("    background = ${darkScheme.background.toHexLiteral()},")
+            appendLine("    onBackground = ${darkScheme.onBackground.toHexLiteral()},")
+            appendLine("    outline = ${darkScheme.outline.toHexLiteral()},")
+            appendLine("    outlineVariant = ${darkScheme.outlineVariant.toHexLiteral()}")
+            appendLine(")")
+            appendLine()
+            appendLine("// Material 3 Shapes")
+            appendLine("val AppShapes = Shapes(")
+            appendLine("    extraSmall = RoundedCornerShape(${shapes.extraSmallCornerDp.toInt()}.dp),")
+            appendLine("    small = RoundedCornerShape(${shapes.smallCornerDp.toInt()}.dp),")
+            appendLine("    medium = RoundedCornerShape(${shapes.mediumCornerDp.toInt()}.dp),")
+            appendLine("    large = RoundedCornerShape(${shapes.largeCornerDp.toInt()}.dp),")
+            appendLine("    extraLarge = RoundedCornerShape(${shapes.extraLargeCornerDp.toInt()}.dp)")
+            appendLine(")")
+            appendLine()
+            appendLine("// Material 3 Typography")
+            appendLine("val AppTypography = Typography(")
+            val typoStyles = mutableListOf<String>()
+            val bodyFamily = typo.bodyLarge?.fontFamily ?: "Default"
+            if (bodyFamily != "Default") {
+                typoStyles.add("    bodyLarge = TextStyle(fontFamily = FontFamily.${bodyFamily})")
+                typoStyles.add("    bodyMedium = TextStyle(fontFamily = FontFamily.${bodyFamily})")
+                typoStyles.add("    bodySmall = TextStyle(fontFamily = FontFamily.${bodyFamily})")
+            }
+            val titleFamily = typo.titleLarge?.fontFamily ?: "Default"
+            if (titleFamily != "Default" && titleFamily != bodyFamily) {
+                typoStyles.add("    titleLarge = TextStyle(fontFamily = FontFamily.${titleFamily})")
+                typoStyles.add("    titleMedium = TextStyle(fontFamily = FontFamily.${titleFamily})")
+                typoStyles.add("    titleSmall = TextStyle(fontFamily = FontFamily.${titleFamily})")
+            }
+            appendLine(typoStyles.joinToString(",\n"))
+            appendLine(")")
+            appendLine()
+            if (config.customTokens.isNotEmpty()) {
+                appendLine("// Custom Design Tokens")
+                appendLine("object DesignTokens {")
+                config.customTokens.forEach { token ->
+                    val cleanName = token.name.replace(Regex("[^A-Za-z0-9]"), "")
+                    when (token.type) {
+                        DesignTokenType.COLOR -> appendLine("    val $cleanName = Color(0x${token.value.removePrefix("#")})")
+                        DesignTokenType.SPACING, DesignTokenType.DIMENSION, DesignTokenType.ELEVATION -> {
+                            val num = token.value.filter { it.isDigit() || it == '.' }
+                            appendLine("    val $cleanName = ${num}.dp")
+                        }
+                        DesignTokenType.SHAPE -> {
+                            val num = token.value.filter { it.isDigit() || it == '.' }
+                            appendLine("    val $cleanName = RoundedCornerShape(${num}.dp)")
+                        }
+                    }
+                }
+                appendLine("}")
+                appendLine()
+            }
+            appendLine("@Composable")
+            appendLine("fun $themeName(")
+            appendLine("    darkTheme: Boolean = isSystemInDarkTheme(),")
+            appendLine("    content: @Composable () -> Unit")
+            appendLine(") {")
+            appendLine("    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme")
+            appendLine("    MaterialTheme(")
+            appendLine("        colorScheme = colorScheme,")
+            appendLine("        typography = AppTypography,")
+            appendLine("        shapes = AppShapes,")
+            appendLine("        content = content")
+            appendLine("    )")
+            appendLine("}")
+        }
+    }
+
     companion object {
         fun sanitizeName(raw: String): String {
             val clean = raw.replace(Regex("[^A-Za-z0-9]"), "")
@@ -1542,6 +1688,9 @@ open class ComposeCodeGenerator(
 
         fun generateFile(project: M3EProject, functionName: String = sanitizeName(project.name)): String =
             default.generateFile(project, functionName)
+
+        fun generateThemeFile(project: M3EProject, themeName: String = "AppTheme"): String =
+            default.generateThemeFile(project, themeName)
 
         fun generateNodeCode(
             node: CanvasNode,

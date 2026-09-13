@@ -516,6 +516,30 @@ class EditorController(
         updateTheme(state.project.themeConfig.copy(isDark = !state.project.themeConfig.isDark))
     }
 
+    fun setColorOverride(role: String, hexColor: String) {
+        updateTheme(state.project.themeConfig.withColorOverride(role, hexColor))
+    }
+
+    fun removeColorOverride(role: String) {
+        updateTheme(state.project.themeConfig.withoutColorOverride(role))
+    }
+
+    fun addOrUpdateDesignToken(token: DesignToken) {
+        updateTheme(state.project.themeConfig.withToken(token))
+    }
+
+    fun removeDesignToken(tokenId: String) {
+        updateTheme(state.project.themeConfig.withoutToken(tokenId))
+    }
+
+    fun updateTypography(typography: DocumentTypographyConfig) {
+        updateTheme(state.project.themeConfig.copy(typography = typography))
+    }
+
+    fun updateShapes(shapes: DocumentShapesConfig) {
+        updateTheme(state.project.themeConfig.copy(shapes = shapes))
+    }
+
     //endregion
 
     //region Device

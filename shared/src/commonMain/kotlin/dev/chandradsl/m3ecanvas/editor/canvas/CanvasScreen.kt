@@ -194,6 +194,12 @@ fun CanvasScreen(controller: EditorController) {
                         val canvasColorScheme = remember(state.project.themeConfig) {
                             CanvasThemeGenerator.generateColorScheme(state.project.themeConfig)
                         }
+                        val canvasTypography = remember(state.project.themeConfig) {
+                            CanvasThemeGenerator.generateTypography(state.project.themeConfig)
+                        }
+                        val canvasShapes = remember(state.project.themeConfig) {
+                            CanvasThemeGenerator.generateShapes(state.project.themeConfig)
+                        }
                         val deviceDensity = remember(deviceProfile.density, deviceProfile.fontScale) {
                             androidx.compose.ui.unit.Density(
                                 density = deviceProfile.density,
@@ -204,7 +210,8 @@ fun CanvasScreen(controller: EditorController) {
                         // Inner Screen Display with isolated device density
                         MaterialTheme(
                             colorScheme = canvasColorScheme,
-                            typography = Typography()
+                            typography = canvasTypography,
+                            shapes = canvasShapes
                         ) {
                             CompositionLocalProvider(
                                 androidx.compose.ui.platform.LocalDensity provides deviceDensity
@@ -336,9 +343,16 @@ fun CanvasScreen(controller: EditorController) {
                             val canvasColorScheme = remember(state.project.themeConfig) {
                                 CanvasThemeGenerator.generateColorScheme(state.project.themeConfig)
                             }
+                            val canvasTypography = remember(state.project.themeConfig) {
+                                CanvasThemeGenerator.generateTypography(state.project.themeConfig)
+                            }
+                            val canvasShapes = remember(state.project.themeConfig) {
+                                CanvasThemeGenerator.generateShapes(state.project.themeConfig)
+                            }
                             MaterialTheme(
                                 colorScheme = canvasColorScheme,
-                                typography = Typography()
+                                typography = canvasTypography,
+                                shapes = canvasShapes
                             ) {
                                 Box(
                                     modifier = Modifier

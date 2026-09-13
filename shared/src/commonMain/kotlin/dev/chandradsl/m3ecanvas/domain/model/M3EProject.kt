@@ -21,10 +21,30 @@ import kotlin.uuid.Uuid
 @Serializable
 data class CanvasThemeConfig(
     val seedColorHex: String = DEFAULT_SEED_HEX,
-    val isDark: Boolean = false
+    val isDark: Boolean = false,
+    val colorOverrides: Map<String, String> = emptyMap(),
+    val typography: DocumentTypographyConfig = DocumentTypographyConfig(),
+    val shapes: DocumentShapesConfig = DocumentShapesConfig(),
+    val customTokens: List<DesignToken> = emptyList()
 ) {
     companion object {
         const val DEFAULT_SEED_HEX = "#6750A4"
+    }
+
+    fun withColorOverride(role: String, hexColor: String): CanvasThemeConfig {
+        return copy(colorOverrides = colorOverrides + (role to hexColor))
+    }
+
+    fun withoutColorOverride(role: String): CanvasThemeConfig {
+        return copy(colorOverrides = colorOverrides - role)
+    }
+
+    fun withToken(token: DesignToken): CanvasThemeConfig {
+        return copy(customTokens = customTokens.filterNot { it.id == token.id } + token)
+    }
+
+    fun withoutToken(tokenId: String): CanvasThemeConfig {
+        return copy(customTokens = customTokens.filterNot { it.id == tokenId })
     }
 }
 

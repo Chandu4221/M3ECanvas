@@ -417,6 +417,277 @@ private fun ProjectSection(controller: EditorController) {
         singleLine = true
     )
 
+    // Role Color Overrides
+    var showColorOverrides by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showColorOverrides = !showColorOverrides }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Role Color Overrides (${themeConfig.colorOverrides.size})",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+        )
+        Icon(
+            imageVector = if (showColorOverrides) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+    if (showColorOverrides) {
+        val keyRoles = listOf("primary", "secondary", "tertiary", "surface", "error")
+        keyRoles.forEach { role ->
+            val overrideHex = themeConfig.colorOverrides[role]
+            val currentHex = overrideHex ?: ""
+            var inputHex by remember(overrideHex) { mutableStateOf(currentHex) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = role.replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.width(70.dp)
+                )
+                OutlinedTextField(
+                    value = inputHex,
+                    onValueChange = {
+                        inputHex = it
+                        if (CanvasThemeGenerator.isValidHexColor(it)) {
+                            controller.setColorOverride(role, if (it.startsWith("#")) it else "#$it")
+                        }
+                    },
+                    placeholder = { Text("#HEX") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    trailingIcon = {
+                        val color = if (CanvasThemeGenerator.isValidHexColor(inputHex)) {
+                            CanvasThemeGenerator.parseHexColor(inputHex)
+                        } else Color.Transparent
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .background(color, CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        )
+                    }
+                )
+                if (overrideHex != null) {
+                    IconButton(
+                        onClick = { controller.removeColorOverride(role) },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Reset", modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    // Typography Scale Configurator
+    var showTypography by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showTypography = !showTypography }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Typography Scale",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+        )
+        Icon(
+            imageVector = if (showTypography) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+    if (showTypography) {
+        val families = TextStyleConfig.FONT_FAMILIES
+        val currentFamily = themeConfig.typography.bodyLarge?.fontFamily ?: "Default"
+        var familyExpanded by remember { mutableStateOf(false) }
+        Text("Document Font Family", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ExposedDropdownMenuBox(
+            expanded = familyExpanded,
+            onExpandedChange = { familyExpanded = it }
+        ) {
+            OutlinedTextField(
+                value = currentFamily,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = familyExpanded) },
+                modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = familyExpanded,
+                onDismissRequest = { familyExpanded = false }
+            ) {
+                families.forEach { family ->
+                    DropdownMenuItem(
+                        text = { Text(family) },
+                        onClick = {
+                            val updated = themeConfig.typography.copy(
+                                bodyLarge = (themeConfig.typography.bodyLarge ?: TextStyleConfig()).copy(fontFamily = family),
+                                bodyMedium = (themeConfig.typography.bodyMedium ?: TextStyleConfig()).copy(fontFamily = family),
+                                bodySmall = (themeConfig.typography.bodySmall ?: TextStyleConfig()).copy(fontFamily = family),
+                                titleLarge = (themeConfig.typography.titleLarge ?: TextStyleConfig()).copy(fontFamily = family),
+                                titleMedium = (themeConfig.typography.titleMedium ?: TextStyleConfig()).copy(fontFamily = family),
+                                titleSmall = (themeConfig.typography.titleSmall ?: TextStyleConfig()).copy(fontFamily = family)
+                            )
+                            controller.updateTypography(updated)
+                            familyExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // Shapes Configurator
+    var showShapes by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showShapes = !showShapes }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Corner Shapes",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+        )
+        Icon(
+            imageVector = if (showShapes) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+    if (showShapes) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                "Small" to themeConfig.shapes.smallCornerDp,
+                "Medium" to themeConfig.shapes.mediumCornerDp,
+                "Large" to themeConfig.shapes.largeCornerDp
+            ).forEach { (label, value) ->
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.labelSmall)
+                    OutlinedTextField(
+                        value = "${value.toInt()}",
+                        onValueChange = { str ->
+                            val v = str.toFloatOrNull() ?: return@OutlinedTextField
+                            val updated = when (label) {
+                                "Small" -> themeConfig.shapes.copy(smallCornerDp = v)
+                                "Medium" -> themeConfig.shapes.copy(mediumCornerDp = v)
+                                "Large" -> themeConfig.shapes.copy(largeCornerDp = v)
+                                else -> themeConfig.shapes
+                            }
+                            controller.updateShapes(updated)
+                        },
+                        suffix = { Text("dp") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+
+    // Design Tokens Manager
+    var showTokens by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showTokens = !showTokens }
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Design Tokens (${themeConfig.customTokens.size})",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+        )
+        Icon(
+            imageVector = if (showTokens) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+    if (showTokens) {
+        var newTokenName by remember { mutableStateOf("") }
+        var newTokenValue by remember { mutableStateOf("") }
+
+        themeConfig.customTokens.forEach { token ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(token.name, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
+                    Text("${token.type.displayName}: ${token.value}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(
+                    onClick = { controller.removeDesignToken(token.id) },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Delete Token", modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = newTokenName,
+                onValueChange = { newTokenName = it },
+                placeholder = { Text("Name") },
+                singleLine = true,
+                modifier = Modifier.weight(1.2f)
+            )
+            OutlinedTextField(
+                value = newTokenValue,
+                onValueChange = { newTokenValue = it },
+                placeholder = { Text("Value") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = {
+                    if (newTokenName.isNotBlank() && newTokenValue.isNotBlank()) {
+                        controller.addOrUpdateDesignToken(
+                            DesignToken(
+                                name = newTokenName.trim(),
+                                type = DesignTokenType.SPACING,
+                                value = newTokenValue.trim()
+                            )
+                        )
+                        newTokenName = ""
+                        newTokenValue = ""
+                    }
+                },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = "Add Token", tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+
     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
     Text(
