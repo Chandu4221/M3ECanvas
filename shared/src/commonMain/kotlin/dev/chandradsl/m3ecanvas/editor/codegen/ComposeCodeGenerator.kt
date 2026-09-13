@@ -355,12 +355,6 @@ open class ComposeCodeGenerator(
                     appendLine("${indent}    navigationIcon = {")
                     append(generateNodeCode(navChild, indent = "$indent        "))
                     appendLine("${indent}    },")
-                } else {
-                    appendLine("${indent}    navigationIcon = {")
-                    appendLine("${indent}        IconButton(onClick = { /* TODO: Open navigation */ }) {")
-                    appendLine("${indent}            Icon(Icons.Outlined.Menu, contentDescription = \"Menu\")")
-                    appendLine("${indent}        }")
-                    appendLine("${indent}    },")
                 }
 
                 if (actionChildren.isNotEmpty()) {
@@ -368,15 +362,6 @@ open class ComposeCodeGenerator(
                     actionChildren.forEach { child ->
                         append(generateNodeCode(child, indent = "$indent        "))
                     }
-                    appendLine("${indent}    },")
-                } else {
-                    appendLine("${indent}    actions = {")
-                    appendLine("${indent}        IconButton(onClick = { /* TODO: Search */ }) {")
-                    appendLine("${indent}            Icon(Icons.Outlined.Search, contentDescription = \"Search\")")
-                    appendLine("${indent}        }")
-                    appendLine("${indent}        IconButton(onClick = { /* TODO: More options */ }) {")
-                    appendLine("${indent}            Icon(Icons.Outlined.MoreVert, contentDescription = \"More\")")
-                    appendLine("${indent}        }")
                     appendLine("${indent}    },")
                 }
                 appendLine("${indent}    modifier = $mod")
@@ -390,25 +375,6 @@ open class ComposeCodeGenerator(
                     node.children.forEach { child ->
                         append(generateNodeCode(child, indent = "$indent    "))
                     }
-                } else {
-                    appendLine("${indent}    NavigationBarItem(")
-                    appendLine("${indent}        selected = true,")
-                    appendLine("${indent}        onClick = { /* TODO: Navigate Home */ },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Home, contentDescription = \"Home\") },")
-                    appendLine("${indent}        label = { Text(\"Home\") }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    NavigationBarItem(")
-                    appendLine("${indent}        selected = false,")
-                    appendLine("${indent}        onClick = { /* TODO: Navigate Explore */ },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Search, contentDescription = \"Explore\") },")
-                    appendLine("${indent}        label = { Text(\"Explore\") }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    NavigationBarItem(")
-                    appendLine("${indent}        selected = false,")
-                    appendLine("${indent}        onClick = { /* TODO: Navigate Profile */ },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Person, contentDescription = \"Profile\") },")
-                    appendLine("${indent}        label = { Text(\"Profile\") }")
-                    appendLine("${indent}    )")
                 }
                 appendLine("${indent}}")
             }
@@ -423,7 +389,7 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}NavigationBarItem(")
                 appendLine("${indent}    selected = $selected,")
-                appendLine("${indent}    onClick = { /* TODO: Select item */ },")
+                appendLine("${indent}    onClick = {},")
                 appendLine("${indent}    icon = { Icon($iconExpr, contentDescription = \"$label\") },")
                 appendLine("${indent}    label = { Text(\"$label\") },")
                 appendLine("${indent}    modifier = $mod")
@@ -443,7 +409,7 @@ open class ComposeCodeGenerator(
                 }
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}$composableName(")
-                appendLine("${indent}    onClick = { /* TODO: Button click action */ },")
+                appendLine("${indent}    onClick = {},")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 appendLine("${indent}    Text(text = \"$text\")")
@@ -516,7 +482,7 @@ open class ComposeCodeGenerator(
                     MaterialVariant.FabSize.MEDIUM -> "FloatingActionButton"
                 }
                 appendLine("${indent}$composableName(")
-                appendLine("${indent}    onClick = { /* TODO: FAB Action */ },")
+                appendLine("${indent}    onClick = {},")
                 when (variant) {
                     MaterialVariant.FloatingActionButton.SURFACE -> {
                         appendLine("${indent}    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,")
@@ -545,7 +511,7 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 val variant = (node.property("variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.FloatingActionButton
                 appendLine("${indent}ExtendedFloatingActionButton(")
-                appendLine("${indent}    onClick = { /* TODO: Action */ },")
+                appendLine("${indent}    onClick = {},")
                 when (variant) {
                     MaterialVariant.FloatingActionButton.SURFACE -> {
                         appendLine("${indent}    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,")
@@ -580,7 +546,7 @@ open class ComposeCodeGenerator(
                 }
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}$composableName(")
-                appendLine("${indent}    onClick = { /* TODO */ },")
+                appendLine("${indent}    onClick = {},")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 appendLine("${indent}    Icon($iconExpr, contentDescription = null)")
@@ -592,10 +558,10 @@ open class ComposeCodeGenerator(
                     ?: MaterialVariant.Chip.ASSIST
                 val label = (node.property("text") as? ComponentProperty.Text)?.value ?: "Chip"
                 val composableName = when (variant) {
-                    MaterialVariant.Chip.ASSIST -> "AssistChip(onClick = { /* TODO */ }, label = { Text(\"$label\") })"
-                    MaterialVariant.Chip.FILTER -> "FilterChip(selected = true, onClick = { /* TODO */ }, label = { Text(\"$label\") })"
-                    MaterialVariant.Chip.INPUT -> "InputChip(selected = false, onClick = { /* TODO */ }, label = { Text(\"$label\") })"
-                    MaterialVariant.Chip.SUGGESTION -> "SuggestionChip(onClick = { /* TODO */ }, label = { Text(\"$label\") })"
+                    MaterialVariant.Chip.ASSIST -> "AssistChip(onClick = {}, label = { Text(\"$label\") })"
+                    MaterialVariant.Chip.FILTER -> "FilterChip(selected = true, onClick = {}, label = { Text(\"$label\") })"
+                    MaterialVariant.Chip.INPUT -> "InputChip(selected = false, onClick = {}, label = { Text(\"$label\") })"
+                    MaterialVariant.Chip.SUGGESTION -> "SuggestionChip(onClick = {}, label = { Text(\"$label\") })"
                 }
                 appendLine("${indent}$composableName")
             }
@@ -608,7 +574,7 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}$composable(")
                 appendLine("${indent}    value = \"$text\",")
-                appendLine("${indent}    onValueChange = { /* TODO: Update state */ },")
+                appendLine("${indent}    onValueChange = {},")
                 appendLine("${indent}    label = { Text(\"${node.name}\") },")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
@@ -617,51 +583,53 @@ open class ComposeCodeGenerator(
             ComponentType.SEGMENTED_BUTTON -> buildString {
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}var selectedIndex by remember { mutableStateOf(0) }")
-                appendLine("${indent}val options = listOf(\"Day\", \"Week\", \"Month\")")
                 appendLine("${indent}SingleChoiceSegmentedButtonRow(modifier = $mod) {")
-                appendLine("${indent}    options.forEachIndexed { index, label ->")
-                appendLine("${indent}        SegmentedButton(")
-                appendLine("${indent}            shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),")
-                appendLine("${indent}            onClick = { selectedIndex = index },")
-                appendLine("${indent}            selected = index == selectedIndex")
-                appendLine("${indent}        ) {")
-                appendLine("${indent}            Text(label)")
-                appendLine("${indent}        }")
-                appendLine("${indent}    }")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEachIndexed { index, child ->
+                        appendLine("${indent}    SegmentedButton(")
+                        appendLine("${indent}        shape = SegmentedButtonDefaults.itemShape(index = $index, count = ${node.children.size}),")
+                        appendLine("${indent}        onClick = { selectedIndex = $index },")
+                        appendLine("${indent}        selected = selectedIndex == $index")
+                        appendLine("${indent}    ) {")
+                        append(generateNodeCode(child, indent = "$indent        "))
+                        appendLine("${indent}    }")
+                    }
+                }
                 appendLine("${indent}}")
             }
 
             ComponentType.SPLIT_BUTTON -> buildString {
                 val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Action"
                 val mod = buildModifierString(node, isRootFloating)
-                appendLine("${indent}Row(modifier = $mod, verticalAlignment = Alignment.CenterVertically) {")
-                appendLine("${indent}    FilledTonalButton(")
-                appendLine("${indent}        onClick = { /* TODO */ },")
-                appendLine("${indent}        shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 4.dp)")
-                appendLine("${indent}    ) {")
-                appendLine("${indent}        Text(\"$text\")")
-                appendLine("${indent}    }")
-                appendLine("${indent}    Spacer(modifier = Modifier.width(2.dp))")
-                appendLine("${indent}    FilledTonalButton(")
-                appendLine("${indent}        onClick = { /* TODO */ },")
-                appendLine("${indent}        shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp),")
-                appendLine("${indent}        contentPadding = PaddingValues(horizontal = 8.dp)")
-                appendLine("${indent}    ) {")
-                appendLine("${indent}        Icon(Icons.Outlined.ArrowDropDown, contentDescription = \"More\")")
-                appendLine("${indent}    }")
-                appendLine("${indent}}")
+                appendLine("${indent}SplitButton(")
+                appendLine("${indent}    leadingButton = {")
+                appendLine("${indent}        SplitButtonDefaults.LeadingButton(onClick = {}) {")
+                appendLine("${indent}            Text(\"$text\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    trailingButton = {")
+                appendLine("${indent}        SplitButtonDefaults.TrailingButton(")
+                appendLine("${indent}            checked = false,")
+                appendLine("${indent}            onCheckedChange = {}")
+                appendLine("${indent}        ) {")
+                appendLine("${indent}            Icon(Icons.Default.ArrowDropDown, contentDescription = \"More options\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    modifier = $mod")
+                appendLine("${indent})")
             }
 
             ComponentType.BUTTON_GROUP -> buildString {
                 val mod = buildModifierString(node, isRootFloating)
-                appendLine("${indent}Row(")
+                appendLine("${indent}ButtonGroup(")
                 appendLine("${indent}    modifier = $mod,")
-                appendLine("${indent}    horizontalArrangement = Arrangement.spacedBy(8.dp),")
-                appendLine("${indent}    verticalAlignment = Alignment.CenterVertically")
+                appendLine("${indent}    horizontalArrangement = Arrangement.spacedBy(8.dp)")
                 appendLine("${indent}) {")
-                appendLine("${indent}    Button(onClick = { /* TODO */ }) { Text(\"Primary\") }")
-                appendLine("${indent}    FilledTonalButton(onClick = { /* TODO */ }) { Text(\"Tonal\") }")
-                appendLine("${indent}    OutlinedButton(onClick = { /* TODO */ }) { Text(\"Cancel\") }")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent    "))
+                    }
+                }
                 appendLine("${indent}}")
             }
 
@@ -686,24 +654,18 @@ open class ComposeCodeGenerator(
                     appendLine("${indent}    supportingContent = {")
                     append(generateNodeCode(supportingChild, indent = "$indent        "))
                     appendLine("${indent}    },")
-                } else if (node.children.isEmpty()) {
-                    appendLine("${indent}    supportingContent = { Text(\"Supporting secondary description\") },")
                 }
 
                 if (leadingChild != null) {
                     appendLine("${indent}    leadingContent = {")
                     append(generateNodeCode(leadingChild, indent = "$indent        "))
                     appendLine("${indent}    },")
-                } else if (node.children.isEmpty()) {
-                    appendLine("${indent}    leadingContent = { Icon(Icons.Outlined.Star, contentDescription = null) },")
                 }
 
                 if (trailingChild != null) {
                     appendLine("${indent}    trailingContent = {")
                     append(generateNodeCode(trailingChild, indent = "$indent        "))
                     appendLine("${indent}    },")
-                } else if (node.children.isEmpty()) {
-                    appendLine("${indent}    trailingContent = { Text(\"10:30\", style = MaterialTheme.typography.labelSmall) },")
                 }
 
                 if (overlineChild != null) {
@@ -717,27 +679,18 @@ open class ComposeCodeGenerator(
             }
 
             ComponentType.MODAL_BOTTOM_SHEET -> buildString {
-                val title = (node.property("text") as? ComponentProperty.Text)?.value ?: "Modal Bottom Sheet"
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}ModalBottomSheet(")
-                appendLine("${indent}    onDismissRequest = { /* TODO: Dismiss sheet */ },")
+                appendLine("${indent}    onDismissRequest = {},")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
-                appendLine("${indent}    Column(modifier = Modifier.padding(16.dp)) {")
                 if (node.children.isNotEmpty()) {
+                    appendLine("${indent}    Column(modifier = Modifier.padding(16.dp)) {")
                     node.children.forEach { child ->
                         append(generateNodeCode(child, indent = "$indent        "))
                     }
-                } else {
-                    appendLine("${indent}        Text(\"$title\", style = MaterialTheme.typography.titleMedium)")
-                    appendLine("${indent}        Spacer(modifier = Modifier.height(8.dp))")
-                    appendLine("${indent}        Text(\"Supplementary modal bottom sheet content.\", style = MaterialTheme.typography.bodyMedium)")
-                    appendLine("${indent}        Spacer(modifier = Modifier.height(16.dp))")
-                    appendLine("${indent}        Button(onClick = { /* TODO */ }, modifier = Modifier.fillMaxWidth()) {")
-                    appendLine("${indent}            Text(\"Confirm\")")
-                    appendLine("${indent}        }")
+                    appendLine("${indent}    }")
                 }
-                appendLine("${indent}    }")
                 appendLine("${indent}}")
             }
 
@@ -752,21 +705,17 @@ open class ComposeCodeGenerator(
                 val title = (node.property("text") as? ComponentProperty.Text)?.value ?: "Dialog Title"
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}AlertDialog(")
-                appendLine("${indent}    onDismissRequest = { /* TODO */ },")
+                appendLine("${indent}    onDismissRequest = {},")
                 if (iconChild != null) {
                     appendLine("${indent}    icon = {")
                     append(generateNodeCode(iconChild, indent = "$indent        "))
                     appendLine("${indent}    },")
-                } else if (node.children.isEmpty()) {
-                    appendLine("${indent}    icon = { Icon(Icons.Outlined.Info, contentDescription = null) },")
                 }
 
                 if (titleChild != null) {
                     appendLine("${indent}    title = {")
                     append(generateNodeCode(titleChild, indent = "$indent        "))
                     appendLine("${indent}    },")
-                } else {
-                    appendLine("${indent}    title = { Text(\"$title\") },")
                 }
 
                 if (contentChildren.isNotEmpty()) {
@@ -777,27 +726,17 @@ open class ComposeCodeGenerator(
                     }
                     appendLine("${indent}        }")
                     appendLine("${indent}    },")
-                } else {
-                    appendLine("${indent}    text = { Text(\"Dialogs inform users about a task and can contain critical information.\") },")
                 }
 
                 if (confirmChild != null) {
                     appendLine("${indent}    confirmButton = {")
                     append(generateNodeCode(confirmChild, indent = "$indent        "))
                     appendLine("${indent}    },")
-                } else {
-                    appendLine("${indent}    confirmButton = {")
-                    appendLine("${indent}        Button(onClick = { /* TODO */ }) { Text(\"Confirm\") }")
-                    appendLine("${indent}    },")
                 }
 
                 if (dismissChild != null) {
                     appendLine("${indent}    dismissButton = {")
                     append(generateNodeCode(dismissChild, indent = "$indent        "))
-                    appendLine("${indent}    },")
-                } else {
-                    appendLine("${indent}    dismissButton = {")
-                    appendLine("${indent}        TextButton(onClick = { /* TODO */ }) { Text(\"Cancel\") }")
                     appendLine("${indent}    },")
                 }
 
@@ -808,7 +747,7 @@ open class ComposeCodeGenerator(
             ComponentType.BASIC_ALERT_DIALOG -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}BasicAlertDialog(")
-                appendLine("${indent}    onDismissRequest = { /* TODO: Dismiss dialog */ },")
+                appendLine("${indent}    onDismissRequest = {},")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
                 appendLine("${indent}    Surface(")
@@ -822,10 +761,6 @@ open class ComposeCodeGenerator(
                         append(generateNodeCode(child, indent = "$indent            "))
                     }
                     appendLine("${indent}        }")
-                } else {
-                    appendLine("${indent}        Column(modifier = Modifier.padding(24.dp)) {")
-                    appendLine("${indent}            Text(text = \"Basic Alert Dialog\", style = MaterialTheme.typography.headlineSmall)")
-                    appendLine("${indent}        }")
                 }
                 appendLine("${indent}    }")
                 appendLine("${indent}}")
@@ -836,7 +771,7 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, "fillMaxWidth()")
                 appendLine("${indent}Snackbar(")
                 appendLine("${indent}    action = {")
-                appendLine("${indent}        TextButton(onClick = { /* TODO */ }) {")
+                appendLine("${indent}        TextButton(onClick = {}) {")
                 appendLine("${indent}            Text(\"Dismiss\")")
                 appendLine("${indent}        }")
                 appendLine("${indent}    },")
@@ -853,14 +788,13 @@ open class ComposeCodeGenerator(
             }
 
             ComponentType.BADGE -> buildString {
-                val count = (node.property("text") as? ComponentProperty.Text)?.value ?: "3"
+                val count = (node.property("text") as? ComponentProperty.Text)?.value ?: ""
                 val mod = buildModifierString(node, isRootFloating)
-                appendLine("${indent}BadgedBox(")
-                appendLine("${indent}    badge = { Badge { Text(\"$count\") } },")
-                appendLine("${indent}    modifier = $mod")
-                appendLine("${indent}) {")
-                appendLine("${indent}    Icon(Icons.Outlined.Notifications, contentDescription = \"Notifications\")")
-                appendLine("${indent}}")
+                if (count.isNotEmpty()) {
+                    appendLine("${indent}Badge(modifier = $mod) { Text(\"$count\") }")
+                } else {
+                    appendLine("${indent}Badge(modifier = $mod)")
+                }
             }
 
             ComponentType.BADGED_BOX -> buildString {
@@ -872,7 +806,7 @@ open class ComposeCodeGenerator(
                 if (badgeChild != null) {
                     append(generateNodeCode(badgeChild, indent = "$indent        "))
                 } else {
-                    appendLine("${indent}        Badge { Text(\"3\") }")
+                    appendLine("${indent}        Badge()")
                 }
                 appendLine("${indent}    },")
                 appendLine("${indent}    modifier = $mod")
@@ -880,26 +814,34 @@ open class ComposeCodeGenerator(
                 if (contentChild != null) {
                     append(generateNodeCode(contentChild, indent = "$indent        "))
                 } else {
-                    appendLine("${indent}        Icon(Icons.Outlined.Notifications, contentDescription = \"Notifications\")")
+                    appendLine("${indent}        Icon(Icons.Outlined.Notifications, contentDescription = null)")
                 }
-                appendLine("${indent}    }")
                 appendLine("${indent}}")
             }
 
             ComponentType.TOOLTIP -> buildString {
-                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Helpful tooltip label"
+                val text = (node.property("text") as? ComponentProperty.Text)?.value ?: "Tooltip label"
                 val mod = buildModifierString(node, isRootFloating)
-                appendLine("${indent}Surface(")
-                appendLine("${indent}    shape = RoundedCornerShape(4.dp),")
-                appendLine("${indent}    color = MaterialTheme.colorScheme.inverseSurface,")
+                appendLine("${indent}val tooltipState = rememberTooltipState()")
+                appendLine("${indent}TooltipBox(")
+                appendLine("${indent}    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),")
+                appendLine("${indent}    tooltip = {")
+                appendLine("${indent}        PlainTooltip {")
+                appendLine("${indent}            Text(\"$text\")")
+                appendLine("${indent}        }")
+                appendLine("${indent}    },")
+                appendLine("${indent}    state = tooltipState,")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent}) {")
-                appendLine("${indent}    Text(")
-                appendLine("${indent}        text = \"$text\",")
-                appendLine("${indent}        style = MaterialTheme.typography.labelSmall,")
-                appendLine("${indent}        color = MaterialTheme.colorScheme.inverseOnSurface,")
-                appendLine("${indent}        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)")
-                appendLine("${indent}    )")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent    "))
+                    }
+                } else {
+                    appendLine("${indent}    IconButton(onClick = {}) {")
+                    appendLine("${indent}        Icon(Icons.Outlined.Info, contentDescription = \"Info\")")
+                    appendLine("${indent}    }")
+                }
                 appendLine("${indent}}")
             }
 
@@ -920,31 +862,11 @@ open class ComposeCodeGenerator(
 
             ComponentType.NAVIGATION_RAIL -> buildString {
                 val mod = buildModifierString(node, isRootFloating, "fillMaxHeight()")
-                appendLine("${indent}var selectedItem by remember { mutableStateOf(0) }")
                 appendLine("${indent}NavigationRail(modifier = $mod) {")
                 if (node.children.isNotEmpty()) {
                     node.children.forEach { child ->
                         append(generateNodeCode(child, indent = "$indent    "))
                     }
-                } else {
-                    appendLine("${indent}    NavigationRailItem(")
-                    appendLine("${indent}        selected = selectedItem == 0,")
-                    appendLine("${indent}        onClick = { selectedItem = 0 },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Home, contentDescription = \"Home\") },")
-                    appendLine("${indent}        label = { Text(\"Home\") }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    NavigationRailItem(")
-                    appendLine("${indent}        selected = selectedItem == 1,")
-                    appendLine("${indent}        onClick = { selectedItem = 1 },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Search, contentDescription = \"Search\") },")
-                    appendLine("${indent}        label = { Text(\"Search\") }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    NavigationRailItem(")
-                    appendLine("${indent}        selected = selectedItem == 2,")
-                    appendLine("${indent}        onClick = { selectedItem = 2 },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Settings, contentDescription = \"Settings\") },")
-                    appendLine("${indent}        label = { Text(\"Settings\") }")
-                    appendLine("${indent}    )")
                 }
                 appendLine("${indent}}")
             }
@@ -959,7 +881,7 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}NavigationRailItem(")
                 appendLine("${indent}    selected = $selected,")
-                appendLine("${indent}    onClick = { /* TODO: Select item */ },")
+                appendLine("${indent}    onClick = {},")
                 appendLine("${indent}    icon = { Icon($iconExpr, contentDescription = \"$label\") },")
                 appendLine("${indent}    label = { Text(\"$label\") },")
                 appendLine("${indent}    modifier = $mod")
@@ -968,29 +890,12 @@ open class ComposeCodeGenerator(
 
             ComponentType.NAVIGATION_DRAWER -> buildString {
                 val mod = buildModifierString(node, isRootFloating, "fillMaxHeight()")
-                appendLine("${indent}var selectedItem by remember { mutableStateOf(0) }")
                 appendLine("${indent}ModalDrawerSheet(modifier = $mod) {")
-                appendLine("${indent}    Text(\"${node.name}\", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)")
-                appendLine("${indent}    HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))")
-                appendLine("${indent}    NavigationDrawerItem(")
-                appendLine("${indent}        label = { Text(\"Inbox\") },")
-                appendLine("${indent}        selected = selectedItem == 0,")
-                appendLine("${indent}        onClick = { selectedItem = 0 },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.Inbox, contentDescription = null) },")
-                appendLine("${indent}        badge = { Text(\"12\") }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    NavigationDrawerItem(")
-                appendLine("${indent}        label = { Text(\"Outbox\") },")
-                appendLine("${indent}        selected = selectedItem == 1,")
-                appendLine("${indent}        onClick = { selectedItem = 1 },")
-                appendLine("${indent}        icon = { Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = null) }")
-                appendLine("${indent}    )")
-                appendLine("${indent}    NavigationDrawerItem(")
-                appendLine("${indent}        label = { Text(\"Favorites\") },")
-                appendLine("${indent}        selected = selectedItem == 2,")
-                appendLine("${indent}        onClick = { selectedItem = 2 },")
-                appendLine("${indent}        icon = { Icon(Icons.Outlined.FavoriteBorder, contentDescription = null) }")
-                appendLine("${indent}    )")
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent    "))
+                    }
+                }
                 appendLine("${indent}}")
             }
 
@@ -1002,25 +907,6 @@ open class ComposeCodeGenerator(
                     node.children.forEach { child ->
                         append(generateNodeCode(child, indent = "$indent    "))
                     }
-                } else {
-                    appendLine("${indent}    Tab(")
-                    appendLine("${indent}        selected = selectedTab == 0,")
-                    appendLine("${indent}        onClick = { selectedTab = 0 },")
-                    appendLine("${indent}        text = { Text(\"Overview\") },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Dashboard, contentDescription = null) }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    Tab(")
-                    appendLine("${indent}        selected = selectedTab == 1,")
-                    appendLine("${indent}        onClick = { selectedTab = 1 },")
-                    appendLine("${indent}        text = { Text(\"Analytics\") },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Analytics, contentDescription = null) }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    Tab(")
-                    appendLine("${indent}        selected = selectedTab == 2,")
-                    appendLine("${indent}        onClick = { selectedTab = 2 },")
-                    appendLine("${indent}        text = { Text(\"Settings\") },")
-                    appendLine("${indent}        icon = { Icon(Icons.Outlined.Tune, contentDescription = null) }")
-                    appendLine("${indent}    )")
                 }
                 appendLine("${indent}}")
             }
@@ -1032,7 +918,7 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}Tab(")
                 appendLine("${indent}    selected = $selected,")
-                appendLine("${indent}    onClick = { /* TODO: Select tab */ },")
+                appendLine("${indent}    onClick = {},")
                 appendLine("${indent}    text = { Text(\"$text\") },")
                 if (iconName.isNotEmpty()) {
                     val iconExpr = resolveIconCodeExpression(iconName)
@@ -1050,7 +936,7 @@ open class ComposeCodeGenerator(
                 appendLine("${indent}        SearchBarDefaults.InputField(")
                 appendLine("${indent}            query = searchQuery,")
                 appendLine("${indent}            onQueryChange = { searchQuery = it },")
-                appendLine("${indent}            onSearch = { /* TODO */ },")
+                appendLine("${indent}            onSearch = {},")
                 appendLine("${indent}            expanded = false,")
                 appendLine("${indent}            onExpandedChange = {},")
                 appendLine("${indent}            placeholder = { Text(\"Search components...\") },")
@@ -1158,23 +1044,6 @@ open class ComposeCodeGenerator(
                     node.children.forEach { child ->
                         append(generateNodeCode(child, indent = "$indent    "))
                     }
-                } else {
-                    appendLine("${indent}    DropdownMenuItem(")
-                    appendLine("${indent}        text = { Text(\"Edit\") },")
-                    appendLine("${indent}        onClick = { /* TODO */ },")
-                    appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    DropdownMenuItem(")
-                    appendLine("${indent}        text = { Text(\"Duplicate\") },")
-                    appendLine("${indent}        onClick = { /* TODO */ },")
-                    appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) }")
-                    appendLine("${indent}    )")
-                    appendLine("${indent}    HorizontalDivider()")
-                    appendLine("${indent}    DropdownMenuItem(")
-                    appendLine("${indent}        text = { Text(\"Delete\") },")
-                    appendLine("${indent}        onClick = { /* TODO */ },")
-                    appendLine("${indent}        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) }")
-                    appendLine("${indent}    )")
                 }
                 appendLine("${indent}}")
             }
@@ -1185,7 +1054,7 @@ open class ComposeCodeGenerator(
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}DropdownMenuItem(")
                 appendLine("${indent}    text = { Text(\"$text\") },")
-                appendLine("${indent}    onClick = { /* TODO: Action */ },")
+                appendLine("${indent}    onClick = {},")
                 if (iconName.isNotEmpty()) {
                     val iconExpr = resolveIconCodeExpression(iconName)
                     appendLine("${indent}    leadingIcon = { Icon($iconExpr, contentDescription = null) },")
@@ -1195,27 +1064,22 @@ open class ComposeCodeGenerator(
             }
 
             ComponentType.BOTTOM_APP_BAR -> buildString {
+                val actions = node.childrenInSlot(SlotRole.ACTIONS)
+                val fab = node.childInSlot(SlotRole.FAB)
                 val mod = buildModifierString(node, isRootFloating = false, "fillMaxWidth()")
                 appendLine("${indent}BottomAppBar(")
-                appendLine("${indent}    actions = {")
-                appendLine("${indent}        IconButton(onClick = { /* TODO */ }) {")
-                appendLine("${indent}            Icon(Icons.Outlined.Menu, contentDescription = \"Menu\")")
-                appendLine("${indent}        }")
-                appendLine("${indent}        IconButton(onClick = { /* TODO */ }) {")
-                appendLine("${indent}            Icon(Icons.Outlined.Search, contentDescription = \"Search\")")
-                appendLine("${indent}        }")
-                appendLine("${indent}        IconButton(onClick = { /* TODO */ }) {")
-                appendLine("${indent}            Icon(Icons.Outlined.FavoriteBorder, contentDescription = \"Favorite\")")
-                appendLine("${indent}        }")
-                appendLine("${indent}    },")
-                appendLine("${indent}    floatingActionButton = {")
-                appendLine("${indent}        FloatingActionButton(")
-                appendLine("${indent}            onClick = { /* TODO */ },")
-                appendLine("${indent}            elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation()")
-                appendLine("${indent}        ) {")
-                appendLine("${indent}            Icon(Icons.Filled.Add, contentDescription = \"Add\")")
-                appendLine("${indent}        }")
-                appendLine("${indent}    },")
+                if (actions.isNotEmpty()) {
+                    appendLine("${indent}    actions = {")
+                    actions.forEach { child ->
+                        append(generateNodeCode(child, indent = "$indent        "))
+                    }
+                    appendLine("${indent}    },")
+                }
+                if (fab != null) {
+                    appendLine("${indent}    floatingActionButton = {")
+                    append(generateNodeCode(fab, indent = "$indent        "))
+                    appendLine("${indent}    },")
+                }
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
             }
@@ -1538,7 +1402,7 @@ open class ComposeCodeGenerator(
                 }
                 is ModifierSpec.Align -> parts.add("align(${resolveAlignTargetCode(spec.alignment)})")
                 is ModifierSpec.ZIndex -> parts.add("zIndex(${spec.value}f)")
-                is ModifierSpec.Clickable -> parts.add("clickable(enabled = ${spec.enabled}) { /* TODO */ }")
+                is ModifierSpec.Clickable -> parts.add("clickable(enabled = ${spec.enabled}) {}")
             }
         }
 

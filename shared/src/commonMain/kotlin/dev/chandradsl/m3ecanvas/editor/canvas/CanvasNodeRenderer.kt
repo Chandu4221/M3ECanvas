@@ -30,6 +30,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -48,6 +49,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
@@ -189,9 +193,9 @@ fun CanvasNodeRenderer(
         ComponentType.ICON_BUTTON -> RenderIconButton(node = node, controller = controller)
         ComponentType.FAB -> RenderFab(node = node)
         ComponentType.EXTENDED_FAB -> RenderExtendedFab(node = node)
-        ComponentType.SEGMENTED_BUTTON -> RenderSegmentedButton(node = node)
-        ComponentType.SPLIT_BUTTON -> RenderSplitButton(node = node)
-        ComponentType.BUTTON_GROUP -> RenderButtonGroup(node = node)
+        ComponentType.SEGMENTED_BUTTON -> RenderSegmentedButton(node = node, controller = controller)
+        ComponentType.SPLIT_BUTTON -> RenderSplitButton(node = node, controller = controller)
+        ComponentType.BUTTON_GROUP -> RenderButtonGroup(node = node, controller = controller)
         ComponentType.TOGGLE_BUTTON -> RenderToggleButton(node = node)
 
         // Containment
@@ -208,7 +212,7 @@ fun CanvasNodeRenderer(
         ComponentType.SNACKBAR_HOST -> RenderSnackbarHost(node = node)
         ComponentType.BADGE -> RenderBadge(node = node)
         ComponentType.BADGED_BOX -> RenderBadgedBox(node = node, controller = controller)
-        ComponentType.TOOLTIP -> RenderTooltip(node = node)
+        ComponentType.TOOLTIP -> RenderTooltip(node = node, controller = controller)
         ComponentType.PROGRESS_INDICATOR -> RenderProgressIndicator(node = node)
         ComponentType.LOADING_INDICATOR -> RenderLoadingIndicator(node = node)
 
@@ -216,10 +220,10 @@ fun CanvasNodeRenderer(
         ComponentType.TOP_APP_BAR -> RenderTopAppBar(node = node, controller = controller)
         ComponentType.NAVIGATION_BAR -> RenderNavigationBar(node = node, controller = controller)
         ComponentType.NAVIGATION_BAR_ITEM -> RenderNavigationBarItem(node = node)
-        ComponentType.BOTTOM_APP_BAR -> RenderBottomAppBar(node = node)
+        ComponentType.BOTTOM_APP_BAR -> RenderBottomAppBar(node = node, controller = controller)
         ComponentType.NAVIGATION_RAIL -> RenderNavigationRail(node = node, controller = controller)
         ComponentType.NAVIGATION_RAIL_ITEM -> RenderNavigationRailItem(node = node)
-        ComponentType.NAVIGATION_DRAWER -> RenderNavigationDrawer(node = node)
+        ComponentType.NAVIGATION_DRAWER -> RenderNavigationDrawer(node = node, controller = controller)
         ComponentType.TABS -> RenderTabs(node = node, controller = controller)
         ComponentType.TAB -> RenderTab(node = node)
         ComponentType.SEARCH -> RenderSearch(node = node)
@@ -530,35 +534,27 @@ private fun RenderTopAppBar(node: CanvasNode, controller: EditorController) {
                 Text(text = titleText, maxLines = 1)
             }
         },
-        navigationIcon = {
-            if (navChild != null) {
-                ContainerChild(child = navChild, controller = controller)
-            } else {
-                IconButton(onClick = {}) {
-                    Icon(
-                        imageVector = Icons.Outlined.Menu,
-                        contentDescription = "Navigation"
-                    )
+        navigationIcon = if (navChild != null) {
+            { ContainerChild(child = navChild, controller = controller) }
+        } else {
+            val navIconName = (node.property("navigationIcon") as? ComponentProperty.Icon)?.iconName
+            if (!navIconName.isNullOrBlank()) {
+                {
+                    IconButton(onClick = {}) {
+                        Icon(
+                            imageVector = resolveMaterialIcon(navIconName),
+                            contentDescription = "Navigation"
+                        )
+                    }
                 }
+            } else {
+                {}
             }
         },
         actions = {
             if (actionChildren.isNotEmpty()) {
                 actionChildren.forEach { child ->
                     ContainerChild(child = child, controller = controller)
-                }
-            } else {
-                IconButton(onClick = {}) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = "Search"
-                    )
-                }
-                IconButton(onClick = {}) {
-                    Icon(
-                        imageVector = Icons.Outlined.MoreVert,
-                        contentDescription = "More"
-                    )
                 }
             }
         },
@@ -586,23 +582,9 @@ private fun RenderNavigationBar(node: CanvasNode, controller: EditorController) 
                 }
             }
         } else {
-            NavigationBarItem(
-                selected = if (isInteractive) selectedIndex == 0 else true,
-                onClick = { if (isInteractive) selectedIndex = 0 },
-                icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
-                label = { Text(text = "Home") }
-            )
-            NavigationBarItem(
-                selected = if (isInteractive) selectedIndex == 1 else false,
-                onClick = { if (isInteractive) selectedIndex = 1 },
-                icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Explore") },
-                label = { Text(text = "Explore") }
-            )
-            NavigationBarItem(
-                selected = if (isInteractive) selectedIndex == 2 else false,
-                onClick = { if (isInteractive) selectedIndex = 2 },
-                icon = { Icon(imageVector = Icons.Outlined.Person, contentDescription = "Profile") },
-                label = { Text(text = "Profile") }
+            EditorSlotAffordance(
+                label = "NavigationBar: Add NavigationBarItem children",
+                modifier = Modifier.fillMaxWidth().height(48.dp)
             )
         }
     }
@@ -772,18 +754,7 @@ private fun ContainerChild(
     controller: EditorController,
     modifier: Modifier = Modifier
 ) {
-    val isInteractive = controller.state.isInteractiveMode
-    val isSelected = !isInteractive && controller.state.isNodeSelected(nodeId = child.id)
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(isSelected) {
-        if (isSelected) {
-            try {
-                focusRequester.requestFocus()
-            } catch (_: Throwable) {}
-        }
-    }
-
+    val canvasCoords = LocalCanvasCoordinates.current
     val fillMaxSize = child.modifiers.filterIsInstance<ModifierSpec.FillMaxSize>().firstOrNull()
     val fillMaxWidth = child.modifiers.filterIsInstance<ModifierSpec.FillMaxWidth>().firstOrNull()
     val fillMaxHeight = child.modifiers.filterIsInstance<ModifierSpec.FillMaxHeight>().firstOrNull()
@@ -792,52 +763,51 @@ private fun ContainerChild(
     val sizeSpec = child.modifiers.filterIsInstance<ModifierSpec.Size>().firstOrNull()
     val wrapContent = child.modifiers.filterIsInstance<ModifierSpec.WrapContentSize>().firstOrNull()
 
+    // Compose layout semantics: intrinsic content-driven sizing unless explicitly overridden by modifier
     val sizeModifier = when {
         fillMaxSize != null -> Modifier.fillMaxSize(fraction = fillMaxSize.fraction)
         fillMaxWidth != null && fillMaxHeight != null -> Modifier.fillMaxWidth().fillMaxHeight()
-        fillMaxWidth != null -> Modifier.fillMaxWidth().height(heightSpec?.dp?.dp ?: sizeSpec?.height?.dp ?: child.size.height.dp)
-        fillMaxHeight != null -> Modifier.fillMaxHeight().width(widthSpec?.dp?.dp ?: sizeSpec?.width?.dp ?: child.size.width.dp)
+        fillMaxWidth != null && heightSpec != null -> Modifier.fillMaxWidth().height(heightSpec.dp.dp)
+        fillMaxWidth != null -> Modifier.fillMaxWidth()
+        fillMaxHeight != null && widthSpec != null -> Modifier.fillMaxHeight().width(widthSpec.dp.dp)
+        fillMaxHeight != null -> Modifier.fillMaxHeight()
         sizeSpec != null -> Modifier.size(width = sizeSpec.width.dp, height = sizeSpec.height.dp)
         widthSpec != null && heightSpec != null -> Modifier.size(width = widthSpec.dp.dp, height = heightSpec.dp.dp)
-        widthSpec != null -> Modifier.width(widthSpec.dp.dp).height(child.size.height.dp)
-        heightSpec != null -> Modifier.width(child.size.width.dp).height(heightSpec.dp.dp)
+        widthSpec != null -> Modifier.width(widthSpec.dp.dp)
+        heightSpec != null -> Modifier.height(heightSpec.dp.dp)
         wrapContent != null -> Modifier.wrapContentSize()
-        else -> Modifier.size(width = child.size.width.dp, height = child.size.height.dp)
+        else -> Modifier
+    }
+
+    DisposableEffect(child.id) {
+        onDispose {
+            controller.geometryStore.removeBounds(child.id)
+        }
     }
 
     Box(
         modifier = modifier
             .then(sizeModifier)
-            .border(
-                width = if (isSelected) 2.dp else 0.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(4.dp)
-            )
-            .then(
-                if (!isInteractive) {
-                    Modifier
-                        .focusRequester(focusRequester)
-                        .focusable()
-                        .onKeyEvent { event ->
-                            if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                                controller.deleteSelected()
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
-                } else Modifier
-            )
+            .onGloballyPositioned { coords ->
+                if (coords.isAttached) {
+                    val root = canvasCoords
+                    val boundsInCanvas = if (root != null && root.isAttached) {
+                        root.localBoundingBoxOf(coords, clipBounds = false)
+                    } else {
+                        coords.boundsInRoot()
+                    }
+                    controller.geometryStore.updateBounds(
+                        child.id,
+                        RenderedBounds(
+                            boundsInCanvas = boundsInCanvas,
+                            boundsInWindow = coords.boundsInWindow(),
+                            sizePx = coords.size
+                        )
+                    )
+                }
+            }
     ) {
         CanvasNodeRenderer(node = child, controller = controller)
-        if (!isInteractive && !child.type.isContainer && child.children.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .selectOnPress(nodeId = child.id, controller = controller, focusRequester = focusRequester)
-            )
-        }
     }
 }
 
@@ -899,56 +869,67 @@ private fun RenderTextField(node: CanvasNode, controller: EditorController) {
 }
 
 @Composable
-private fun RenderSegmentedButton(node: CanvasNode) {
-    val options = listOf("Day", "Week", "Month")
+private fun RenderSegmentedButton(node: CanvasNode, controller: EditorController) {
+    val isInteractive = controller.state.isInteractiveMode
+    var selectedIndex by remember(node.id, isInteractive) { mutableIntStateOf(0) }
     SingleChoiceSegmentedButtonRow(
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
-        options.forEachIndexed { index, label ->
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-                onClick = {},
-                selected = index == 0
-            ) {
-                Text(text = label)
+        if (node.children.isNotEmpty()) {
+            node.children.forEachIndexed { index, child ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = node.children.size),
+                    onClick = { if (isInteractive) selectedIndex = index },
+                    selected = if (isInteractive) index == selectedIndex else child.booleanProperty(key = "selected", default = index == 0)
+                ) {
+                    ContainerChild(child = child, controller = controller)
+                }
+            }
+        } else {
+            EditorSlotAffordance(
+                label = "SegmentedButton: Add item children",
+                modifier = Modifier.fillMaxWidth().height(40.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RenderSplitButton(node: CanvasNode, controller: EditorController) {
+    if (node.children.isNotEmpty()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = node.modifiers.toModifier().wrapContentSize()
+        ) {
+            node.children.forEach { child ->
+                ContainerChild(child = child, controller = controller)
             }
         }
+    } else {
+        EditorSlotAffordance(
+            label = "SplitButton: Add Primary/Trailing Actions",
+            modifier = node.modifiers.toModifier().wrapContentSize()
+        )
     }
 }
 
 @Composable
-private fun RenderSplitButton(node: CanvasNode) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = node.modifiers.toModifier().wrapContentSize()
-    ) {
-        FilledTonalButton(
-            onClick = {},
-            shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 4.dp)
+private fun RenderButtonGroup(node: CanvasNode, controller: EditorController) {
+    if (node.children.isNotEmpty()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = node.modifiers.toModifier().wrapContentSize()
         ) {
-            Text(text = node.textOrDefault(default = "Action"))
+            node.children.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
         }
-        Spacer(modifier = Modifier.width(2.dp))
-        FilledTonalButton(
-            onClick = {},
-            shape = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp)
-        ) {
-            Icon(imageVector = Icons.Outlined.ArrowDropDown, contentDescription = "More")
-        }
-    }
-}
-
-@Composable
-private fun RenderButtonGroup(node: CanvasNode) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = node.modifiers.toModifier().wrapContentSize()
-    ) {
-        Button(onClick = {}) { Text("Primary") }
-        FilledTonalButton(onClick = {}) { Text("Tonal") }
-        OutlinedButton(onClick = {}) { Text("Outlined") }
+    } else {
+        EditorSlotAffordance(
+            label = "ButtonGroup: Add Buttons",
+            modifier = node.modifiers.toModifier().wrapContentSize()
+        )
     }
 }
 
@@ -1013,48 +994,54 @@ private fun RenderListItem(node: CanvasNode, controller: EditorController) {
     val leadingChild = node.childInSlot(SlotRole.LEADING)
     val trailingChild = node.childInSlot(SlotRole.TRAILING)
     val overlineChild = node.childInSlot(SlotRole.OVERLINE)
+    val headlineText = (node.property("text") as? ComponentProperty.Text)?.value
+        ?: (node.property("headline") as? ComponentProperty.Text)?.value
 
     val headlineComposable: @Composable () -> Unit = {
         if (headlineChild != null) {
             ContainerChild(child = headlineChild, controller = controller)
+        } else if (!headlineText.isNullOrBlank()) {
+            Text(text = headlineText)
         } else {
-            Text(text = node.textOrDefault(default = "Headline text"))
+            EditorSlotAffordance(label = "Headline")
         }
     }
 
     val supportingComposable: (@Composable () -> Unit)? = if (supportingChild != null) {
         { ContainerChild(child = supportingChild, controller = controller) }
-    } else if (node.children.isEmpty()) {
-        { Text(text = "Secondary supporting description") }
-    } else null
+    } else {
+        val supportingText = (node.property("supporting") as? ComponentProperty.Text)?.value
+        if (!supportingText.isNullOrBlank()) {
+            { Text(text = supportingText) }
+        } else null
+    }
 
     val leadingComposable: (@Composable () -> Unit)? = if (leadingChild != null) {
         { ContainerChild(child = leadingChild, controller = controller) }
-    } else if (node.children.isEmpty()) {
-        {
-            Icon(
-                imageVector = Icons.Outlined.Star,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-    } else null
+    } else {
+        val leadingIcon = (node.property("leadingIcon") as? ComponentProperty.Icon)?.iconName
+        if (!leadingIcon.isNullOrBlank()) {
+            { Icon(imageVector = resolveMaterialIcon(leadingIcon), contentDescription = null) }
+        } else null
+    }
 
     val trailingComposable: (@Composable () -> Unit)? = if (trailingChild != null) {
         { ContainerChild(child = trailingChild, controller = controller) }
-    } else if (node.children.isEmpty()) {
-        {
-            Text(
-                text = "10:30",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline
-            )
-        }
-    } else null
+    } else {
+        val trailingText = (node.property("trailing") as? ComponentProperty.Text)?.value
+        if (!trailingText.isNullOrBlank()) {
+            { Text(text = trailingText, style = MaterialTheme.typography.labelSmall) }
+        } else null
+    }
 
     val overlineComposable: (@Composable () -> Unit)? = if (overlineChild != null) {
         { ContainerChild(child = overlineChild, controller = controller) }
-    } else null
+    } else {
+        val overlineText = (node.property("overline") as? ComponentProperty.Text)?.value
+        if (!overlineText.isNullOrBlank()) {
+            { Text(text = overlineText) }
+        } else null
+    }
 
     ListItem(
         headlineContent = headlineComposable,
@@ -1071,50 +1058,28 @@ private fun RenderListItem(node: CanvasNode, controller: EditorController) {
 
 @Composable
 private fun RenderBottomSheet(node: CanvasNode, controller: EditorController) {
-    Surface(
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ModalBottomSheet(
+        onDismissRequest = {
+            if (controller.state.isInteractiveMode) {
+                controller.dismissOverlay(node.id)
+            }
+        },
+        modifier = node.modifiers.toModifier()
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(width = 32.dp, height = 4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-            )
-            Spacer(modifier = Modifier.height(16.dp))
             if (node.children.isNotEmpty()) {
                 node.children.forEach { child ->
                     ContainerChild(child = child, controller = controller)
                 }
             } else {
-                Text(
-                    text = node.textOrDefault(default = "Bottom Sheet Title"),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                EditorSlotAffordance(
+                    label = "ModalBottomSheet: Add Content",
+                    modifier = Modifier.fillMaxWidth().height(120.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Expressive bottom sheet preview anchored to the viewport.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        if (controller.state.isInteractiveMode) {
-                            controller.dismissOverlay(node.id)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Action Button")
-                }
             }
         }
     }
@@ -1129,112 +1094,75 @@ private fun RenderDialog(node: CanvasNode, controller: EditorController) {
     val contentChildren = node.children.filter {
         it.slot == null || it.slot == SlotRole.CONTENT || it.slot == SlotRole.SUPPORTING
     }
+    val titleText = (node.property("title") as? ComponentProperty.Text)?.value
+        ?: (node.property("text") as? ComponentProperty.Text)?.value
 
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
-        modifier = node.modifiers.toModifier().fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            if (iconChild != null) {
-                ContainerChild(child = iconChild, controller = controller)
-                Spacer(modifier = Modifier.height(16.dp))
-            } else if (node.children.isEmpty()) {
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+    AlertDialog(
+        onDismissRequest = {
+            if (controller.state.isInteractiveMode) {
+                controller.dismissOverlay(node.id)
             }
-
-            if (titleChild != null) {
-                ContainerChild(child = titleChild, controller = controller)
+        },
+        confirmButton = {
+            if (confirmChild != null) {
+                ContainerChild(child = confirmChild, controller = controller)
             } else {
-                Text(
-                    text = node.textOrDefault(default = "Dialog Title"),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                EditorSlotAffordance(label = "Confirm Button")
             }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (contentChildren.isNotEmpty()) {
-                contentChildren.forEach { child ->
-                    ContainerChild(child = child, controller = controller)
-                }
-            } else {
-                Text(
-                    text = "Dialogs inform users about a task and can contain critical information.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (dismissChild != null) {
-                    ContainerChild(child = dismissChild, controller = controller)
-                } else if (node.children.isEmpty()) {
-                    TextButton(onClick = {
-                        if (controller.state.isInteractiveMode) {
-                            controller.dismissOverlay(node.id)
-                        }
-                    }) { Text("Cancel") }
-                }
-                if (dismissChild != null && confirmChild != null) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                } else if (node.children.isEmpty()) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                if (confirmChild != null) {
-                    ContainerChild(child = confirmChild, controller = controller)
-                } else if (node.children.isEmpty()) {
-                    Button(onClick = {
-                        if (controller.state.isInteractiveMode) {
-                            controller.dismissOverlay(node.id)
-                        }
-                    }) { Text("Confirm") }
+        },
+        dismissButton = if (dismissChild != null) {
+            { ContainerChild(child = dismissChild, controller = controller) }
+        } else null,
+        icon = if (iconChild != null) {
+            { ContainerChild(child = iconChild, controller = controller) }
+        } else null,
+        title = if (titleChild != null) {
+            { ContainerChild(child = titleChild, controller = controller) }
+        } else if (!titleText.isNullOrBlank()) {
+            { Text(text = titleText) }
+        } else null,
+        text = if (contentChildren.isNotEmpty()) {
+            {
+                Column {
+                    contentChildren.forEach { child ->
+                        ContainerChild(child = child, controller = controller)
+                    }
                 }
             }
-        }
-    }
+        } else null,
+        modifier = node.modifiers.toModifier()
+    )
 }
 
 @Composable
 private fun RenderBasicDialog(node: CanvasNode, controller: EditorController) {
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
+    BasicAlertDialog(
+        onDismissRequest = {
+            if (controller.state.isInteractiveMode) {
+                controller.dismissOverlay(node.id)
+            }
+        },
         modifier = node.modifiers.toModifier()
-            .widthIn(min = 280.dp, max = 560.dp)
-            .padding(24.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp
         ) {
-            if (node.children.isNotEmpty()) {
-                node.children.forEach { child ->
-                    ContainerChild(child = child, controller = controller)
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (node.children.isNotEmpty()) {
+                    node.children.forEach { child ->
+                        ContainerChild(child = child, controller = controller)
+                    }
+                } else {
+                    EditorSlotAffordance(
+                        label = "BasicAlertDialog: Add Content",
+                        modifier = Modifier.fillMaxWidth().height(80.dp)
+                    )
                 }
-            } else {
-                Text(
-                    text = "Basic Alert Dialog",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "A simple dialog container without predetermined slots.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }
@@ -1242,51 +1170,37 @@ private fun RenderBasicDialog(node: CanvasNode, controller: EditorController) {
 
 @Composable
 private fun RenderSnackbar(node: CanvasNode) {
+    val message = (node.property("text") as? ComponentProperty.Text)?.value ?: "Snackbar notification alert."
     Snackbar(
-        action = {
-            TextButton(onClick = {}) {
-                Text("Action", color = MaterialTheme.colorScheme.inversePrimary)
-            }
-        },
         modifier = node.modifiers.toModifier().fillMaxWidth()
     ) {
-        Text(text = node.textOrDefault(default = "Material 3 Snackbar notification."))
+        Text(text = message)
     }
 }
 
 @Composable
 private fun RenderSnackbarHost(node: CanvasNode) {
-    Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = MaterialTheme.colorScheme.inverseSurface,
-        modifier = node.modifiers.toModifier().padding(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "SnackbarHost preview",
-                color = MaterialTheme.colorScheme.inverseOnSurface,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
+    val hostState = remember { SnackbarHostState() }
+    SnackbarHost(
+        hostState = hostState,
+        modifier = node.modifiers.toModifier().wrapContentSize()
+    )
 }
 
 @Composable
 private fun RenderBadge(node: CanvasNode) {
+    val text = (node.property("text") as? ComponentProperty.Text)?.value
     BadgedBox(
         badge = {
-            Badge { Text(text = "3") }
+            if (!text.isNullOrBlank()) {
+                Badge { Text(text = text) }
+            } else {
+                Badge()
+            }
         },
         modifier = node.modifiers.toModifier().wrapContentSize()
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Notifications,
-            contentDescription = "Notifications",
-            tint = MaterialTheme.colorScheme.onSurface
-        )
+        EditorSlotAffordance(label = "Badge Anchor", modifier = Modifier.size(24.dp))
     }
 }
 
@@ -1300,7 +1214,12 @@ private fun RenderBadgedBox(node: CanvasNode, controller: EditorController) {
             if (badgeChild != null) {
                 ContainerChild(child = badgeChild, controller = controller)
             } else {
-                Badge { Text("3") }
+                val badgeText = (node.property("badge") as? ComponentProperty.Text)?.value
+                if (!badgeText.isNullOrBlank()) {
+                    Badge { Text(text = badgeText) }
+                } else {
+                    Badge()
+                }
             }
         },
         modifier = node.modifiers.toModifier()
@@ -1308,33 +1227,35 @@ private fun RenderBadgedBox(node: CanvasNode, controller: EditorController) {
         if (contentChild != null) {
             ContainerChild(child = contentChild, controller = controller)
         } else {
-            Icon(imageVector = Icons.Outlined.Notifications, contentDescription = "Notifications")
+            EditorSlotAffordance(label = "Anchor Item", modifier = Modifier.size(36.dp))
         }
     }
 }
 
 @Composable
-private fun RenderTooltip(node: CanvasNode) {
-    Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = MaterialTheme.colorScheme.inverseSurface,
+private fun RenderTooltip(node: CanvasNode, controller: EditorController) {
+    val tooltipText = (node.property("text") as? ComponentProperty.Text)?.value ?: ""
+    val tooltipState = rememberTooltipState()
+    val contentChild = node.children.firstOrNull()
+
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                if (tooltipText.isNotEmpty()) {
+                    Text(text = tooltipText)
+                } else {
+                    EditorSlotAffordance(label = "Tooltip Text")
+                }
+            }
+        },
+        state = tooltipState,
         modifier = node.modifiers.toModifier().wrapContentSize()
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.inverseOnSurface,
-                modifier = Modifier.size(16.dp).padding(end = 4.dp)
-            )
-            Text(
-                text = node.textOrDefault(default = "Helpful tooltip label"),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.inverseOnSurface
-            )
+        if (contentChild != null) {
+            ContainerChild(child = contentChild, controller = controller)
+        } else {
+            EditorSlotAffordance(label = "Anchor Item", modifier = Modifier.size(48.dp))
         }
     }
 }
@@ -1368,23 +1289,9 @@ private fun RenderNavigationRail(node: CanvasNode, controller: EditorController)
                 }
             }
         } else {
-            NavigationRailItem(
-                selected = true,
-                onClick = {},
-                icon = { Icon(imageVector = Icons.Outlined.Home, contentDescription = "Home") },
-                label = { Text("Home") }
-            )
-            NavigationRailItem(
-                selected = false,
-                onClick = {},
-                icon = { Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search") },
-                label = { Text("Search") }
-            )
-            NavigationRailItem(
-                selected = false,
-                onClick = {},
-                icon = { Icon(imageVector = Icons.Outlined.Settings, contentDescription = "Settings") },
-                label = { Text("Settings") }
+            EditorSlotAffordance(
+                label = "NavigationRail: Add Items",
+                modifier = Modifier.width(64.dp).height(48.dp)
             )
         }
     }
@@ -1406,38 +1313,30 @@ private fun RenderNavigationRailItem(node: CanvasNode) {
 }
 
 @Composable
-private fun RenderNavigationDrawer(node: CanvasNode) {
+private fun RenderNavigationDrawer(node: CanvasNode, controller: EditorController) {
     ModalDrawerSheet(
         modifier = node.modifiers.toModifier().fillMaxHeight().width(300.dp)
     ) {
-        Text(
-            text = node.textOrDefault(default = "Navigation Menu"),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(16.dp)
-        )
-        HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
-        NavigationDrawerItem(
-            label = { Text("Inbox") },
-            selected = true,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.Inbox, contentDescription = null) },
-            badge = { Text("12") },
-            modifier = Modifier.padding(horizontal = 12.dp)
-        )
-        NavigationDrawerItem(
-            label = { Text("Outbox") },
-            selected = false,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.AutoMirrored.Outlined.Send, contentDescription = null) },
-            modifier = Modifier.padding(horizontal = 12.dp)
-        )
-        NavigationDrawerItem(
-            label = { Text("Favorites") },
-            selected = false,
-            onClick = {},
-            icon = { Icon(imageVector = Icons.Outlined.FavoriteBorder, contentDescription = null) },
-            modifier = Modifier.padding(horizontal = 12.dp)
-        )
+        val title = (node.property("title") as? ComponentProperty.Text)?.value
+            ?: (node.property("text") as? ComponentProperty.Text)?.value
+        if (!title.isNullOrBlank()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(16.dp)
+            )
+            HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+        }
+        if (node.children.isNotEmpty()) {
+            node.children.forEach { child ->
+                ContainerChild(child = child, controller = controller)
+            }
+        } else {
+            EditorSlotAffordance(
+                label = "Drawer: Add drawer content",
+                modifier = Modifier.fillMaxWidth().height(80.dp)
+            )
+        }
     }
 }
 
@@ -1462,23 +1361,9 @@ private fun RenderTabs(node: CanvasNode, controller: EditorController) {
                 }
             }
         } else {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { if (isInteractive) selectedTab = 0 },
-                text = { Text("Overview") },
-                icon = { Icon(imageVector = Icons.Outlined.Dashboard, contentDescription = null) }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { if (isInteractive) selectedTab = 1 },
-                text = { Text("Analytics") },
-                icon = { Icon(imageVector = Icons.Outlined.Analytics, contentDescription = null) }
-            )
-            Tab(
-                selected = selectedTab == 2,
-                onClick = { if (isInteractive) selectedTab = 2 },
-                text = { Text("Settings") },
-                icon = { Icon(imageVector = Icons.Outlined.Tune, contentDescription = null) }
+            EditorSlotAffordance(
+                label = "Tabs: Add Tab children",
+                modifier = Modifier.fillMaxWidth().height(40.dp)
             )
         }
     }
@@ -1502,34 +1387,29 @@ private fun RenderTab(
 
 @Composable
 private fun RenderSearch(node: CanvasNode) {
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = node.modifiers.toModifier().fillMaxWidth().height(56.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+    val query = node.textOrDefault(default = "")
+    val placeholder = (node.property("placeholder") as? ComponentProperty.Text)?.value ?: "Search..."
+    SearchBar(
+        inputField = {
+            SearchBarDefaults.InputField(
+                query = query,
+                onQueryChange = {},
+                onSearch = {},
+                expanded = false,
+                onExpandedChange = {},
+                placeholder = { Text(placeholder) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Search"
+                    )
+                }
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = node.textOrDefault(default = "Search components..."),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Outlined.Mic,
-                contentDescription = "Voice",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+        },
+        expanded = false,
+        onExpandedChange = {},
+        modifier = node.modifiers.toModifier().fillMaxWidth()
+    ) {}
 }
 
 @Composable
@@ -1610,128 +1490,20 @@ private fun RenderSlider(node: CanvasNode, controller: EditorController) {
 
 @Composable
 private fun RenderDatePicker(node: CanvasNode) {
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
-        modifier = node.modifiers.toModifier().fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "Select Date",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Mon, Sep 15",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
-                    Text(
-                        text = day,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                listOf("14", "15", "16", "17", "18", "19", "20").forEach { date ->
-                    val isSelected = date == "15"
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .then(
-                                if (isSelected) Modifier.background(MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
-                                else Modifier
-                            )
-                    ) {
-                        Text(
-                            text = date,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        }
-    }
+    val datePickerState = rememberDatePickerState()
+    DatePicker(
+        state = datePickerState,
+        modifier = node.modifiers.toModifier()
+    )
 }
 
 @Composable
 private fun RenderTimePicker(node: CanvasNode) {
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
-        modifier = node.modifiers.toModifier().fillMaxWidth()
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(20.dp)
-        ) {
-            Text(
-                text = "Select Time",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.Start)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(text = "10", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                }
-                Text(text = ":", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier = Modifier.size(width = 64.dp, height = 56.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(text = "30", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Surface(
-                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        modifier = Modifier.size(width = 44.dp, height = 26.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(text = "AM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                        }
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        modifier = Modifier.size(width = 44.dp, height = 26.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(text = "PM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    val timePickerState = rememberTimePickerState(initialHour = 10, initialMinute = 30)
+    TimePicker(
+        state = timePickerState,
+        modifier = node.modifiers.toModifier()
+    )
 }
 
 @Composable
@@ -1752,21 +1524,9 @@ private fun RenderMenu(node: CanvasNode, controller: EditorController) {
                     }
                 }
             } else {
-                DropdownMenuItem(
-                    text = { Text("Edit") },
-                    onClick = {},
-                    leadingIcon = { Icon(imageVector = Icons.Outlined.Edit, contentDescription = null) }
-                )
-                DropdownMenuItem(
-                    text = { Text("Duplicate") },
-                    onClick = {},
-                    leadingIcon = { Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = null) }
-                )
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text("Delete") },
-                    onClick = {},
-                    leadingIcon = { Icon(imageVector = Icons.Outlined.Delete, contentDescription = null) }
+                EditorSlotAffordance(
+                    label = "Menu: Add DropdownMenuItem children",
+                    modifier = Modifier.width(180.dp).height(48.dp)
                 )
             }
         }
@@ -1896,26 +1656,22 @@ private fun RenderSurface(
 }
 
 @Composable
-private fun RenderBottomAppBar(node: CanvasNode) {
+private fun RenderBottomAppBar(node: CanvasNode, controller: EditorController) {
+    val actionChildren = node.childrenInSlot(SlotRole.ACTIONS)
+    val fabChild = node.childInSlot(SlotRole.FAB)
+
     BottomAppBar(
         actions = {
-            IconButton(onClick = {}) {
-                Icon(imageVector = Icons.Outlined.Menu, contentDescription = "Menu")
-            }
-            IconButton(onClick = {}) {
-                Icon(imageVector = Icons.Outlined.Search, contentDescription = "Search")
-            }
-            IconButton(onClick = {}) {
-                Icon(imageVector = Icons.Outlined.FavoriteBorder, contentDescription = "Favorite")
+            if (actionChildren.isNotEmpty()) {
+                actionChildren.forEach { child ->
+                    ContainerChild(child = child, controller = controller)
+                }
+            } else {
+                EditorSlotAffordance(label = "Actions Slot")
             }
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {},
-                elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation()
-            ) {
-                Icon(imageVector = Icons.Filled.Add, contentDescription = "Add")
-            }
+        floatingActionButton = fabChild?.let { child ->
+            { ContainerChild(child = child, controller = controller) }
         },
         modifier = node.modifiers.toModifier().fillMaxWidth()
     )

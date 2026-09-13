@@ -23,6 +23,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -204,143 +208,40 @@ fun CanvasScreen(controller: EditorController) {
                                 // Simulated Android Status Bar
                                 SimulatedStatusBar()
 
-                                // Screen Content Area with Marquee Drag Selection
-                                val density = LocalDensity.current
-                                var marqueeStart by remember { mutableStateOf<Offset?>(null) }
-                                var marqueeCurrent by remember { mutableStateOf<Offset?>(null) }
-                                var isModifierActive by remember { mutableStateOf(false) }
-
-                                val marqueeRect = remember(marqueeStart, marqueeCurrent) {
-                                    val s = marqueeStart
-                                    val c = marqueeCurrent
-                                    if (s != null && c != null) {
-                                        Rect(
-                                            left = min(s.x, c.x),
-                                            top = min(s.y, c.y),
-                                            right = max(s.x, c.x),
-                                            bottom = max(s.y, c.y)
-                                        )
-                                    } else null
-                                }
+                                // Screen Content Area with Decoupled Two-Layer Architecture
+                                var canvasCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                                var marqueeRect by remember { mutableStateOf<Rect?>(null) }
 
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxWidth()
-                                        .then(
-                                            if (!state.isInteractiveMode) {
-                                                Modifier.pointerInput(Unit) {
-                                                    awaitEachGesture {
-                                                        val down = awaitFirstDown(pass = PointerEventPass.Main, requireUnconsumed = false)
-                                                if (down.isConsumed) {
-                                                    // Node or container was clicked and handled selection!
-                                                    // Do not intercept or clear selection!
-                                                    return@awaitEachGesture
-                                                }
-
-                                                val isModifier = currentEvent.keyboardModifiers.isShiftPressed ||
-                                                        currentEvent.keyboardModifiers.isCtrlPressed ||
-                                                        currentEvent.keyboardModifiers.isMetaPressed
-                                                var start = down.position
-                                                var current = down.position
-                                                marqueeStart = start
-                                                marqueeCurrent = current
-
-                                                while (true) {
-                                                    val event = awaitPointerEvent(pass = PointerEventPass.Main)
-                                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                                    if (change.changedToUp()) {
-                                                        change.consume()
-                                                        break
-                                                    }
-                                                    if (change.positionChange() != Offset.Zero) {
-                                                        change.consume()
-                                                        current = change.position
-                                                        marqueeCurrent = current
-                                                    }
-                                                }
-
-                                                val finalStart = marqueeStart
-                                                val finalCurrent = marqueeCurrent
-                                                if (finalStart != null && finalCurrent != null) {
-                                                    val rect = Rect(
-                                                        left = min(finalStart.x, finalCurrent.x),
-                                                        top = min(finalStart.y, finalCurrent.y),
-                                                        right = max(finalStart.x, finalCurrent.x),
-                                                        bottom = max(finalStart.y, finalCurrent.y)
-                                                    )
-                                                    if (rect.width > 5f || rect.height > 5f) {
-                                                        val hits = state.project.allNodes().filter { node ->
-                                                            if (node.type == ComponentType.SCAFFOLD || node.type.isOverlay()) return@filter false
-                                                            val leftPx = with(density) { node.position.x.dp.toPx() }
-                                                            val topPx = with(density) { node.position.y.dp.toPx() }
-                                                            val widthPx = with(density) { node.size.width.dp.toPx() }
-                                                            val heightPx = with(density) { node.size.height.dp.toPx() }
-                                                            val nodeRect = Rect(leftPx, topPx, leftPx + widthPx, topPx + heightPx)
-                                                            !(rect.right < nodeRect.left || rect.left > nodeRect.right ||
-                                                                    rect.bottom < nodeRect.top || rect.top > nodeRect.bottom)
-                                                        }.map { it.id }.toSet()
-
-                                                        if (isModifier) {
-                                                            controller.selectNodes(state.selectedNodeIds + hits)
-                                                        } else {
-                                                            controller.selectNodes(hits)
-                                                        }
-                                                    } else {
-                                                        controller.clearSelection()
-                                                    }
-                                                }
-                                                marqueeStart = null
-                                                marqueeCurrent = null
-                                            }
-                                        }
-                                    } else Modifier
-                                )
-                                        .drawBehind {
-                                             val rect = if (!state.isInteractiveMode) marqueeRect else null
-                                             if (rect != null && (rect.width > 2f || rect.height > 2f)) {
-                                                 drawRect(
-                                                     color = canvasColorScheme.primary.copy(alpha = 0.15f),
-                                                     topLeft = rect.topLeft,
-                                                     size = rect.size
-                                                 )
-                                                 drawRect(
-                                                     color = canvasColorScheme.primary,
-                                                     topLeft = rect.topLeft,
-                                                     size = rect.size,
-                                                     style = Stroke(
-                                                         width = 1.5.dp.toPx(),
-                                                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
-                                                     )
-                                                 )
-                                             }
-
-                                             // Draw magnetic alignment guides during dragging
-                                             val guides = if (!state.isInteractiveMode) state.alignmentGuides else emptyList()
-                                            for (guide in guides) {
-                                                val guidePx = with(density) { guide.position.dp.toPx() }
-                                                if (guide.orientation == GuideOrientation.VERTICAL) {
-                                                    drawLine(
-                                                        color = canvasColorScheme.tertiary,
-                                                        start = Offset(guidePx, 0f),
-                                                        end = Offset(guidePx, size.height),
-                                                        strokeWidth = 1.5.dp.toPx(),
-                                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
-                                                    )
-                                                } else {
-                                                    drawLine(
-                                                        color = canvasColorScheme.tertiary,
-                                                        start = Offset(0f, guidePx),
-                                                        end = Offset(size.width, guidePx),
-                                                        strokeWidth = 1.5.dp.toPx(),
-                                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
-                                                    )
-                                                }
-                                            }
-                                        }
                                 ) {
-                                    state.project.nodes.forEach { node ->
-                                        CanvasNodePlacement(node = node, controller = controller)
+                                    // LAYER 1: Component Content Layer (pure Compose components)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .onGloballyPositioned { coords ->
+                                                canvasCoordinates = coords
+                                            }
+                                    ) {
+                                        CompositionLocalProvider(LocalCanvasCoordinates provides canvasCoordinates) {
+                                            state.project.nodes.forEach { node ->
+                                                CanvasNodePlacement(node = node, controller = controller)
+                                            }
+                                        }
+                                    }
+
+                                    // LAYER 2: Editor Overlay Layer (decoupled overlay above content)
+                                    if (!state.isInteractiveMode) {
+                                        EditorOverlayLayer(
+                                            controller = controller,
+                                            geometryStore = controller.geometryStore,
+                                            alignmentGuides = state.alignmentGuides,
+                                            marqueeRect = marqueeRect,
+                                            onMarqueeChange = { marqueeRect = it },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     }
                                 }
 
@@ -787,29 +688,19 @@ private fun SimulatedNavigationBar() {
 @Composable
 private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) {
     val isInteractive = controller.state.isInteractiveMode
-    val isSelected = !isInteractive && controller.state.isNodeSelected(nodeId = node.id)
     val isScaffold = node.type == ComponentType.SCAFFOLD
     val isOverlay = node.type.isOverlay()
-    val isLocked = node.isLockedInSlot || isScaffold || isOverlay || isInteractive
-    val focusRequester = remember { FocusRequester() }
+    val canvasCoords = LocalCanvasCoordinates.current
 
-    LaunchedEffect(isSelected) {
-        if (isSelected) {
-            try {
-                focusRequester.requestFocus()
-            } catch (_: Throwable) {}
+    DisposableEffect(node.id) {
+        onDispose {
+            controller.geometryStore.removeBounds(node.id)
         }
     }
 
     if (isOverlay) {
         if (isInteractive && node.id in controller.state.dismissedOverlayIds) {
             return
-        }
-
-        val shape = if (node.type == ComponentType.MODAL_BOTTOM_SHEET) {
-            RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-        } else {
-            RoundedCornerShape(28.dp)
         }
 
         Box(
@@ -841,27 +732,24 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
 
             Box(
                 modifier = contentModifier
-                    .border(
-                        width = if (isSelected) 2.dp else 0.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        shape = shape
-                    )
-                    .then(
-                        if (!isInteractive) {
-                            Modifier
-                                .focusRequester(focusRequester)
-                                .focusable()
-                                .onKeyEvent { event ->
-                                    if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                                        controller.deleteSelected()
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                                .selectOnPress(nodeId = node.id, controller = controller, focusRequester = focusRequester)
-                        } else Modifier
-                    )
+                    .onGloballyPositioned { coords ->
+                        if (coords.isAttached) {
+                            val root = canvasCoords
+                            val boundsInCanvas = if (root != null && root.isAttached) {
+                                root.localBoundingBoxOf(coords, clipBounds = false)
+                            } else {
+                                coords.boundsInRoot()
+                            }
+                            controller.geometryStore.updateBounds(
+                                node.id,
+                                RenderedBounds(
+                                    boundsInCanvas = boundsInCanvas,
+                                    boundsInWindow = coords.boundsInWindow(),
+                                    sizePx = coords.size
+                                )
+                            )
+                        }
+                    }
             ) {
                 CanvasNodeRenderer(node = node, controller = controller)
             }
@@ -880,57 +768,25 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
 
     Box(
         modifier = baseModifier
-            .border(
-                width = if (isSelected) 2.dp else 0.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = if (isScaffold) RoundedCornerShape(36.dp) else RoundedCornerShape(4.dp)
-            )
-            .then(
-                if (!isInteractive) {
-                    Modifier
-                        .focusRequester(focusRequester)
-                        .focusable()
-                        .onKeyEvent { event ->
-                            if (isSelected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
-                                controller.deleteSelected()
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        .selectOnPress(nodeId = node.id, controller = controller, focusRequester = focusRequester)
-                        .then(
-                            if (!isLocked) {
-                                Modifier.pointerInput(node.id) {
-                                    detectDragGestures(
-                                        onDragStart = {
-                                            controller.startDrag(nodeId = node.id)
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            controller.updateDrag(
-                                                deltaX = dragAmount.x,
-                                                deltaY = dragAmount.y
-                                            )
-                                        },
-                                        onDragEnd = { controller.endDrag() },
-                                        onDragCancel = { controller.endDrag() }
-                                    )
-                                }
-                            } else {
-                                Modifier
-                            }
+            .onGloballyPositioned { coords ->
+                if (coords.isAttached) {
+                    val root = canvasCoords
+                    val boundsInCanvas = if (root != null && root.isAttached) {
+                        root.localBoundingBoxOf(coords, clipBounds = false)
+                    } else {
+                        coords.boundsInRoot()
+                    }
+                    controller.geometryStore.updateBounds(
+                        node.id,
+                        RenderedBounds(
+                            boundsInCanvas = boundsInCanvas,
+                            boundsInWindow = coords.boundsInWindow(),
+                            sizePx = coords.size
                         )
-                } else Modifier
-            )
+                    )
+                }
+            }
     ) {
         CanvasNodeRenderer(node = node, controller = controller)
-        if (!node.type.isContainer && node.children.isEmpty() && !isInteractive) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .selectOnPress(nodeId = node.id, controller = controller, focusRequester = focusRequester)
-            )
-        }
     }
 }
