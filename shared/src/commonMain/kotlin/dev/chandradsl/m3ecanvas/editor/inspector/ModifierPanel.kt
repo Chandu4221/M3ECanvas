@@ -1,5 +1,7 @@
 package dev.chandradsl.m3ecanvas.editor.inspector
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -13,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import kotlin.math.round
@@ -31,7 +34,7 @@ fun ModifierSection(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(space = 8.dp)
+        verticalArrangement = Arrangement.spacedBy(space = 6.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -39,9 +42,13 @@ fun ModifierSection(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Modifiers",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
+                text = "MODIFIERS",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    letterSpacing = 0.6.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             AddModifierMenu(node = node, controller = controller)
         }
@@ -49,7 +56,8 @@ fun ModifierSection(
         if (node.modifiers.isEmpty()) {
             Text(
                 text = "No modifiers yet. Add one to decorate this node.",
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -67,8 +75,14 @@ private fun AddModifierMenu(
     var expanded by remember { mutableStateOf(value = false) }
 
     Box {
-        TextButton(onClick = { expanded = true }) {
-            Text(text = "Add")
+        OutlinedButton(
+            onClick = { expanded = true },
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+            modifier = Modifier.height(24.dp)
+        ) {
+            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(12.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(text = "Add", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
         }
         DropdownMenu(
             expanded = expanded,
@@ -76,7 +90,7 @@ private fun AddModifierMenu(
         ) {
             ModifierKind.entries.forEach { kind ->
                 DropdownMenuItem(
-                    text = { Text(text = kind.displayName) },
+                    text = { Text(text = kind.displayName, style = MaterialTheme.typography.bodySmall) },
                     onClick = {
                         controller.addModifier(nodeId = node.id, spec = kind.create())
                         expanded = false
@@ -96,7 +110,9 @@ private fun ModifierRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(all = 4.dp),
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow, androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(space = 4.dp)
     ) {
         Row(
@@ -105,8 +121,7 @@ private fun ModifierRow(
         ) {
             Text(
                 text = spec.label(),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.weight(weight = 1f)
             )
             ModifierActionIcon(
@@ -122,6 +137,7 @@ private fun ModifierRow(
             ModifierActionIcon(
                 imageVector = Icons.Outlined.Delete,
                 contentDescription = "Remove modifier",
+                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                 onClick = { controller.removeModifier(nodeId = node.id, specId = spec.id) }
             )
         }
@@ -136,15 +152,16 @@ private fun ModifierRow(
 private fun ModifierActionIcon(
     imageVector: ImageVector,
     contentDescription: String,
+    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onClick: () -> Unit
 ) {
     Icon(
         imageVector = imageVector,
         contentDescription = contentDescription,
-        tint = MaterialTheme.colorScheme.primary,
+        tint = tint,
         modifier = Modifier
             .clickable { onClick() }
-            .padding(all = 4.dp)
+            .padding(all = 2.dp)
             .size(size = 16.dp)
     )
 }

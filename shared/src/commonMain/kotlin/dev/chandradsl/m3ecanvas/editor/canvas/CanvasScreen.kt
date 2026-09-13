@@ -51,6 +51,8 @@ import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import dev.chandradsl.m3ecanvas.editor.state.EditorMode
 import dev.chandradsl.m3ecanvas.editor.state.GuideOrientation
 import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
+import dev.chandradsl.m3ecanvas.editor.theme.EditorCanvasBackground
+import dev.chandradsl.m3ecanvas.editor.theme.EditorCanvasGridDot
 import kotlin.math.max
 import kotlin.math.min
 
@@ -82,8 +84,8 @@ fun CanvasScreen(controller: EditorController) {
             }
         }
 
-        val dotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-        val backgroundColor = Color(0xFFE2E4E8)
+        val dotColor = EditorCanvasGridDot
+        val backgroundColor = EditorCanvasBackground
 
         // Outer Interactive Canvas Viewport (Background + Pan Drag + Scroll Zoom/Pan)
         Box(
@@ -91,8 +93,8 @@ fun CanvasScreen(controller: EditorController) {
                 .fillMaxSize()
                 .drawBehind {
                     drawRect(color = backgroundColor)
-                    val dotSpacing = 24.dp.toPx()
-                    val dotRadius = 1.25.dp.toPx()
+                    val dotSpacing = 20.dp.toPx()
+                    val dotRadius = 1.dp.toPx()
                     val offsetX = (viewport.panOffset.x % dotSpacing + dotSpacing) % dotSpacing
                     val offsetY = (viewport.panOffset.y % dotSpacing + dotSpacing) % dotSpacing
 
@@ -164,7 +166,7 @@ fun CanvasScreen(controller: EditorController) {
                 // Primary Device Column
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Device Information Header Badge (Click to select Project & display Project properties)
                     DeviceHeaderBadge(
@@ -179,17 +181,18 @@ fun CanvasScreen(controller: EditorController) {
                     Surface(
                         modifier = Modifier
                             .size(
-                                width = (deviceProfile.effectiveWidth + 16f).dp,
-                                height = (deviceProfile.effectiveHeight + 16f).dp
+                                width = (deviceProfile.effectiveWidth + 18f).dp,
+                                height = (deviceProfile.effectiveHeight + 18f).dp
                             )
                             .shadow(
-                                elevation = 20.dp,
-                                shape = RoundedCornerShape(36.dp),
-                                spotColor = Color.Black.copy(alpha = 0.35f)
+                                elevation = 28.dp,
+                                shape = RoundedCornerShape(40.dp),
+                                spotColor = Color(0xFF6750A4).copy(alpha = 0.20f),
+                                ambientColor = Color.Black.copy(alpha = 0.12f)
                             ),
-                        shape = RoundedCornerShape(36.dp),
-                        color = Color(0xFF1C1D22),
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF383A42))
+                        shape = RoundedCornerShape(40.dp),
+                        color = Color(0xFF16161A),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF2E2F38))
                     ) {
                         val canvasColorScheme = remember(state.project.themeConfig) {
                             CanvasThemeGenerator.generateColorScheme(state.project.themeConfig)
@@ -200,9 +203,10 @@ fun CanvasScreen(controller: EditorController) {
                         val canvasShapes = remember(state.project.themeConfig) {
                             CanvasThemeGenerator.generateShapes(state.project.themeConfig)
                         }
-                        val deviceDensity = remember(deviceProfile.density, deviceProfile.fontScale) {
+                        val hostDensity = androidx.compose.ui.platform.LocalDensity.current
+                        val deviceDensity = remember(hostDensity.density, deviceProfile.fontScale) {
                             androidx.compose.ui.unit.Density(
-                                density = deviceProfile.density,
+                                density = hostDensity.density,
                                 fontScale = deviceProfile.fontScale
                             )
                         }
@@ -247,9 +251,13 @@ fun CanvasScreen(controller: EditorController) {
                                                         canvasCoordinates = coords
                                                     }
                                             ) {
-                                                CompositionLocalProvider(LocalCanvasCoordinates provides canvasCoordinates) {
-                                                    state.project.nodes.forEach { node ->
-                                                        CanvasNodePlacement(node = node, controller = controller)
+                                                if (state.project.nodes.isEmpty()) {
+                                                    CanvasEmptyState(controller = controller)
+                                                } else {
+                                                    CompositionLocalProvider(LocalCanvasCoordinates provides canvasCoordinates) {
+                                                        state.project.nodes.forEach { node ->
+                                                            CanvasNodePlacement(node = node, controller = controller)
+                                                        }
                                                     }
                                                 }
                                             }
@@ -515,125 +523,133 @@ private fun ViewportControlBar(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.shadow(elevation = 6.dp, shape = RoundedCornerShape(24.dp)),
+        modifier = modifier.shadow(
+            elevation = 6.dp,
+            shape = RoundedCornerShape(24.dp),
+            spotColor = Color(0xFF6750A4).copy(alpha = 0.15f)
+        ),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             // Rulers Toggle
             IconButton(
                 onClick = onToggleRulers,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.SquareFoot,
                     contentDescription = if (showRulers) "Hide Rulers" else "Show Rulers",
                     tint = if (showRulers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
             // Distance Measurements Toggle
             IconButton(
                 onClick = onToggleMeasurements,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Straighten,
                     contentDescription = if (showMeasurements) "Hide Distance Measurements" else "Show Distance Measurements",
                     tint = if (showMeasurements) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
             // Magnetic Snapping Toggle
             IconButton(
                 onClick = onToggleSnapping,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.GridOn,
                     contentDescription = if (snappingEnabled) "Snapping Enabled" else "Snapping Disabled",
                     tint = if (snappingEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
             // Multi-Device Preview Toggle
             IconButton(
                 onClick = onToggleMultiDevicePreview,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Devices,
                     contentDescription = if (multiDevicePreview) "Multi-Device Preview Active" else "Single Device Preview",
                     tint = if (multiDevicePreview) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
             VerticalDivider(
                 modifier = Modifier
-                    .height(20.dp)
-                    .padding(horizontal = 2.dp)
+                    .height(18.dp)
+                    .padding(horizontal = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
             // Zoom Out
             IconButton(
                 onClick = onZoomOut,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Remove,
                     contentDescription = "Zoom Out",
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
             // Current Zoom Level (Click to Reset to 100%)
             TextButton(
                 onClick = onResetZoom,
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.height(28.dp)
             ) {
                 Text(
                     text = "${(zoom * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 )
             }
 
             // Zoom In
             IconButton(
                 onClick = onZoomIn,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Add,
                     contentDescription = "Zoom In",
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
             VerticalDivider(
                 modifier = Modifier
-                    .height(20.dp)
-                    .padding(horizontal = 2.dp)
+                    .height(18.dp)
+                    .padding(horizontal = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
             // Fit to Screen
             IconButton(
                 onClick = onFitToScreen,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.FitScreen,
                     contentDescription = "Fit to Screen",
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
@@ -641,15 +657,155 @@ private fun ViewportControlBar(
             if (panOffset.x != 0f || panOffset.y != 0f) {
                 IconButton(
                     onClick = onResetPan,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.CenterFocusStrong,
                         contentDescription = "Center Viewport",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CanvasEmptyState(controller: EditorController) {
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                modifier = Modifier.size(52.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Widgets,
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "Drop a component or choose a template",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Click a template to start quickly, or drag from the left palette",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TemplateCard(
+                    title = "Scaffold",
+                    subtitle = "AppBar + FAB + Col",
+                    icon = Icons.Outlined.Layers,
+                    onClick = {
+                        controller.addNode(ComponentType.SCAFFOLD, CanvasPosition(0f, 0f))
+                        val scaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+                        if (scaffold != null) {
+                            controller.addChildToContainer(scaffold.id, ComponentType.TOP_APP_BAR)
+                            controller.addChildToContainer(scaffold.id, ComponentType.FAB)
+                            controller.addChildToContainer(scaffold.id, ComponentType.COLUMN)
+                        }
+                    }
+                )
+
+                TemplateCard(
+                    title = "Bottom Nav",
+                    subtitle = "AppBar + Nav + Col",
+                    icon = Icons.Outlined.Navigation,
+                    onClick = {
+                        controller.addNode(ComponentType.SCAFFOLD, CanvasPosition(0f, 0f))
+                        val scaffold = controller.state.project.nodes.firstOrNull { it.type == ComponentType.SCAFFOLD }
+                        if (scaffold != null) {
+                            controller.addChildToContainer(scaffold.id, ComponentType.TOP_APP_BAR)
+                            controller.addChildToContainer(scaffold.id, ComponentType.NAVIGATION_BAR)
+                            controller.addChildToContainer(scaffold.id, ComponentType.COLUMN)
+                        }
+                    }
+                )
+
+                TemplateCard(
+                    title = "Empty Column",
+                    subtitle = "Vertical layout",
+                    icon = Icons.Outlined.TableRows,
+                    onClick = {
+                        controller.addNode(ComponentType.COLUMN, CanvasPosition(16f, 16f))
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TemplateCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        shadowElevation = 2.dp,
+        modifier = Modifier.width(104.dp).height(80.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                modifier = Modifier.size(28.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                maxLines = 1
+            )
         }
     }
 }
@@ -666,33 +822,35 @@ private fun DeviceHeaderBadge(
         color = if (isSelected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+            MaterialTheme.colorScheme.surface
         },
         contentColor = if (isSelected) {
             MaterialTheme.colorScheme.onPrimaryContainer
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         },
+        shadowElevation = 2.dp,
         border = androidx.compose.foundation.BorderStroke(
             width = if (isSelected) 1.5.dp else 1.dp,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
                 imageVector = getDeviceCategoryIcon(currentProfile.category),
                 contentDescription = "Project Settings",
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(14.dp),
                 tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "${currentProfile.displayName} • ${currentProfile.effectiveWidth.toInt()} × ${currentProfile.effectiveHeight.toInt()} dp • ${currentProfile.widthSizeClass.displayName}",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                text = "${currentProfile.displayName} · ${currentProfile.effectiveWidth.toInt()} × ${currentProfile.effectiveHeight.toInt()} dp · ${currentProfile.widthSizeClass.displayName}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 11.sp
                 )
             )
         }
@@ -863,8 +1021,18 @@ private fun CanvasNodePlacement(node: CanvasNode, controller: EditorController) 
         Modifier.fillMaxSize()
     } else {
         var mod = Modifier.offset(x = node.position.x.dp, y = node.position.y.dp)
-        mod = if (node.hasFillMaxWidth()) mod.fillMaxWidth() else mod.width(node.size.width.dp)
-        mod = if (node.hasFillMaxHeight()) mod.fillMaxHeight() else mod.height(node.size.height.dp)
+        mod = when {
+            node.hasFillMaxWidth() -> mod.fillMaxWidth()
+            node.hasExplicitWidth() -> mod.width(node.size.width.dp)
+            node.isContainer -> mod.width(node.size.width.dp)
+            else -> mod.wrapContentSize()
+        }
+        mod = when {
+            node.hasFillMaxHeight() -> mod.fillMaxHeight()
+            node.hasExplicitHeight() -> mod.height(node.size.height.dp)
+            node.isContainer -> mod.height(node.size.height.dp)
+            else -> mod.wrapContentSize()
+        }
         mod
     }
 

@@ -276,7 +276,7 @@ private fun RenderButton(node: CanvasNode, controller: EditorController) {
         ?: MaterialVariant.Button.FILLED
     val text = node.textOrDefault(default = "Button")
     val onClick = { handleInteractiveButtonClick(node, controller) }
-    val modifier = node.modifiers.toModifier().fillMaxSize()
+    val modifier = node.modifiers.toModifier()
 
     when (variant) {
         MaterialVariant.Button.FILLED -> Button(onClick = onClick, modifier = modifier) { Text(text = text) }
@@ -296,19 +296,18 @@ private fun RenderCard(
     val variant = forcedVariant
         ?: (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.Card
         ?: MaterialVariant.Card.FILLED
-    val modifier = node.modifiers.toModifier().fillMaxSize()
+    val modifier = node.modifiers.toModifier()
 
     val cardContent: @Composable ColumnScope.() -> Unit = {
         Column(
             modifier = Modifier
-                .fillMaxSize()
                 .padding(all = node.layoutConfig.padding.dp),
             verticalArrangement = resolveVerticalArrangement(config = node.layoutConfig),
             horizontalAlignment = resolveHorizontalAlignment(config = node.layoutConfig)
         ) {
             if (node.children.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    modifier = Modifier.defaultMinSize(minHeight = 80.dp).fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -345,7 +344,7 @@ private fun RenderIconButton(node: CanvasNode, controller: EditorController) {
         ?: MaterialVariant.IconButton.STANDARD
     val iconName = node.iconProperty(key = "icon", default = "Add")
     val onClick = { handleInteractiveButtonClick(node, controller) }
-    val modifier = node.modifiers.toModifier().fillMaxSize()
+    val modifier = node.modifiers.toModifier()
     val icon = @Composable { Icon(imageVector = resolveMaterialIcon(iconName), contentDescription = null) }
 
     when (variant) {
@@ -369,12 +368,13 @@ private fun RenderChip(node: CanvasNode, controller: EditorController) {
             selected = !selected
         }
     }
+    val modifier = node.modifiers.toModifier()
 
     when (variant) {
-        MaterialVariant.Chip.ASSIST -> AssistChip(onClick = onClick, label = label)
-        MaterialVariant.Chip.FILTER -> FilterChip(selected = if (isInteractive) selected else false, onClick = onClick, label = label)
-        MaterialVariant.Chip.INPUT -> InputChip(selected = if (isInteractive) selected else false, onClick = onClick, label = label)
-        MaterialVariant.Chip.SUGGESTION -> SuggestionChip(onClick = onClick, label = label)
+        MaterialVariant.Chip.ASSIST -> AssistChip(onClick = onClick, label = label, modifier = modifier)
+        MaterialVariant.Chip.FILTER -> FilterChip(selected = if (isInteractive) selected else false, onClick = onClick, label = label, modifier = modifier)
+        MaterialVariant.Chip.INPUT -> InputChip(selected = if (isInteractive) selected else false, onClick = onClick, label = label, modifier = modifier)
+        MaterialVariant.Chip.SUGGESTION -> SuggestionChip(onClick = onClick, label = label, modifier = modifier)
     }
 }
 
@@ -700,6 +700,13 @@ private fun SlotContainer(
     val isInteractive = controller.state.isInteractiveMode
     val isSelected = !isInteractive && controller.state.isNodeSelected(nodeId = child.id)
     val focusRequester = remember { FocusRequester() }
+    val canvasCoords = LocalCanvasCoordinates.current
+
+    DisposableEffect(child.id) {
+        onDispose {
+            controller.geometryStore.removeBounds(child.id)
+        }
+    }
 
     LaunchedEffect(isSelected) {
         if (isSelected) {
@@ -718,11 +725,24 @@ private fun SlotContainer(
                     Modifier.wrapContentSize()
                 }
             )
-            .border(
-                width = if (isSelected) 2.dp else 0.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(4.dp)
-            )
+            .onGloballyPositioned { coords ->
+                if (coords.isAttached) {
+                    val root = canvasCoords
+                    val boundsInCanvas = if (root != null && root.isAttached) {
+                        root.localBoundingBoxOf(coords, clipBounds = false)
+                    } else {
+                        coords.boundsInRoot()
+                    }
+                    controller.geometryStore.updateBounds(
+                        child.id,
+                        RenderedBounds(
+                            boundsInCanvas = boundsInCanvas,
+                            boundsInWindow = coords.boundsInWindow(),
+                            sizePx = coords.size
+                        )
+                    )
+                }
+            }
             .then(
                 if (!isInteractive) {
                     Modifier
@@ -740,7 +760,21 @@ private fun SlotContainer(
                 } else Modifier
             )
     ) {
+        // Placeholder overlay for empty container slots
+        if (child.children.isEmpty() && child.type.isContainer) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(Color.LightGray.copy(alpha = 0.2f))
+                    .border(
+                        width = 1.dp,
+                        color = Color.LightGray,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+            )
+        }
         CanvasNodeRenderer(node = child, controller = controller)
+        // Existing placeholder for non-container empty nodes when not interactive
         if (!isInteractive && !child.type.isContainer && child.children.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -750,6 +784,7 @@ private fun SlotContainer(
         }
     }
 }
+
 
 @Composable
 private fun ContainerChild(
@@ -780,6 +815,7 @@ private fun ContainerChild(
         widthSpec != null -> Modifier.width(widthSpec.dp.dp)
         heightSpec != null -> Modifier.height(heightSpec.dp.dp)
         wrapContent != null -> Modifier.wrapContentSize()
+        child.slot == SlotRole.CONTENT && child.isContainer -> Modifier.fillMaxSize()
         else -> Modifier
     }
 
@@ -852,7 +888,7 @@ private fun RenderTextField(node: CanvasNode, controller: EditorController) {
     val isInteractive = controller.state.isInteractiveMode
     val variant = (node.property(key = "variant") as? ComponentProperty.Variant)?.value as? MaterialVariant.TextField
         ?: MaterialVariant.TextField.OUTLINED
-    val modifier = node.modifiers.toModifier().fillMaxSize()
+    val modifier = node.modifiers.toModifier()
 
     when (variant) {
         MaterialVariant.TextField.OUTLINED -> OutlinedTextField(
@@ -1570,7 +1606,7 @@ private fun RenderIcon(node: CanvasNode) {
         imageVector = resolveMaterialIcon(reference = iconRef),
         contentDescription = iconRef.name,
         tint = MaterialTheme.colorScheme.primary,
-        modifier = node.modifiers.toModifier().fillMaxSize()
+        modifier = node.modifiers.toModifier()
     )
 }
 
@@ -1664,7 +1700,7 @@ private fun RenderVerticalDivider(node: CanvasNode) {
 
 @Composable
 private fun RenderSpacer(node: CanvasNode) {
-    Spacer(modifier = node.modifiers.toModifier().fillMaxSize())
+    Spacer(modifier = node.modifiers.toModifier())
 }
 
 @Composable
@@ -1684,11 +1720,10 @@ private fun RenderSurface(
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 1.dp,
-        modifier = node.modifiers.toModifier().fillMaxSize()
+        modifier = node.modifiers.toModifier()
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
                 .padding(all = node.layoutConfig.padding.dp),
             contentAlignment = resolveContentAlignment(config = node.layoutConfig)
         ) {

@@ -5,8 +5,11 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -80,7 +83,7 @@ fun App(repository: ProjectRepository) {
     var layersExpanded by remember { mutableStateOf(value = true) }
     var propertiesExpanded by remember { mutableStateOf(value = true) }
     var showHistoryDialog by remember { mutableStateOf(value = false) }
-    var paletteWidth by remember { mutableStateOf(240.dp) }
+    var paletteWidth by remember { mutableStateOf(260.dp) }
     var inspectorWidth by remember { mutableStateOf(280.dp) }
     var codeExportWidth by remember { mutableStateOf(440.dp) }
     var layersHeightRatio by remember { mutableStateOf(0.5f) }
@@ -353,7 +356,7 @@ fun App(repository: ProjectRepository) {
                 },
                 onOpenCommandPalette = { controller.openCommandPalette() }
             )
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Row(modifier = Modifier.weight(weight = 1f)) {
                 // Collapsible & Resizable Palette
                 AnimatedVisibility(
@@ -704,206 +707,379 @@ private fun TopBar(
     onToggleInteractiveMode: () -> Unit = {},
     onOpenCommandPalette: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
-        IconButton(
-            onClick = onTogglePalette
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.ViewSidebar,
-                contentDescription = if (showPalette) "Hide Palette (Ctrl+[)" else "Show Palette (Ctrl+[)",
-                tint = if (showPalette) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Text(
-            text = "M3E Canvas",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        IconButton(
-            onClick = onUndo,
-            enabled = canUndo && !isInteractiveMode
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.Undo,
-                contentDescription = "Undo (Ctrl+Z)"
-            )
-        }
-        IconButton(
-            onClick = onRedo,
-            enabled = canRedo && !isInteractiveMode
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.Redo,
-                contentDescription = "Redo (Ctrl+Shift+Z)"
-            )
-        }
-        IconButton(
-            onClick = onOpenHistory,
-            enabled = !isInteractiveMode
-        ) {
-            val total = undoCount + redoCount
-            if (total > 0) {
-                BadgedBox(
-                    badge = {
-                        Badge {
-                            Text("$undoCount")
+            // Group 1: Floating Brand Pill
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    IconButton(
+                        onClick = onTogglePalette,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ViewSidebar,
+                            contentDescription = if (showPalette) "Hide Palette (Ctrl+[)" else "Show Palette (Ctrl+[)",
+                            tint = if (showPalette) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "M",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 12.sp
+                                )
+                            )
                         }
                     }
+                    Text(
+                        text = "M3E Canvas",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(end = 6.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Group 2: History & Edit Operations Pill
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    IconButton(
+                        onClick = onUndo,
+                        enabled = canUndo && !isInteractiveMode,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Undo,
+                            contentDescription = "Undo (Ctrl+Z)",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onRedo,
+                        enabled = canRedo && !isInteractiveMode,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Redo,
+                            contentDescription = "Redo (Ctrl+Shift+Z)",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenHistory,
+                        enabled = !isInteractiveMode,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        val total = undoCount + redoCount
+                        if (total > 0) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text("$undoCount", fontSize = 8.sp)
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.History,
+                                    contentDescription = "History Timeline (Ctrl+H)",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else {
+                            Icon(
+                                imageVector = Icons.Outlined.History,
+                                contentDescription = "History Timeline (Ctrl+H)",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        enabled = hasSelection && !isInteractiveMode,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = "Delete Selected (Del)",
+                            tint = if (hasSelection) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Group 3: Design | Preview Floating Segmented Pill
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Design Mode Tab
+                    Surface(
+                        onClick = { if (isInteractiveMode) onToggleInteractiveMode() },
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (!isInteractiveMode) MaterialTheme.colorScheme.surface else Color.Transparent,
+                        shadowElevation = if (!isInteractiveMode) 1.dp else 0.dp,
+                        border = if (!isInteractiveMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)) else null,
+                        modifier = Modifier.fillMaxHeight()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = if (!isInteractiveMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Design",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (!isInteractiveMode) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                color = if (!isInteractiveMode) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Preview Mode Tab
+                    Surface(
+                        onClick = { if (!isInteractiveMode) onToggleInteractiveMode() },
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isInteractiveMode) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        shadowElevation = if (isInteractiveMode) 1.dp else 0.dp,
+                        modifier = Modifier.fillMaxHeight()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = if (isInteractiveMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Preview",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (isInteractiveMode) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                color = if (isInteractiveMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Group 4: Quick Command Jump Pill (Ctrl+K)
+            Surface(
+                onClick = onOpenCommandPalette,
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.History,
-                        contentDescription = "History Timeline (Ctrl+H)"
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Search / Commands (Ctrl+K)",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-            } else {
-                Icon(
-                    imageVector = Icons.Outlined.History,
-                    contentDescription = "History Timeline (Ctrl+H)",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        IconButton(
-            onClick = onDelete,
-            enabled = hasSelection && !isInteractiveMode
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = "Delete Selected (Del / Backspace)"
-            )
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        // Mode Switcher: Design (✏️) vs Interactive Preview (▶️)
-        Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Row(
-                modifier = Modifier.padding(2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilterChip(
-                    selected = !isInteractiveMode,
-                    onClick = { if (isInteractiveMode) onToggleInteractiveMode() },
-                    label = { Text("Design", style = MaterialTheme.typography.labelMedium) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    },
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                FilterChip(
-                    selected = isInteractiveMode,
-                    onClick = { if (!isInteractiveMode) onToggleInteractiveMode() },
-                    label = { Text("Preview", style = MaterialTheme.typography.labelMedium) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    },
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Quick Command Palette / Search Trigger (Ctrl+K)
-        Surface(
-            onClick = onOpenCommandPalette,
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = "Search / Commands (Ctrl+K)",
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Search or jump to...",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                )
-                Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
                     Text(
-                        text = "Ctrl+K",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        text = "Jump to...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = "Ctrl+K",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            if (isOperating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            if (statusMessage.isNotEmpty()) {
+                Text(
+                    text = statusMessage,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+            }
+
+            // Group 5: Primary Action "Export Code & AI" Pill
+            Button(
+                onClick = onToggleCodeExport,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (showCodeExport) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(20.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Code,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (showCodeExport) "Hide Code" else "Export Code & AI",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Group 6: Secondary Load & Save Actions Pill
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.height(36.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onLoad,
+                        enabled = !isOperating,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.FolderOpen,
+                            contentDescription = "Load",
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Load", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    VerticalDivider(
+                        modifier = Modifier.height(16.dp).padding(horizontal = 2.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
+                    TextButton(
+                        onClick = onSave,
+                        enabled = !isOperating,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Save,
+                            contentDescription = "Save",
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Save", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Group 7: Inspector Toggle Button Pill
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (showInspector) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.size(36.dp)
+            ) {
+                IconButton(
+                    onClick = onToggleInspector,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = if (showInspector) "Hide Inspector (Ctrl+])" else "Show Inspector (Ctrl+])",
+                        tint = if (showInspector) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(17.dp)
                     )
                 }
             }
-        }
-        Spacer(modifier = Modifier.weight(weight = 1f))
-        if (isOperating) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-        if (statusMessage.isNotEmpty()) {
-            Text(
-                text = statusMessage,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 12.dp)
-            )
-        }
-        FilledTonalButton(
-            onClick = onToggleCodeExport,
-            colors = ButtonDefaults.filledTonalButtonColors(
-                containerColor = if (showCodeExport) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Icon(imageVector = Icons.Outlined.Code, contentDescription = "Export Code & AI")
-            Text(
-                text = if (showCodeExport) "Hide Code" else "Export Code & AI",
-                modifier = Modifier.padding(start = 6.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        TextButton(onClick = onLoad, enabled = !isOperating) {
-            Icon(imageVector = Icons.Outlined.FolderOpen, contentDescription = "Load")
-            Text(text = "Load", modifier = Modifier.padding(start = 6.dp))
-        }
-        TextButton(onClick = onSave, enabled = !isOperating) {
-            Icon(imageVector = Icons.Outlined.Save, contentDescription = "Save")
-            Text(text = "Save", modifier = Modifier.padding(start = 6.dp))
-        }
-        Spacer(modifier = Modifier.width(4.dp))
-        IconButton(
-            onClick = onToggleInspector
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Tune,
-                contentDescription = if (showInspector) "Hide Inspector (Ctrl+])" else "Show Inspector (Ctrl+])",
-                tint = if (showInspector) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

@@ -19,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.domain.model.AssetAlignment as AssetAlignmentType
 import dev.chandradsl.m3ecanvas.editor.asset.DefaultAssetRepository
@@ -30,6 +32,84 @@ import dev.chandradsl.m3ecanvas.editor.service.AlignmentType
 import dev.chandradsl.m3ecanvas.editor.service.DistributionType
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
+
+@Composable
+private fun InspectorSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    defaultExpanded: Boolean = true,
+    badge: String? = null,
+    actions: @Composable (RowScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    var expanded by remember(title) { mutableStateOf(defaultExpanded) }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = if (expanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = title.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp,
+                        fontSize = 10.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (badge != null) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ) {
+                        Text(
+                            text = badge,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+            if (actions != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    content = actions
+                )
+            }
+        }
+        if (expanded) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content
+            )
+        }
+    }
+}
 
 /**
  * The inspector panel. Shows project-level settings when nothing is
@@ -53,46 +133,118 @@ fun PropertiesPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = onToggleExpand != null) { onToggleExpand?.invoke() }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Properties",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                )
-                if (selectedNodes.isNotEmpty()) {
-                    TextButton(
-                        onClick = { controller.clearSelection() },
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                        modifier = Modifier.height(26.dp)
+            if (selectedNodes.isEmpty()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Project & Theme",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            } else if (selectedNodes.size == 1) {
+                val node = selectedNodes.first()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text(
+                        text = node.name,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
                         Text(
-                            text = "Project",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                            text = node.type.displayName,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            ),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Selection",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Text(
+                            text = "${selectedNodes.size} selected",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            ),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
             }
-            if (onToggleExpand != null) {
-                IconButton(
-                    onClick = onToggleExpand,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse Properties" else "Expand Properties",
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                if (selectedNodes.isNotEmpty()) {
+                    IconButton(
+                        onClick = { controller.clearSelection() },
+                        modifier = Modifier.size(22.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = "Deselect (show Project)",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (onToggleExpand != null) {
+                    IconButton(
+                        onClick = onToggleExpand,
+                        modifier = Modifier.size(22.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                            contentDescription = if (isExpanded) "Collapse Properties" else "Expand Properties",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
         if (isExpanded) {
             Column(
@@ -100,8 +252,8 @@ fun PropertiesPanel(
                     .weight(1f, fill = false)
                     .fillMaxWidth()
                     .verticalScroll(state = rememberScrollState())
-                    .padding(all = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(space = 12.dp)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(space = 6.dp)
             ) {
                 when {
                     selectedNodes.isEmpty() -> ProjectSection(controller = controller)
@@ -115,11 +267,24 @@ fun PropertiesPanel(
 
 @Composable
 private fun NodeSection(node: CanvasNode, controller: EditorController) {
-    SectionLabel(text = node.type.displayName)
+    // Top: Layer Name & Slot
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        OutlinedTextField(
+            value = node.name,
+            onValueChange = { controller.renameNode(nodeId = node.id, name = it) },
+            label = { Text("Layer Name", style = MaterialTheme.typography.labelSmall) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall
+        )
+    }
 
     val parent = controller.findParent(node.id)
     val availableSlots = if (parent != null) node.type.allowedSlotsIn(parent.type) else emptyList()
-
     if (node.slot != null || availableSlots.size > 1) {
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -127,8 +292,8 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
         ) {
             if (node.slot != null) {
                 Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -139,7 +304,7 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
                             "Slot: ${node.slot.displayName}"
                         },
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -149,7 +314,7 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
                     OutlinedButton(
                         onClick = { expanded = true },
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -162,7 +327,8 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
                             )
                             Icon(
                                 imageVector = Icons.Outlined.ArrowDropDown,
-                                contentDescription = "Select Slot"
+                                contentDescription = "Select Slot",
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -172,13 +338,13 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
                     ) {
                         availableSlots.forEach { slotRole ->
                             DropdownMenuItem(
-                                text = { Text(slotRole.displayName) },
+                                text = { Text(slotRole.displayName, style = MaterialTheme.typography.bodySmall) },
                                 onClick = {
                                     controller.setNodeSlot(node.id, slotRole)
                                     expanded = false
                                 },
                                 leadingIcon = if (node.slot == slotRole) {
-                                    { Icon(Icons.Outlined.Check, contentDescription = null) }
+                                    { Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
                                 } else null
                             )
                         }
@@ -188,111 +354,374 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
         }
     }
 
-    OutlinedTextField(
-        value = node.name,
-        onValueChange = { controller.renameNode(nodeId = node.id, name = it) },
-        label = { Text(text = "Name") },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true
-    )
+    // 1. LAYOUT GROUP
+    val isLayoutRelevant = node.isContainer || node.slot != null || availableSlots.isNotEmpty()
+    InspectorSection(
+        title = "Layout",
+        defaultExpanded = isLayoutRelevant
+    ) {
+        if (node.isContainer) {
+            LayoutSection(node = node, controller = controller)
+            if (node.type != ComponentType.SCAFFOLD && node.children.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { controller.ungroupSelected() },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Outlined.FolderOpen, contentDescription = "Ungroup", modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Ungroup Container (Ctrl+Shift+G)", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
 
-    if (node.type == ComponentType.TOP_APP_BAR) {
-        val currentTitle = (node.property(key = "title") as? ComponentProperty.Text)?.value
-            ?: (node.property(key = "text") as? ComponentProperty.Text)?.value
-            ?: ""
-        OutlinedTextField(
-            value = currentTitle,
-            onValueChange = {
-                controller.updateNodeProperty(
-                    nodeId = node.id,
-                    property = ComponentProperty.Text(key = "title", value = it)
-                )
-            },
-            label = { Text(text = "AppBar Title") },
+        // Dimension / Size quick chips
+        Text("Dimensions & Sizing", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val hasFillWidth = node.modifiers.any { it is ModifierSpec.FillMaxWidth }
+            val hasFillHeight = node.modifiers.any { it is ModifierSpec.FillMaxHeight }
+            val hasWrap = node.modifiers.any { it is ModifierSpec.WrapContentSize }
+
+            FilterChip(
+                selected = hasFillWidth,
+                onClick = {
+                    if (hasFillWidth) {
+                        node.modifiers.filterIsInstance<ModifierSpec.FillMaxWidth>().forEach {
+                            controller.removeModifier(node.id, it.id)
+                        }
+                    } else {
+                        controller.addModifier(node.id, ModifierSpec.FillMaxWidth())
+                    }
+                },
+                label = { Text("Fill W", style = MaterialTheme.typography.labelSmall) },
+                modifier = Modifier.weight(1f)
+            )
+            FilterChip(
+                selected = hasFillHeight,
+                onClick = {
+                    if (hasFillHeight) {
+                        node.modifiers.filterIsInstance<ModifierSpec.FillMaxHeight>().forEach {
+                            controller.removeModifier(node.id, it.id)
+                        }
+                    } else {
+                        controller.addModifier(node.id, ModifierSpec.FillMaxHeight())
+                    }
+                },
+                label = { Text("Fill H", style = MaterialTheme.typography.labelSmall) },
+                modifier = Modifier.weight(1f)
+            )
+            FilterChip(
+                selected = hasWrap,
+                onClick = {
+                    if (hasWrap) {
+                        node.modifiers.filterIsInstance<ModifierSpec.WrapContentSize>().forEach {
+                            controller.removeModifier(node.id, it.id)
+                        }
+                    } else {
+                        controller.addModifier(node.id, ModifierSpec.WrapContentSize())
+                    }
+                },
+                label = { Text("Wrap", style = MaterialTheme.typography.labelSmall) },
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 
-    if (supportsText(node = node)) {
-        OutlinedTextField(
-            value = (node.property(key = "text") as? ComponentProperty.Text)?.value.orEmpty(),
-            onValueChange = {
-                controller.updateNodeProperty(
-                    nodeId = node.id,
-                    property = ComponentProperty.Text(key = "text", value = it)
-                )
-            },
-            label = { Text(text = "Text") },
+    // 2. APPEARANCE GROUP
+    InspectorSection(
+        title = "Appearance",
+        defaultExpanded = true
+    ) {
+        val variants = variantsFor(type = node.type)
+        if (variants.isNotEmpty()) {
+            VariantDropdown(node = node, variants = variants, controller = controller)
+        }
+
+        if (node.type == ComponentType.TEXT) {
+            TypographyDropdown(node = node, controller = controller)
+        }
+
+        // Direct Appearance Modifiers: Background Color with Live Preview
+        val bgMod = node.modifiers.filterIsInstance<ModifierSpec.Background>().firstOrNull()
+        var bgHex by remember(bgMod?.colorHex) { mutableStateOf(bgMod?.colorHex ?: "#FFFFFF") }
+        val isBgValid = CanvasThemeGenerator.isValidHexColor(bgHex)
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-    }
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            OutlinedTextField(
+                value = bgHex,
+                onValueChange = { input ->
+                    bgHex = input
+                    if (CanvasThemeGenerator.isValidHexColor(input)) {
+                        val formatted = if (input.startsWith("#")) input else "#$input"
+                        if (bgMod != null) {
+                            controller.updateModifier(node.id, bgMod.copy(colorHex = formatted))
+                        } else {
+                            controller.addModifier(node.id, ModifierSpec.Background(colorHex = formatted))
+                        }
+                    }
+                },
+                label = { Text("Background Hex", style = MaterialTheme.typography.labelSmall) },
+                placeholder = { Text("#FFFFFF") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.bodySmall,
+                trailingIcon = {
+                    val color = if (isBgValid) CanvasThemeGenerator.parseHexColor(bgHex) else Color.Transparent
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .background(color, CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    )
+                }
+            )
+            if (bgMod != null) {
+                IconButton(
+                    onClick = { controller.removeModifier(node.id, bgMod.id) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Remove Background", modifier = Modifier.size(16.dp))
+                }
+            }
+        }
 
-    if (node.type == ComponentType.TEXT) {
-        TypographyDropdown(node = node, controller = controller)
-    }
-
-    if (node.type == ComponentType.ICON || node.type == ComponentType.ICON_BUTTON || node.type == ComponentType.FAB || node.type == ComponentType.EXTENDED_FAB) {
-        IconDropdown(node = node, controller = controller)
-    }
-
-    if (node.type == ComponentType.IMAGE) {
-        ImageAssetSection(node = node, controller = controller)
-    }
-
-    if (node.type == ComponentType.CHECKBOX) {
-        BooleanPropertySwitch(label = "Checked", key = "checked", node = node, controller = controller, default = true)
-    } else if (node.type == ComponentType.RADIO_BUTTON) {
-        BooleanPropertySwitch(label = "Selected", key = "selected", node = node, controller = controller, default = true)
-    } else if (node.type == ComponentType.SWITCH) {
-        BooleanPropertySwitch(label = "Checked", key = "checked", node = node, controller = controller, default = true)
-    }
-
-    if (node.type == ComponentType.SLIDER) {
-        FloatSliderRow(label = "Slider Value", key = "value", node = node, controller = controller, default = 0.6f)
-    } else if (node.type == ComponentType.RANGE_SLIDER) {
-        FloatSliderRow(label = "Range Start", key = "startValue", node = node, controller = controller, default = 0.2f)
-        FloatSliderRow(label = "Range End", key = "endValue", node = node, controller = controller, default = 0.8f)
-    }
-
-    val variants = variantsFor(type = node.type)
-    if (variants.isNotEmpty()) {
-        VariantDropdown(node = node, variants = variants, controller = controller)
-    }
-
-    if (node.isContainer) {
-        LayoutSection(node = node, controller = controller)
-        if (node.type != ComponentType.SCAFFOLD && node.children.isNotEmpty()) {
-            OutlinedButton(
-                onClick = { controller.ungroupSelected() },
-                modifier = Modifier.fillMaxWidth()
+        // Direct Appearance: Border
+        val borderMod = node.modifiers.filterIsInstance<ModifierSpec.Border>().firstOrNull()
+        if (borderMod != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(Icons.Outlined.FolderOpen, contentDescription = "Ungroup", modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Ungroup Container (Ctrl+Shift+G)")
+                OutlinedTextField(
+                    value = borderMod.colorHex,
+                    onValueChange = {
+                        if (CanvasThemeGenerator.isValidHexColor(it)) {
+                            controller.updateModifier(node.id, borderMod.copy(colorHex = if (it.startsWith("#")) it else "#$it"))
+                        }
+                    },
+                    label = { Text("Border Hex", style = MaterialTheme.typography.labelSmall) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.bodySmall
+                )
+                IconButton(
+                    onClick = { controller.removeModifier(node.id, borderMod.id) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Remove Border", modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        // Direct Appearance: Opacity / Alpha
+        val alphaMod = node.modifiers.filterIsInstance<ModifierSpec.Alpha>().firstOrNull()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("Opacity", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(48.dp))
+            Slider(
+                value = alphaMod?.value ?: 1f,
+                onValueChange = { v ->
+                    if (alphaMod != null) {
+                        controller.updateModifier(node.id, alphaMod.copy(value = v))
+                    } else {
+                        controller.addModifier(node.id, ModifierSpec.Alpha(value = v))
+                    }
+                },
+                valueRange = 0f..1f,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "${((alphaMod?.value ?: 1f) * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.width(36.dp)
+            )
+        }
+    }
+
+    // 3. CONTENT GROUP
+    val isContentRelevant = supportsText(node) ||
+            node.type == ComponentType.TOP_APP_BAR ||
+            node.type == ComponentType.ICON ||
+            node.type == ComponentType.ICON_BUTTON ||
+            node.type == ComponentType.FAB ||
+            node.type == ComponentType.EXTENDED_FAB ||
+            node.type == ComponentType.IMAGE ||
+            node.type == ComponentType.CHECKBOX ||
+            node.type == ComponentType.RADIO_BUTTON ||
+            node.type == ComponentType.SWITCH ||
+            node.type == ComponentType.SLIDER ||
+            node.type == ComponentType.RANGE_SLIDER
+
+    if (isContentRelevant) {
+        InspectorSection(
+            title = "Content",
+            defaultExpanded = true
+        ) {
+            if (node.type == ComponentType.TOP_APP_BAR) {
+                val currentTitle = (node.property(key = "title") as? ComponentProperty.Text)?.value
+                    ?: (node.property(key = "text") as? ComponentProperty.Text)?.value
+                    ?: ""
+                OutlinedTextField(
+                    value = currentTitle,
+                    onValueChange = {
+                        controller.updateNodeProperty(
+                            nodeId = node.id,
+                            property = ComponentProperty.Text(key = "title", value = it)
+                        )
+                    },
+                    label = { Text(text = "AppBar Title", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (supportsText(node = node)) {
+                OutlinedTextField(
+                    value = (node.property(key = "text") as? ComponentProperty.Text)?.value.orEmpty(),
+                    onValueChange = {
+                        controller.updateNodeProperty(
+                            nodeId = node.id,
+                            property = ComponentProperty.Text(key = "text", value = it)
+                        )
+                    },
+                    label = { Text(text = "Text Value", style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (node.type == ComponentType.ICON || node.type == ComponentType.ICON_BUTTON || node.type == ComponentType.FAB || node.type == ComponentType.EXTENDED_FAB) {
+                IconDropdown(node = node, controller = controller)
+            }
+
+            if (node.type == ComponentType.IMAGE) {
+                ImageAssetSection(node = node, controller = controller)
+            }
+
+            if (node.type == ComponentType.CHECKBOX) {
+                BooleanPropertySwitch(label = "Checked", key = "checked", node = node, controller = controller, default = true)
+            } else if (node.type == ComponentType.RADIO_BUTTON) {
+                BooleanPropertySwitch(label = "Selected", key = "selected", node = node, controller = controller, default = true)
+            } else if (node.type == ComponentType.SWITCH) {
+                BooleanPropertySwitch(label = "Checked", key = "checked", node = node, controller = controller, default = true)
+            }
+
+            if (node.type == ComponentType.SLIDER) {
+                FloatSliderRow(label = "Slider Value", key = "value", node = node, controller = controller, default = 0.6f)
+            } else if (node.type == ComponentType.RANGE_SLIDER) {
+                FloatSliderRow(label = "Range Start", key = "startValue", node = node, controller = controller, default = 0.2f)
+                FloatSliderRow(label = "Range End", key = "endValue", node = node, controller = controller, default = 0.8f)
             }
         }
     }
-    ModifierSection(node = node, controller = controller)
-    AccessibilitySection(node = node, controller = controller)
 
-    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-    Button(
+    // 4. BEHAVIOR GROUP
+    InspectorSection(
+        title = "Behavior",
+        defaultExpanded = false
+    ) {
+        val clickMod = node.modifiers.filterIsInstance<ModifierSpec.Clickable>().firstOrNull()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Clickable / Interactive", style = MaterialTheme.typography.bodySmall)
+            Switch(
+                checked = clickMod?.enabled ?: false,
+                onCheckedChange = { enabled ->
+                    if (enabled) {
+                        if (clickMod != null) {
+                            controller.updateModifier(node.id, clickMod.copy(enabled = true))
+                        } else {
+                            controller.addModifier(node.id, ModifierSpec.Clickable(enabled = true))
+                        }
+                    } else {
+                        if (clickMod != null) {
+                            controller.removeModifier(node.id, clickMod.id)
+                        }
+                    }
+                }
+            )
+        }
+
+        // Z-Index
+        val zMod = node.modifiers.filterIsInstance<ModifierSpec.ZIndex>().firstOrNull()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("Z-Index", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(48.dp))
+            Slider(
+                value = zMod?.value ?: 0f,
+                onValueChange = { v ->
+                    if (zMod != null) {
+                        controller.updateModifier(node.id, zMod.copy(value = v))
+                    } else {
+                        controller.addModifier(node.id, ModifierSpec.ZIndex(value = v))
+                    }
+                },
+                valueRange = -10f..10f,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "${(zMod?.value ?: 0f).toInt()}",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.width(28.dp)
+            )
+        }
+    }
+
+    // 5. ACCESSIBILITY GROUP
+    InspectorSection(
+        title = "Accessibility",
+        defaultExpanded = false
+    ) {
+        AccessibilitySection(node = node, controller = controller)
+    }
+
+    // 6. MODIFIER CHAIN (Advanced reordering & details)
+    InspectorSection(
+        title = "Modifier Chain",
+        badge = "${node.modifiers.size}",
+        defaultExpanded = false
+    ) {
+        ModifierSection(node = node, controller = controller)
+    }
+
+    // 7. DANGER ZONE: DELETE COMPONENT
+    OutlinedButton(
         onClick = { controller.removeNode(nodeId = node.id) },
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.error
         ),
-        modifier = Modifier.fillMaxWidth()
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Icon(
             imageVector = Icons.Outlined.Delete,
             contentDescription = null,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(16.dp)
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "Delete ${node.type.displayName}")
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "Delete ${node.type.displayName}",
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+        )
     }
 }
 
@@ -302,229 +731,218 @@ private fun ProjectSection(controller: EditorController) {
     val current = controller.state.project.deviceProfile
     val themeConfig = controller.state.project.themeConfig
 
-    SectionLabel(text = "Project")
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it }
+    InspectorSection(
+        title = "Device & Screen",
+        defaultExpanded = true
     ) {
-        OutlinedTextField(
-            value = current.displayName,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(text = "Device") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-        )
-        ExposedDropdownMenu(
+        ExposedDropdownMenuBox(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onExpandedChange = { expanded = it }
         ) {
-            DeviceProfile.presets.forEach { profile ->
-                DropdownMenuItem(
-                    text = { Text(text = "${profile.displayName} (${profile.size.width.toInt()} × ${profile.size.height.toInt()} dp)") },
-                    onClick = {
-                        controller.setDeviceProfile(profile = profile)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-
-    Spacer(modifier = Modifier.height(4.dp))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "${current.effectiveWidth.toInt()} × ${current.effectiveHeight.toInt()} dp • ${current.widthSizeClass.displayName}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        IconButton(
-            onClick = { controller.toggleDeviceOrientation() },
-            modifier = Modifier.size(28.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.ScreenRotation,
-                contentDescription = "Rotate Device Orientation",
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.primary
+            OutlinedTextField(
+                value = current.displayName,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(text = "Device Preset", style = MaterialTheme.typography.labelSmall) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                textStyle = MaterialTheme.typography.bodySmall
             )
-        }
-    }
-
-    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-    SectionLabel(text = "Theme & Colors")
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = if (themeConfig.isDark) "Dark Mode" else "Light Mode",
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Switch(
-            checked = themeConfig.isDark,
-            onCheckedChange = { controller.toggleThemeDarkMode() }
-        )
-    }
-
-    Text(
-        text = "Seed Color Presets",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        CanvasThemeGenerator.PRESETS.forEach { preset ->
-            val isSelected = themeConfig.seedColorHex.equals(preset.hexColor, ignoreCase = true)
-            FilterChip(
-                selected = isSelected,
-                onClick = { controller.setThemeSeed(preset.hexColor) },
-                label = { Text(preset.name, style = MaterialTheme.typography.labelSmall) },
-                leadingIcon = {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .background(preset.color, shape = CircleShape)
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DeviceProfile.presets.forEach { profile ->
+                    DropdownMenuItem(
+                        text = { Text(text = "${profile.displayName} (${profile.size.width.toInt()} × ${profile.size.height.toInt()} dp)", style = MaterialTheme.typography.bodySmall) },
+                        onClick = {
+                            controller.setDeviceProfile(profile = profile)
+                            expanded = false
+                        }
                     )
                 }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "${current.effectiveWidth.toInt()} × ${current.effectiveHeight.toInt()} dp • ${current.widthSizeClass.displayName}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            IconButton(
+                onClick = { controller.toggleDeviceOrientation() },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.ScreenRotation,
+                    contentDescription = "Rotate Device Orientation",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 
-    var hexInput by remember(themeConfig.seedColorHex) { mutableStateOf(themeConfig.seedColorHex) }
-    val isValid = CanvasThemeGenerator.isValidHexColor(hexInput)
-
-    OutlinedTextField(
-        value = hexInput,
-        onValueChange = { input ->
-            hexInput = input
-            if (CanvasThemeGenerator.isValidHexColor(input)) {
-                val formatted = if (input.startsWith("#")) input else "#$input"
-                controller.setThemeSeed(formatted)
-            }
-        },
-        label = { Text(text = "Custom Seed Hex") },
-        placeholder = { Text("#6750A4") },
-        isError = !isValid && hexInput.isNotBlank(),
-        trailingIcon = {
-            val previewColor = if (isValid) CanvasThemeGenerator.parseHexColor(hexInput) else Color.Transparent
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .background(previewColor, shape = CircleShape)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-            )
-        },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true
-    )
-
-    // Role Color Overrides
-    var showColorOverrides by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { showColorOverrides = !showColorOverrides }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    InspectorSection(
+        title = "Theme & Colors",
+        defaultExpanded = true
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (themeConfig.isDark) "Dark Mode" else "Light Mode",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Switch(
+                checked = themeConfig.isDark,
+                onCheckedChange = { controller.toggleThemeDarkMode() }
+            )
+        }
+
         Text(
-            text = "Role Color Overrides (${themeConfig.colorOverrides.size})",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+            text = "Seed Color Presets",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Icon(
-            imageVector = if (showColorOverrides) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-    if (showColorOverrides) {
-        val keyRoles = listOf("primary", "secondary", "tertiary", "surface", "error")
-        keyRoles.forEach { role ->
-            val overrideHex = themeConfig.colorOverrides[role]
-            val currentHex = overrideHex ?: ""
-            var inputHex by remember(overrideHex) { mutableStateOf(currentHex) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = role.replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.width(70.dp)
-                )
-                OutlinedTextField(
-                    value = inputHex,
-                    onValueChange = {
-                        inputHex = it
-                        if (CanvasThemeGenerator.isValidHexColor(it)) {
-                            controller.setColorOverride(role, if (it.startsWith("#")) it else "#$it")
-                        }
-                    },
-                    placeholder = { Text("#HEX") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    trailingIcon = {
-                        val color = if (CanvasThemeGenerator.isValidHexColor(inputHex)) {
-                            CanvasThemeGenerator.parseHexColor(inputHex)
-                        } else Color.Transparent
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            CanvasThemeGenerator.PRESETS.forEach { preset ->
+                val isSelected = themeConfig.seedColorHex.equals(preset.hexColor, ignoreCase = true)
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { controller.setThemeSeed(preset.hexColor) },
+                    label = { Text(preset.name, style = MaterialTheme.typography.labelSmall) },
+                    leadingIcon = {
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
-                                .background(color, CircleShape)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                                .size(10.dp)
+                                .background(preset.color, shape = CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
                         )
                     }
                 )
-                if (overrideHex != null) {
-                    IconButton(
-                        onClick = { controller.removeColorOverride(role) },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Reset", modifier = Modifier.size(16.dp))
+            }
+        }
+
+        var hexInput by remember(themeConfig.seedColorHex) { mutableStateOf(themeConfig.seedColorHex) }
+        val isValid = CanvasThemeGenerator.isValidHexColor(hexInput)
+
+        OutlinedTextField(
+            value = hexInput,
+            onValueChange = { input ->
+                hexInput = input
+                if (CanvasThemeGenerator.isValidHexColor(input)) {
+                    val formatted = if (input.startsWith("#")) input else "#$input"
+                    controller.setThemeSeed(formatted)
+                }
+            },
+            label = { Text(text = "Custom Seed Hex", style = MaterialTheme.typography.labelSmall) },
+            placeholder = { Text("#6750A4") },
+            isError = !isValid && hexInput.isNotBlank(),
+            trailingIcon = {
+                val previewColor = if (isValid) CanvasThemeGenerator.parseHexColor(hexInput) else Color.Transparent
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(previewColor, shape = CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall
+        )
+
+        // Role Color Overrides
+        var showColorOverrides by remember { mutableStateOf(false) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showColorOverrides = !showColorOverrides }
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Role Overrides (${themeConfig.colorOverrides.size})",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Icon(
+                imageVector = if (showColorOverrides) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        if (showColorOverrides) {
+            val keyRoles = listOf("primary", "secondary", "tertiary", "surface", "error")
+            keyRoles.forEach { role ->
+                val overrideHex = themeConfig.colorOverrides[role]
+                val currentHex = overrideHex ?: ""
+                var inputHex by remember(overrideHex) { mutableStateOf(currentHex) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = role.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.width(64.dp)
+                    )
+                    OutlinedTextField(
+                        value = inputHex,
+                        onValueChange = {
+                            inputHex = it
+                            if (CanvasThemeGenerator.isValidHexColor(it)) {
+                                controller.setColorOverride(role, if (it.startsWith("#")) it else "#$it")
+                            }
+                        },
+                        placeholder = { Text("#HEX") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        trailingIcon = {
+                            val color = if (CanvasThemeGenerator.isValidHexColor(inputHex)) {
+                                CanvasThemeGenerator.parseHexColor(inputHex)
+                            } else Color.Transparent
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .background(color, CircleShape)
+                                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                            )
+                        }
+                    )
+                    if (overrideHex != null) {
+                        IconButton(
+                            onClick = { controller.removeColorOverride(role) },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Reset", modifier = Modifier.size(14.dp))
+                        }
                     }
                 }
             }
         }
     }
 
-    // Typography Scale Configurator
-    var showTypography by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { showTypography = !showTypography }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    InspectorSection(
+        title = "Typography Scale",
+        defaultExpanded = false
     ) {
-        Text(
-            text = "Typography Scale",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-        )
-        Icon(
-            imageVector = if (showTypography) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-    if (showTypography) {
         val families = TextStyleConfig.FONT_FAMILIES
         val currentFamily = themeConfig.typography.bodyLarge?.fontFamily ?: "Default"
         var familyExpanded by remember { mutableStateOf(false) }
@@ -538,7 +956,8 @@ private fun ProjectSection(controller: EditorController) {
                 onValueChange = {},
                 readOnly = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = familyExpanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                modifier = Modifier.fillMaxWidth().menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                textStyle = MaterialTheme.typography.bodySmall
             )
             ExposedDropdownMenu(
                 expanded = familyExpanded,
@@ -546,7 +965,7 @@ private fun ProjectSection(controller: EditorController) {
             ) {
                 families.forEach { family ->
                     DropdownMenuItem(
-                        text = { Text(family) },
+                        text = { Text(family, style = MaterialTheme.typography.bodySmall) },
                         onClick = {
                             val updated = themeConfig.typography.copy(
                                 bodyLarge = (themeConfig.typography.bodyLarge ?: TextStyleConfig()).copy(fontFamily = family),
@@ -565,30 +984,13 @@ private fun ProjectSection(controller: EditorController) {
         }
     }
 
-    // Shapes Configurator
-    var showShapes by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { showShapes = !showShapes }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    InspectorSection(
+        title = "Corner Shapes",
+        defaultExpanded = false
     ) {
-        Text(
-            text = "Corner Shapes",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-        )
-        Icon(
-            imageVector = if (showShapes) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-    if (showShapes) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             listOf(
                 "Small" to themeConfig.shapes.smallCornerDp,
@@ -609,36 +1011,21 @@ private fun ProjectSection(controller: EditorController) {
                             }
                             controller.updateShapes(updated)
                         },
-                        suffix = { Text("dp") },
+                        suffix = { Text("dp", style = MaterialTheme.typography.labelSmall) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodySmall
                     )
                 }
             }
         }
     }
 
-    // Design Tokens Manager
-    var showTokens by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { showTokens = !showTokens }
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    InspectorSection(
+        title = "Design Tokens",
+        badge = "${themeConfig.customTokens.size}",
+        defaultExpanded = false
     ) {
-        Text(
-            text = "Design Tokens (${themeConfig.customTokens.size})",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-        )
-        Icon(
-            imageVector = if (showTokens) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-    if (showTokens) {
         var newTokenName by remember { mutableStateOf("") }
         var newTokenValue by remember { mutableStateOf("") }
 
@@ -646,42 +1033,44 @@ private fun ProjectSection(controller: EditorController) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(token.name, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold))
-                    Text("${token.type.displayName}: ${token.value}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(token.name, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold))
+                    Text("${token.type.displayName}: ${token.value}", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(
                     onClick = { controller.removeDesignToken(token.id) },
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 ) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Delete Token", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Outlined.Delete, contentDescription = "Delete Token", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
                 }
             }
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = newTokenName,
                 onValueChange = { newTokenName = it },
-                placeholder = { Text("Name") },
+                placeholder = { Text("Name", style = MaterialTheme.typography.labelSmall) },
                 singleLine = true,
-                modifier = Modifier.weight(1.2f)
+                modifier = Modifier.weight(1.2f),
+                textStyle = MaterialTheme.typography.bodySmall
             )
             OutlinedTextField(
                 value = newTokenValue,
                 onValueChange = { newTokenValue = it },
-                placeholder = { Text("Value") },
+                placeholder = { Text("Value", style = MaterialTheme.typography.labelSmall) },
                 singleLine = true,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.bodySmall
             )
             IconButton(
                 onClick = {
@@ -697,20 +1086,12 @@ private fun ProjectSection(controller: EditorController) {
                         newTokenValue = ""
                     }
                 },
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(32.dp)
             ) {
-                Icon(Icons.Outlined.Add, contentDescription = "Add Token", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Outlined.Add, contentDescription = "Add Token", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
-
-    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-    Text(
-        text = "Select a component on the canvas or layer tree to edit its properties.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 }
 
 @Composable
@@ -718,20 +1099,18 @@ private fun MultiSelectSection(
     selectedNodes: List<CanvasNode>,
     controller: EditorController
 ) {
-    SectionLabel(text = "Selection (${selectedNodes.size} items)")
-
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = "${selectedNodes.size} components selected",
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             )
             val summaryNames = selectedNodes.take(4).joinToString(", ") { it.name }
             val suffix = if (selectedNodes.size > 4) " + ${selectedNodes.size - 4} more" else ""
@@ -743,175 +1122,182 @@ private fun MultiSelectSection(
         }
     }
 
-    SectionLabel(text = "Alignment & Distribution")
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    InspectorSection(
+        title = "Alignment & Distribution",
+        defaultExpanded = true
     ) {
-        IconButton(
-            onClick = { controller.alignSelectedNodes(AlignmentType.LEFT) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.AlignHorizontalLeft,
-                contentDescription = "Align Left",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        IconButton(
-            onClick = { controller.alignSelectedNodes(AlignmentType.CENTER_HORIZONTALLY) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AlignHorizontalCenter,
-                contentDescription = "Align Center Horizontally",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        IconButton(
-            onClick = { controller.alignSelectedNodes(AlignmentType.RIGHT) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.AlignHorizontalRight,
-                contentDescription = "Align Right",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        VerticalDivider(modifier = Modifier.height(20.dp))
-
-        IconButton(
-            onClick = { controller.alignSelectedNodes(AlignmentType.TOP) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AlignVerticalTop,
-                contentDescription = "Align Top",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        IconButton(
-            onClick = { controller.alignSelectedNodes(AlignmentType.CENTER_VERTICALLY) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AlignVerticalCenter,
-                contentDescription = "Align Center Vertically",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        IconButton(
-            onClick = { controller.alignSelectedNodes(AlignmentType.BOTTOM) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AlignVerticalBottom,
-                contentDescription = "Align Bottom",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-
-    if (selectedNodes.size >= 3) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { controller.alignSelectedNodes(AlignmentType.LEFT) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.AlignHorizontalLeft,
+                    contentDescription = "Align Left",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            IconButton(
+                onClick = { controller.alignSelectedNodes(AlignmentType.CENTER_HORIZONTALLY) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AlignHorizontalCenter,
+                    contentDescription = "Align Center Horizontally",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            IconButton(
+                onClick = { controller.alignSelectedNodes(AlignmentType.RIGHT) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.AlignHorizontalRight,
+                    contentDescription = "Align Right",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            VerticalDivider(modifier = Modifier.height(18.dp))
+
+            IconButton(
+                onClick = { controller.alignSelectedNodes(AlignmentType.TOP) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AlignVerticalTop,
+                    contentDescription = "Align Top",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            IconButton(
+                onClick = { controller.alignSelectedNodes(AlignmentType.CENTER_VERTICALLY) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AlignVerticalCenter,
+                    contentDescription = "Align Center Vertically",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            IconButton(
+                onClick = { controller.alignSelectedNodes(AlignmentType.BOTTOM) },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AlignVerticalBottom,
+                    contentDescription = "Align Bottom",
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        if (selectedNodes.size >= 3) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { controller.distributeSelectedNodes(DistributionType.HORIZONTALLY) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                ) {
+                    Text(text = "Distribute H", style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedButton(
+                    onClick = { controller.distributeSelectedNodes(DistributionType.VERTICALLY) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                ) {
+                    Text(text = "Distribute V", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+
+    InspectorSection(
+        title = "Selection Actions",
+        defaultExpanded = true
+    ) {
+        FilledTonalButton(
+            onClick = { controller.groupSelected() },
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Icon(Icons.Outlined.Workspaces, contentDescription = "Group", modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Group Selection (Ctrl+G)", style = MaterialTheme.typography.labelSmall)
+        }
+
+        OutlinedButton(
+            onClick = { controller.deleteSelected() },
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            ),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Icon(Icons.Outlined.Delete, contentDescription = "Delete All", modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Delete Selected (${selectedNodes.size})", style = MaterialTheme.typography.labelSmall)
+        }
+
+        Text(
+            text = "Nudge Alignment",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             OutlinedButton(
-                onClick = { controller.distributeSelectedNodes(DistributionType.HORIZONTALLY) },
+                onClick = { controller.nudgeSelected(0f, -4f) },
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
             ) {
-                Text(text = "Distribute H", style = MaterialTheme.typography.labelSmall)
+                Text("↑ Up", style = MaterialTheme.typography.labelSmall)
             }
             OutlinedButton(
-                onClick = { controller.distributeSelectedNodes(DistributionType.VERTICALLY) },
+                onClick = { controller.nudgeSelected(0f, 4f) },
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
             ) {
-                Text(text = "Distribute V", style = MaterialTheme.typography.labelSmall)
+                Text("↓ Down", style = MaterialTheme.typography.labelSmall)
             }
-        }
-    }
-
-    SectionLabel(text = "Quick Actions")
-
-    FilledTonalButton(
-        onClick = { controller.groupSelected() },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Icon(Icons.Outlined.Workspaces, contentDescription = "Group", modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Group Selection (Ctrl+G)")
-    }
-
-    Button(
-        onClick = { controller.deleteSelected() },
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.error,
-            contentColor = MaterialTheme.colorScheme.onError
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Icon(Icons.Outlined.Delete, contentDescription = "Delete All", modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Delete Selected (${selectedNodes.size})")
-    }
-
-    Text(
-        text = "Group Nudge",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        OutlinedButton(
-            onClick = { controller.nudgeSelected(0f, -4f) },
-            modifier = Modifier.weight(1f)
-        ) {
-            Text("↑ Up")
-        }
-        OutlinedButton(
-            onClick = { controller.nudgeSelected(0f, 4f) },
-            modifier = Modifier.weight(1f)
-        ) {
-            Text("↓ Down")
-        }
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        OutlinedButton(
-            onClick = { controller.nudgeSelected(-4f, 0f) },
-            modifier = Modifier.weight(1f)
-        ) {
-            Text("← Left")
-        }
-        OutlinedButton(
-            onClick = { controller.nudgeSelected(4f, 0f) },
-            modifier = Modifier.weight(1f)
-        ) {
-            Text("→ Right")
+            OutlinedButton(
+                onClick = { controller.nudgeSelected(-4f, 0f) },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
+            ) {
+                Text("← Left", style = MaterialTheme.typography.labelSmall)
+            }
+            OutlinedButton(
+                onClick = { controller.nudgeSelected(4f, 0f) },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)
+            ) {
+                Text("→ Right", style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 
     OutlinedButton(
         onClick = { controller.clearSelection() },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        Text("Clear Selection")
+        Text("Clear Selection", style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -1191,9 +1577,13 @@ private fun InspectorDropdown(
 @Composable
 private fun SectionLabel(text: String) {
     Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            letterSpacing = 0.8.sp
+        ),
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 

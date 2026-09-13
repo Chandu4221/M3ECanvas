@@ -25,6 +25,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.editor.palette.icon
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
@@ -49,36 +50,41 @@ fun LayersPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = onToggleExpand != null) { onToggleExpand?.invoke() }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = "Layers",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ) {
                     Text(
                         text = "$allNodesCount",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
                 if (controller.state.selectedNodeIds.size > 1) {
                     FilledTonalButton(
                         onClick = { controller.groupSelected() },
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.height(24.dp)
                     ) {
-                        Text("Group (${controller.state.selectedNodeIds.size})", style = MaterialTheme.typography.labelSmall)
+                        Text("Group (${controller.state.selectedNodeIds.size})", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp))
                     }
                 }
             }
@@ -90,13 +96,13 @@ fun LayersPanel(
                     Icon(
                         imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                         contentDescription = if (isExpanded) "Collapse Layers" else "Expand Layers",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
         if (isExpanded) {
             LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
@@ -105,30 +111,32 @@ fun LayersPanel(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .height(28.dp)
                             .background(
                                 if (isProjectSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                                 else Color.Transparent
                             )
                             .clickable { controller.clearSelection() }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Smartphone,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(14.dp),
                             tint = if (isProjectSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "Project (${controller.state.project.deviceProfile.displayName})",
                             style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = if (isProjectSelected) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isProjectSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 11.sp
                             ),
                             color = if (isProjectSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 }
                 items(
                     items = flattenNodes(nodes = nodes, collapsedIds = controller.state.collapsedNodeIds),
@@ -187,6 +195,7 @@ private fun LayerRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(30.dp)
             .pointerInput(node.id) {
                 awaitEachGesture {
                     awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
@@ -202,12 +211,12 @@ private fun LayerRow(
             }
             .background(
                 color = if (isSelected) {
-                    MaterialTheme.colorScheme.secondaryContainer
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
                     Color.Transparent
                 }
             )
-            .padding(start = (8 + depth * 16).dp, end = 8.dp),
+            .padding(start = (6 + depth * 12).dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 1. Expand / Collapse chevron for container nodes with children
@@ -217,33 +226,35 @@ private fun LayerRow(
                 contentDescription = if (isCollapsed) "Expand" else "Collapse",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(16.dp)
                     .clickable { controller.toggleCollapseNode(node.id) }
-                    .padding(2.dp)
+                    .padding(1.dp)
             )
         } else {
-            Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(16.dp))
         }
 
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(2.dp))
 
         // 2. Component type icon
         Icon(
             imageVector = node.type.icon(),
             contentDescription = node.type.displayName,
-            tint = if (node.isVisible) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-            modifier = Modifier.size(16.dp)
+            tint = if (node.isVisible) {
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            } else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+            modifier = Modifier.size(14.dp)
         )
 
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(5.dp))
 
         // 3. Node name / Inline editor & slot role badge
         Row(
             modifier = Modifier
                 .weight(1f)
-                .padding(vertical = 8.dp),
+                .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             if (isEditing) {
                 BasicTextField(

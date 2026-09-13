@@ -25,7 +25,8 @@ data class CanvasNode(
     val modifiers: List<ModifierSpec> = emptyList(),
     val slot: SlotRole? = null,
     val isVisible: Boolean = true,
-    val isLocked: Boolean = false
+    val isLocked: Boolean = false,
+    val responsiveRules: List<ResponsiveRule> = emptyList()
 ) {
 
     fun withVisibility(visible: Boolean): CanvasNode = copy(isVisible = visible)

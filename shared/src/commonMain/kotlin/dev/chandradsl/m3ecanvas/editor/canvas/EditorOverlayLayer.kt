@@ -206,8 +206,9 @@ fun EditorOverlayLayer(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = 2.dp.toPx()
-            val handleSize = 7.dp.toPx()
+            val handleSize = 8.dp.toPx()
             val handleOffset = handleSize / 2f
+            val guideColor = Color(0xFFE11D48) // High-contrast Figma-style magenta smart guides
 
             // 1. Draw Selection Outlines & Resize Handles
             for (selectedId in state.selectedNodeIds) {
@@ -216,8 +217,8 @@ fun EditorOverlayLayer(
                 val node = state.project.findNode(selectedId)
                 val isLocked = node?.isLocked == true
 
-                // Selection border
-                val borderColor = if (isLocked) Color(0xFFFF9800) else primaryColor
+                // Selection border: crisp 2dp high-contrast border
+                val borderColor = if (isLocked) Color(0xFFF59E0B) else primaryColor
                 drawRect(
                     color = borderColor,
                     topLeft = rect.topLeft,
@@ -236,7 +237,7 @@ fun EditorOverlayLayer(
                     )
                     val badgeTop = Offset(rect.right - lockLayout.size.width - 10f, rect.top + 4f)
                     drawRect(
-                        color = Color(0xFFFF9800),
+                        color = Color(0xFFF59E0B),
                         topLeft = Offset(badgeTop.x - 4f, badgeTop.y - 2f),
                         size = Size(lockLayout.size.width + 8f, lockLayout.size.height + 4f)
                     )
@@ -291,24 +292,22 @@ fun EditorOverlayLayer(
                 )
             }
 
-            // 3. Draw Magnetic Alignment Guides
+            // 3. Draw Magnetic Alignment Guides (Bright magenta, unmistakable)
             for (guide in alignmentGuides) {
                 val guidePx = guide.position.dp.toPx()
                 if (guide.orientation == GuideOrientation.VERTICAL) {
                     drawLine(
-                        color = tertiaryColor,
+                        color = guideColor,
                         start = Offset(guidePx, 0f),
                         end = Offset(guidePx, size.height),
-                        strokeWidth = 1.5.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+                        strokeWidth = 1.5.dp.toPx()
                     )
                 } else {
                     drawLine(
-                        color = tertiaryColor,
+                        color = guideColor,
                         start = Offset(0f, guidePx),
                         end = Offset(size.width, guidePx),
-                        strokeWidth = 1.5.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+                        strokeWidth = 1.5.dp.toPx()
                     )
                 }
             }
