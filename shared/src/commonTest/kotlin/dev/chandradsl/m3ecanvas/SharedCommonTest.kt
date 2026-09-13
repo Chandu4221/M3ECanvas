@@ -423,7 +423,7 @@ class SharedCommonTest {
                 ComponentType.TEXT_FIELD -> "OutlinedTextField("
                 ComponentType.TEXT -> "Text("
                 ComponentType.ICON -> "Icon("
-                ComponentType.IMAGE -> "Surface("
+                ComponentType.IMAGE -> "Image("
                 ComponentType.HORIZONTAL_DIVIDER -> "HorizontalDivider("
                 ComponentType.VERTICAL_DIVIDER -> "VerticalDivider("
                 ComponentType.SCAFFOLD -> "Scaffold("

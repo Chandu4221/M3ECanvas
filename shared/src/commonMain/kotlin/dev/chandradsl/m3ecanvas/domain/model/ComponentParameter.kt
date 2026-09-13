@@ -58,7 +58,26 @@ sealed interface ParameterValue {
     data class VariantVal(val variant: MaterialVariant) : ParameterValue
 
     @Serializable
-    data class IconVal(val iconName: String) : ParameterValue
+    data class IconVal(
+        val iconName: String = "Favorite",
+        val iconRef: IconReference = IconReference.material(iconName)
+    ) : ParameterValue {
+        constructor(reference: IconReference) : this(
+            iconName = reference.name,
+            iconRef = reference
+        )
+    }
+
+    @Serializable
+    data class AssetVal(
+        val assetId: String = "",
+        val assetRef: AssetReference = AssetReference(assetId = assetId)
+    ) : ParameterValue {
+        constructor(reference: AssetReference) : this(
+            assetId = reference.assetId,
+            assetRef = reference
+        )
+    }
 
     @Serializable
     data class ShapeVal(val cornerRadiusDp: Float) : ParameterValue
@@ -93,7 +112,8 @@ fun ComponentProperty.toParameter(): ComponentParameter {
         is ComponentProperty.Numeric -> ParameterValue.FloatVal(value)
         is ComponentProperty.ColorHex -> ParameterValue.ColorVal(value)
         is ComponentProperty.Variant -> ParameterValue.VariantVal(value)
-        is ComponentProperty.Icon -> ParameterValue.IconVal(iconName)
+        is ComponentProperty.Icon -> ParameterValue.IconVal(iconName = iconName, iconRef = iconRef)
+        is ComponentProperty.Asset -> ParameterValue.AssetVal(assetId = assetId, assetRef = assetRef)
     }
     return ComponentParameter(name = key, value = paramValue)
 }
@@ -108,7 +128,8 @@ fun ComponentParameter.toProperty(): ComponentProperty? {
         is ParameterValue.SpVal -> ComponentProperty.Numeric(key = name, value = v.value)
         is ParameterValue.ColorVal -> ComponentProperty.ColorHex(key = name, value = v.hex)
         is ParameterValue.VariantVal -> ComponentProperty.Variant(key = name, value = v.variant)
-        is ParameterValue.IconVal -> ComponentProperty.Icon(key = name, iconName = v.iconName)
+        is ParameterValue.IconVal -> ComponentProperty.Icon(key = name, iconName = v.iconName, iconRef = v.iconRef)
+        is ParameterValue.AssetVal -> ComponentProperty.Asset(key = name, assetId = v.assetId, assetRef = v.assetRef)
         else -> null
     }
 }

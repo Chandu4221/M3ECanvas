@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.domain.model.AssetAlignment as AssetAlignmentType
+import dev.chandradsl.m3ecanvas.editor.asset.DefaultAssetRepository
 import dev.chandradsl.m3ecanvas.editor.canvas.AVAILABLE_MATERIAL_ICONS
 import dev.chandradsl.m3ecanvas.editor.canvas.resolveMaterialIcon
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
@@ -233,6 +235,10 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
 
     if (node.type == ComponentType.ICON || node.type == ComponentType.ICON_BUTTON || node.type == ComponentType.FAB || node.type == ComponentType.EXTENDED_FAB) {
         IconDropdown(node = node, controller = controller)
+    }
+
+    if (node.type == ComponentType.IMAGE) {
+        ImageAssetSection(node = node, controller = controller)
     }
 
     if (node.type == ComponentType.CHECKBOX) {
@@ -1261,53 +1267,116 @@ private fun TypographyDropdown(node: CanvasNode, controller: EditorController) {
 @Composable
 private fun IconDropdown(node: CanvasNode, controller: EditorController) {
     var expanded by remember { mutableStateOf(false) }
-    val current = node.iconProperty(key = "icon", default = "Favorite")
+    var isPickerOpen by remember { mutableStateOf(false) }
+    val currentRef = node.iconReference(key = "icon", default = IconReference.material("Favorite"))
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it }
-    ) {
-        OutlinedTextField(
-            value = current,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(text = "Material Icon") },
-            leadingIcon = {
-                Icon(
-                    imageVector = safeResolveIcon(iconName = current),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-            },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            AVAILABLE_MATERIAL_ICONS.forEach { iconName ->
+            Text(
+                text = "Icon (${currentRef.style.name.lowercase().replaceFirstChar { it.uppercase() }})",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            TextButton(
+                onClick = { isPickerOpen = true },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Browse All...", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            OutlinedTextField(
+                value = currentRef.name,
+                onValueChange = {},
+                readOnly = true,
+                leadingIcon = {
+                    Icon(
+                        imageVector = safeResolveIcon(reference = currentRef),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                AVAILABLE_MATERIAL_ICONS.take(12).forEach { iconName ->
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(
+                                imageVector = safeResolveIcon(iconName = iconName),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        text = { Text(text = iconName) },
+                        onClick = {
+                            controller.updateNodeProperty(
+                                nodeId = node.id,
+                                property = ComponentProperty.Icon(
+                                    key = "icon",
+                                    reference = currentRef.copy(name = iconName)
+                                )
+                            )
+                            expanded = false
+                        }
+                    )
+                }
+                HorizontalDivider()
                 DropdownMenuItem(
                     leadingIcon = {
-                        Icon(
-                            imageVector = safeResolveIcon(iconName = iconName),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
                     },
-                    text = { Text(text = iconName) },
+                    text = { Text("More icons...") },
                     onClick = {
-                        controller.updateNodeProperty(
-                            nodeId = node.id,
-                            property = ComponentProperty.Icon(key = "icon", iconName = iconName)
-                        )
                         expanded = false
+                        isPickerOpen = true
                     }
                 )
             }
         }
+    }
+
+    if (isPickerOpen) {
+        IconPickerModal(
+            isOpen = true,
+            currentReference = currentRef,
+            onDismiss = { isPickerOpen = false },
+            onSelect = { selectedRef ->
+                controller.updateNodeProperty(
+                    nodeId = node.id,
+                    property = ComponentProperty.Icon(key = "icon", reference = selectedRef)
+                )
+            }
+        )
+    }
+}
+
+private fun safeResolveIcon(reference: IconReference): androidx.compose.ui.graphics.vector.ImageVector {
+    return try {
+        resolveMaterialIcon(reference = reference)
+    } catch (_: Throwable) {
+        Icons.Outlined.Star
     }
 }
 
@@ -1316,6 +1385,145 @@ private fun safeResolveIcon(iconName: String): androidx.compose.ui.graphics.vect
         resolveMaterialIcon(iconName = iconName)
     } catch (_: Throwable) {
         Icons.Outlined.Star
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ImageAssetSection(node: CanvasNode, controller: EditorController) {
+    val configuredAsset = node.assetReference()
+    val assetId = configuredAsset?.assetId?.takeIf { it.isNotBlank() }
+        ?: node.assetId().takeIf { it.isNotBlank() }
+        ?: "sample_hero_landscape"
+
+    val currentScale = configuredAsset?.scale ?: ContentScaleType.CROP
+    val currentAlignment = configuredAsset?.alignment ?: AssetAlignmentType.CENTER
+
+    var expandedAssetDropdown by remember { mutableStateOf(false) }
+    var expandedScaleDropdown by remember { mutableStateOf(false) }
+    var expandedAlignDropdown by remember { mutableStateOf(false) }
+
+    val sampleAssets = DefaultAssetRepository.BUNDLED_SAMPLE_ASSETS
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Image Asset (Section 30)",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        // Preset / Asset ID dropdown
+        ExposedDropdownMenuBox(
+            expanded = expandedAssetDropdown,
+            onExpandedChange = { expandedAssetDropdown = it }
+        ) {
+            OutlinedTextField(
+                value = assetId,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Asset Preset") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAssetDropdown) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = expandedAssetDropdown,
+                onDismissRequest = { expandedAssetDropdown = false }
+            ) {
+                sampleAssets.forEach { sample ->
+                    val title = sample.metadata["title"] ?: sample.assetId
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(title, style = MaterialTheme.typography.bodyMedium)
+                                Text(sample.assetId, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        onClick = {
+                            controller.updateNodeProperty(
+                                nodeId = node.id,
+                                property = ComponentProperty.Asset(key = "asset", reference = sample)
+                            )
+                            expandedAssetDropdown = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Content Scale Dropdown
+        ExposedDropdownMenuBox(
+            expanded = expandedScaleDropdown,
+            onExpandedChange = { expandedScaleDropdown = it }
+        ) {
+            OutlinedTextField(
+                value = currentScale.name,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Content Scale") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedScaleDropdown) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = expandedScaleDropdown,
+                onDismissRequest = { expandedScaleDropdown = false }
+            ) {
+                ContentScaleType.entries.forEach { scale ->
+                    DropdownMenuItem(
+                        text = { Text(scale.name) },
+                        onClick = {
+                            val updated = (configuredAsset ?: AssetReference(assetId = assetId)).copy(scale = scale)
+                            controller.updateNodeProperty(
+                                nodeId = node.id,
+                                property = ComponentProperty.Asset(key = "asset", reference = updated)
+                            )
+                            expandedScaleDropdown = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Alignment Dropdown
+        ExposedDropdownMenuBox(
+            expanded = expandedAlignDropdown,
+            onExpandedChange = { expandedAlignDropdown = it }
+        ) {
+            OutlinedTextField(
+                value = currentAlignment.name,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Alignment") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAlignDropdown) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = expandedAlignDropdown,
+                onDismissRequest = { expandedAlignDropdown = false }
+            ) {
+                AssetAlignmentType.entries.forEach { align ->
+                    DropdownMenuItem(
+                        text = { Text(align.name) },
+                        onClick = {
+                            val updated = (configuredAsset ?: AssetReference(assetId = assetId)).copy(alignment = align)
+                            controller.updateNodeProperty(
+                                nodeId = node.id,
+                                property = ComponentProperty.Asset(key = "asset", reference = updated)
+                            )
+                            expandedAlignDropdown = false
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 

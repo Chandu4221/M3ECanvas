@@ -74,6 +74,7 @@ open class AIPromptGenerator(
             is ComponentProperty.ColorHex -> prop.value
             is ComponentProperty.Variant -> prop.value.displayName
             is ComponentProperty.Icon -> prop.iconName
+            is ComponentProperty.Asset -> prop.assetId
         }
     }
 

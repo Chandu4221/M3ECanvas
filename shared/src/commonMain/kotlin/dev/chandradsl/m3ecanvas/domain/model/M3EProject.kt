@@ -57,6 +57,7 @@ data class M3EProject(
     val deviceProfile: DeviceProfile = DeviceProfile.default,
     val themeConfig: CanvasThemeConfig = CanvasThemeConfig(),
     val nodes: List<CanvasNode> = emptyList(),
+    val assets: List<AssetReference> = emptyList(),
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 ) {
@@ -110,5 +111,21 @@ data class M3EProject(
     /** Returns a copy with the given theme config applied. */
     fun withTheme(themeConfig: CanvasThemeConfig): M3EProject {
         return copy(themeConfig = themeConfig)
+    }
+
+    /** Finds an asset reference by [assetId]. */
+    fun findAsset(assetId: String): AssetReference? {
+        return assets.firstOrNull { it.assetId == assetId }
+    }
+
+    /** Returns a copy with the given asset added or updated. */
+    fun withAsset(asset: AssetReference): M3EProject {
+        val updated = assets.filterNot { it.assetId == asset.assetId } + asset
+        return copy(assets = updated)
+    }
+
+    /** Returns a copy with the asset matching [assetId] removed. */
+    fun removeAsset(assetId: String): M3EProject {
+        return copy(assets = assets.filterNot { it.assetId == assetId })
     }
 }

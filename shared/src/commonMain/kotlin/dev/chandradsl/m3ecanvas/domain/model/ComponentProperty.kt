@@ -50,10 +50,31 @@ sealed interface ComponentProperty {
         val value: MaterialVariant
     ) : ComponentProperty
 
-    /** An icon reference by name. */
+    /** An icon reference adhering to Section 31. */
     @Serializable
     data class Icon(
         override val key: String,
-        val iconName: String
-    ) : ComponentProperty
+        val iconName: String = "Favorite",
+        val iconRef: IconReference = IconReference.material(iconName)
+    ) : ComponentProperty {
+        constructor(key: String, reference: IconReference) : this(
+            key = key,
+            iconName = reference.name,
+            iconRef = reference
+        )
+    }
+
+    /** An asset reference adhering to Section 30. */
+    @Serializable
+    data class Asset(
+        override val key: String,
+        val assetId: String = "",
+        val assetRef: AssetReference = AssetReference(assetId = assetId)
+    ) : ComponentProperty {
+        constructor(key: String, reference: AssetReference) : this(
+            key = key,
+            assetId = reference.assetId,
+            assetRef = reference
+        )
+    }
 }

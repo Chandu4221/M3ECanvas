@@ -58,6 +58,8 @@ import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import dev.chandradsl.m3ecanvas.domain.model.*
+import dev.chandradsl.m3ecanvas.editor.asset.DefaultAssetRepository
+import dev.chandradsl.m3ecanvas.editor.asset.drawSampleAsset
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
 /**
@@ -249,7 +251,7 @@ fun CanvasNodeRenderer(
 
         // Graphics
         ComponentType.ICON -> RenderIcon(node = node)
-        ComponentType.IMAGE -> RenderImage(node = node)
+        ComponentType.IMAGE -> RenderImage(node = node, controller = controller)
         ComponentType.HORIZONTAL_DIVIDER -> RenderHorizontalDivider(node = node)
         ComponentType.VERTICAL_DIVIDER -> RenderVerticalDivider(node = node)
     }
@@ -1563,43 +1565,83 @@ private fun RenderText(node: CanvasNode) {
 
 @Composable
 private fun RenderIcon(node: CanvasNode) {
-    val iconName = node.iconProperty("icon", default = "Favorite")
+    val iconRef = node.iconReference("icon", default = IconReference.material("Favorite"))
     Icon(
-        imageVector = resolveMaterialIcon(iconName = iconName),
-        contentDescription = iconName,
+        imageVector = resolveMaterialIcon(reference = iconRef),
+        contentDescription = iconRef.name,
         tint = MaterialTheme.colorScheme.primary,
         modifier = node.modifiers.toModifier().fillMaxSize()
     )
 }
 
 @Composable
-private fun RenderImage(node: CanvasNode) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = node.modifiers.toModifier().fillMaxSize()
+private fun RenderImage(node: CanvasNode, controller: EditorController) {
+    val configuredAsset = node.assetReference()
+    val rawAssetId = node.assetId()
+    val assetId = configuredAsset?.assetId?.takeIf { it.isNotBlank() }
+        ?: rawAssetId.takeIf { it.isNotBlank() }
+        ?: "sample_hero_landscape"
+
+    val projectAsset = controller.state.project.findAsset(assetId)
+    val resolvedAsset = configuredAsset ?: projectAsset ?: DefaultAssetRepository.default.getAsset(assetId)
+
+    // Section 42: Graceful recoverable UI when an asset is missing
+    if (resolvedAsset == null && (assetId.startsWith("missing_") || rawAssetId.isNotBlank())) {
+        RenderMissingAsset(assetId = assetId, node = node)
+        return
+    }
+
+    val alignmentType = configuredAsset?.alignment ?: resolvedAsset?.alignment ?: AssetAlignment.CENTER
+    val contentAlignment = when (alignmentType) {
+        AssetAlignment.TOP_START -> Alignment.TopStart
+        AssetAlignment.TOP_CENTER -> Alignment.TopCenter
+        AssetAlignment.TOP_END -> Alignment.TopEnd
+        AssetAlignment.CENTER_START -> Alignment.CenterStart
+        AssetAlignment.CENTER -> Alignment.Center
+        AssetAlignment.CENTER_END -> Alignment.CenterEnd
+        AssetAlignment.BOTTOM_START -> Alignment.BottomStart
+        AssetAlignment.BOTTOM_CENTER -> Alignment.BottomCenter
+        AssetAlignment.BOTTOM_END -> Alignment.BottomEnd
+    }
+
+    Box(
+        contentAlignment = contentAlignment,
+        modifier = node.modifiers.toModifier()
+            .clip(RoundedCornerShape(8.dp))
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
+        androidx.compose.foundation.Canvas(
             modifier = Modifier.fillMaxSize()
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Image,
-                    contentDescription = "Image placeholder",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(36.dp)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = node.name,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            drawSampleAsset(resolvedAsset?.assetId ?: assetId)
+        }
+    }
+}
+
+@Composable
+private fun RenderMissingAsset(assetId: String, node: CanvasNode) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = node.modifiers.toModifier()
+            .border(1.dp, MaterialTheme.colorScheme.error, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .padding(8.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Warning,
+                contentDescription = "Missing Asset",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Missing Asset: $assetId",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
         }
     }
 }

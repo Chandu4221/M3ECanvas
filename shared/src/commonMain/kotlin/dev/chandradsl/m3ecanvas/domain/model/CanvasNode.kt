@@ -97,6 +97,29 @@ data class CanvasNode(
         return (property(key = key) as? ComponentProperty.Icon)?.iconName ?: default
     }
 
+    /** Convenience helper for icon properties returning an [IconReference] (Section 31). */
+    fun iconReference(key: String = "icon", default: IconReference = IconReference.material("Favorite")): IconReference {
+        return when (val prop = property(key = key)) {
+            is ComponentProperty.Icon -> prop.iconRef
+            else -> default
+        }
+    }
+
+    /** Convenience helper for asset references (Section 30). */
+    fun assetReference(key: String = "asset", default: AssetReference? = null): AssetReference? {
+        return when (val prop = property(key = key)) {
+            is ComponentProperty.Asset -> prop.assetRef
+            else -> default
+        }
+    }
+
+    /** Convenience helper for asset ID string property. */
+    fun assetId(key: String = "assetId", default: String = ""): String {
+        return (property(key = "asset") as? ComponentProperty.Asset)?.assetId
+            ?: (property(key = key) as? ComponentProperty.Text)?.value
+            ?: default
+    }
+
     //endregion
 
     //region Transform

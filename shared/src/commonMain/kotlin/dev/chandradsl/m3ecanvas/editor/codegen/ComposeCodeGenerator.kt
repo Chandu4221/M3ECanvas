@@ -21,6 +21,7 @@ open class ComposeCodeGenerator(
         val body = buildString {
             appendLine("package com.example.app.ui.screens")
             appendLine()
+            appendLine("import androidx.compose.foundation.Image")
             appendLine("import androidx.compose.foundation.background")
             appendLine("import androidx.compose.foundation.border")
             appendLine("import androidx.compose.foundation.clickable")
@@ -60,6 +61,8 @@ open class ComposeCodeGenerator(
             appendLine("import androidx.compose.ui.draw.shadow")
             appendLine("import androidx.compose.ui.graphics.Color")
             appendLine("import androidx.compose.ui.graphics.RectangleShape")
+            appendLine("import androidx.compose.ui.layout.ContentScale")
+            appendLine("import androidx.compose.ui.res.painterResource")
             appendLine("import androidx.compose.ui.text.font.FontWeight")
             appendLine("import androidx.compose.ui.unit.dp")
             appendLine("import androidx.compose.ui.zIndex")
@@ -1098,12 +1101,12 @@ open class ComposeCodeGenerator(
             }
 
             ComponentType.ICON -> buildString {
-                val iconName = node.iconProperty("icon", default = "Favorite")
-                val iconExpr = resolveIconCodeExpression(iconName)
+                val iconRef = node.iconReference("icon", default = IconReference.material("Favorite"))
+                val iconExpr = resolveIconCodeExpression(iconRef)
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
                 appendLine("${indent}Icon(")
                 appendLine("${indent}    imageVector = $iconExpr,")
-                appendLine("${indent}    contentDescription = \"$iconName\",")
+                appendLine("${indent}    contentDescription = \"${iconRef.name}\",")
                 appendLine("${indent}    tint = MaterialTheme.colorScheme.primary,")
                 appendLine("${indent}    modifier = $mod")
                 appendLine("${indent})")
@@ -1111,15 +1114,46 @@ open class ComposeCodeGenerator(
 
             ComponentType.IMAGE -> buildString {
                 val mod = buildModifierString(node, isRootFloating, extraModifier)
-                appendLine("${indent}Surface(")
-                appendLine("${indent}    shape = RoundedCornerShape(8.dp),")
-                appendLine("${indent}    color = MaterialTheme.colorScheme.surfaceVariant,")
+                val configuredAsset = node.assetReference()
+                val assetId = configuredAsset?.assetId?.takeIf { it.isNotBlank() }
+                    ?: node.assetId().takeIf { it.isNotBlank() }
+                    ?: "sample_hero_landscape"
+
+                val scaleExpr = when (configuredAsset?.scale ?: ContentScaleType.CROP) {
+                    ContentScaleType.FIT -> "ContentScale.Fit"
+                    ContentScaleType.CROP -> "ContentScale.Crop"
+                    ContentScaleType.FILL_BOUNDS -> "ContentScale.FillBounds"
+                    ContentScaleType.INSIDE -> "ContentScale.Inside"
+                    ContentScaleType.FILL_WIDTH -> "ContentScale.FillWidth"
+                    ContentScaleType.FILL_HEIGHT -> "ContentScale.FillHeight"
+                    ContentScaleType.NONE -> "ContentScale.None"
+                }
+
+                val alignExpr = when (configuredAsset?.alignment ?: AssetAlignment.CENTER) {
+                    AssetAlignment.TOP_START -> "Alignment.TopStart"
+                    AssetAlignment.TOP_CENTER -> "Alignment.TopCenter"
+                    AssetAlignment.TOP_END -> "Alignment.TopEnd"
+                    AssetAlignment.CENTER_START -> "Alignment.CenterStart"
+                    AssetAlignment.CENTER -> "Alignment.Center"
+                    AssetAlignment.CENTER_END -> "Alignment.CenterEnd"
+                    AssetAlignment.BOTTOM_START -> "Alignment.BottomStart"
+                    AssetAlignment.BOTTOM_CENTER -> "Alignment.BottomCenter"
+                    AssetAlignment.BOTTOM_END -> "Alignment.BottomEnd"
+                }
+
+                val contentDesc = "\"${node.name}\""
+                val painterExpr = when (configuredAsset?.source) {
+                    AssetSourceType.REMOTE -> "rememberAsyncImagePainter(\"${configuredAsset.uri}\")"
+                    else -> "painterResource(\"assets/$assetId.png\")"
+                }
+
+                appendLine("${indent}Image(")
+                appendLine("${indent}    painter = $painterExpr,")
+                appendLine("${indent}    contentDescription = $contentDesc,")
+                appendLine("${indent}    contentScale = $scaleExpr,")
+                appendLine("${indent}    alignment = $alignExpr,")
                 appendLine("${indent}    modifier = $mod")
-                appendLine("${indent}) {")
-                appendLine("${indent}    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {")
-                appendLine("${indent}        Icon(Icons.Outlined.Image, contentDescription = \"Image\", tint = MaterialTheme.colorScheme.onSurfaceVariant)")
-                appendLine("${indent}    }")
-                appendLine("${indent}}")
+                appendLine("${indent})")
             }
 
             ComponentType.HORIZONTAL_DIVIDER -> buildString {
@@ -1501,6 +1535,40 @@ open class ComposeCodeGenerator(
                 LayoutArrangement.SPACE_EVENLY -> "Arrangement.SpaceEvenly"
             }
         }
+    }
+
+    private fun resolveIconCodeExpression(reference: IconReference): String {
+        val name = reference.name.trim().lowercase()
+        if (reference.style == IconStyle.FILLED) {
+            return when (name) {
+                "arrowback", "arrow_back" -> "Icons.AutoMirrored.Filled.ArrowBack"
+                "send" -> "Icons.AutoMirrored.Filled.Send"
+                "favorite" -> "Icons.Filled.Favorite"
+                "home" -> "Icons.Filled.Home"
+                "search" -> "Icons.Filled.Search"
+                "settings" -> "Icons.Filled.Settings"
+                "add" -> "Icons.Filled.Add"
+                "close" -> "Icons.Filled.Close"
+                "star" -> "Icons.Filled.Star"
+                "notifications" -> "Icons.Filled.Notifications"
+                "share" -> "Icons.Filled.Share"
+                "delete" -> "Icons.Filled.Delete"
+                "edit" -> "Icons.Filled.Edit"
+                "info" -> "Icons.Filled.Info"
+                "menu" -> "Icons.Filled.Menu"
+                "check" -> "Icons.Filled.Check"
+                "person" -> "Icons.Filled.Person"
+                "refresh" -> "Icons.Filled.Refresh"
+                "lock" -> "Icons.Filled.Lock"
+                "email", "mail" -> "Icons.Filled.Email"
+                "phone" -> "Icons.Filled.Phone"
+                "thumbup", "thumb_up" -> "Icons.Filled.ThumbUp"
+                "playarrow", "play_arrow" -> "Icons.Filled.PlayArrow"
+                "warning" -> "Icons.Filled.Warning"
+                else -> "Icons.Filled.Favorite"
+            }
+        }
+        return resolveIconCodeExpression(reference.name)
     }
 
     private fun resolveIconCodeExpression(iconName: String): String {
