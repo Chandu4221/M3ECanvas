@@ -20,7 +20,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.editor.state.AlignmentGuide
@@ -50,6 +55,7 @@ fun EditorOverlayLayer(
     val primaryColor = MaterialTheme.colorScheme.primary
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val focusRequester = remember { FocusRequester() }
+    val textMeasurer = rememberTextMeasurer()
 
     LaunchedEffect(Unit) {
         try {
@@ -270,6 +276,64 @@ fun EditorOverlayLayer(
                         strokeWidth = 1.5.dp.toPx(),
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
                     )
+                }
+            }
+
+            // 4. Draw Distance & Spacing Measurements when a single node is selected
+            if (state.showMeasurements && state.selectedNodeIds.size == 1) {
+                val selectedId = state.selectedNodeIds.first()
+                val selectedBounds = geometryStore.getBounds(selectedId)
+                if (selectedBounds != null) {
+                    val rect = selectedBounds.boundsInCanvas
+                    val measureColor = Color(0xFFE91E63)
+                    val isNearTop = rect.top > 8f
+                    val isNearLeft = rect.left > 8f
+
+                    // Top Distance to Canvas / Container Edge
+                    if (isNearTop) {
+                        val distanceDp = with(density) { rect.top.toDp().value }
+                        drawLine(
+                            color = measureColor,
+                            start = Offset(rect.center.x, 0f),
+                            end = Offset(rect.center.x, rect.top),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                        val text = "${distanceDp.toInt()} dp"
+                        val layout = textMeasurer.measure(
+                            text = text,
+                            style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        )
+                        val badgeTop = Offset(rect.center.x - layout.size.width / 2f, rect.top / 2f - layout.size.height / 2f)
+                        drawRect(
+                            color = measureColor,
+                            topLeft = Offset(badgeTop.x - 3f, badgeTop.y - 2f),
+                            size = Size(layout.size.width + 6f, layout.size.height + 4f)
+                        )
+                        drawText(textLayoutResult = layout, topLeft = badgeTop)
+                    }
+
+                    // Left Distance to Canvas / Container Edge
+                    if (isNearLeft) {
+                        val distanceDp = with(density) { rect.left.toDp().value }
+                        drawLine(
+                            color = measureColor,
+                            start = Offset(0f, rect.center.y),
+                            end = Offset(rect.left, rect.center.y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                        val text = "${distanceDp.toInt()} dp"
+                        val layout = textMeasurer.measure(
+                            text = text,
+                            style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        )
+                        val badgeLeft = Offset(rect.left / 2f - layout.size.width / 2f, rect.center.y - layout.size.height / 2f)
+                        drawRect(
+                            color = measureColor,
+                            topLeft = Offset(badgeLeft.x - 3f, badgeLeft.y - 2f),
+                            size = Size(layout.size.width + 6f, layout.size.height + 4f)
+                        )
+                        drawText(textLayoutResult = layout, topLeft = badgeLeft)
+                    }
                 }
             }
         }

@@ -609,6 +609,44 @@ class EditorController(
         state = state.copy(showSystemInsets = !state.showSystemInsets)
     }
 
+    /**
+     * Aligns all currently selected nodes along the specified [alignment] axis.
+     */
+    fun alignSelectedNodes(alignment: AlignmentType) {
+        if (state.selectedNodeIds.size < 2) return
+        val updatedProject = documentEditor.alignNodes(state.project, state.selectedNodeIds, alignment)
+        if (updatedProject != state.project) {
+            pushState()
+            updateProject(updatedProject)
+        }
+    }
+
+    /**
+     * Distributes 3 or more currently selected nodes with equal spacing along [distribution] axis.
+     */
+    fun distributeSelectedNodes(distribution: DistributionType) {
+        if (state.selectedNodeIds.size < 3) return
+        val updatedProject = documentEditor.distributeNodes(state.project, state.selectedNodeIds, distribution)
+        if (updatedProject != state.project) {
+            pushState()
+            updateProject(updatedProject)
+        }
+    }
+
+    /**
+     * Toggles visibility of canvas rulers.
+     */
+    fun toggleRulers() {
+        state = state.copy(showRulers = !state.showRulers)
+    }
+
+    /**
+     * Toggles visibility of distance and spacing measurement overlays.
+     */
+    fun toggleMeasurements() {
+        state = state.copy(showMeasurements = !state.showMeasurements)
+    }
+
     /** Replaces the entire project and resets transient UI state (used by Load). */
     fun replaceProject(project: M3EProject) {
         historyService.clear()

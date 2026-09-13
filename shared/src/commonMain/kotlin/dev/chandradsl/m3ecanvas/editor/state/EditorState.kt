@@ -36,7 +36,9 @@ data class EditorState(
     val mode: EditorMode = EditorMode.DESIGN,
     val dismissedOverlayIds: Set<String> = emptySet(),
     val showSystemInsets: Boolean = true,
-    val isViewportResizing: Boolean = false
+    val isViewportResizing: Boolean = false,
+    val showRulers: Boolean = true,
+    val showMeasurements: Boolean = true
 ) {
 
     /** Returns true if the editor is in interactive preview mode. */

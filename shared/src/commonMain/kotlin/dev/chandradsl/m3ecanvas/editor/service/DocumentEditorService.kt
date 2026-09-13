@@ -343,4 +343,224 @@ class DocumentEditorService {
 
         return violations
     }
+
+    /**
+     * Updates the canvas position of the node identified by [nodeId].
+     */
+    fun updateNodePosition(project: M3EProject, nodeId: String, newPosition: CanvasPosition): M3EProject {
+        val node = project.findNode(nodeId) ?: return project
+        return project.updateNode(node.copy(position = newPosition))
+    }
+
+    /**
+     * Aligns multiple nodes along the specified [alignment] axis.
+     * Computes the collective bounding box and updates positions for top-level nodes,
+     * or adjusts modifier alignment for children in Row, Column, or Box containers.
+     */
+    fun alignNodes(
+        project: M3EProject,
+        nodeIds: Set<String>,
+        alignment: AlignmentType
+    ): M3EProject {
+        if (nodeIds.size < 2) return project
+        val selectedNodes = nodeIds.mapNotNull { project.findNode(it) }
+        if (selectedNodes.size < 2) return project
+
+        // Check if all selected nodes share the same parent container
+        val parents = selectedNodes.map { findParent(project, it.id) }
+        val commonParent = if (parents.all { it != null && it.id == parents.first()?.id }) parents.first() else null
+
+        if (commonParent != null) {
+            when (commonParent.type) {
+                ComponentType.COLUMN, ComponentType.LAZY_COLUMN -> {
+                    // Column aligns children horizontally via Modifier.align
+                    val target = when (alignment) {
+                        AlignmentType.LEFT -> AlignTarget.START
+                        AlignmentType.CENTER_HORIZONTALLY -> AlignTarget.CENTER_HORIZONTALLY
+                        AlignmentType.RIGHT -> AlignTarget.END
+                        else -> null
+                    }
+                    if (target != null) {
+                        var currentProject = project
+                        for (node in selectedNodes) {
+                            val updated = withAlignmentModifier(node, target)
+                            currentProject = currentProject.updateNode(updated)
+                        }
+                        return currentProject
+                    }
+                }
+                ComponentType.ROW, ComponentType.LAZY_ROW -> {
+                    // Row aligns children vertically via Modifier.align
+                    val target = when (alignment) {
+                        AlignmentType.TOP -> AlignTarget.TOP
+                        AlignmentType.CENTER_VERTICALLY -> AlignTarget.CENTER_VERTICALLY
+                        AlignmentType.BOTTOM -> AlignTarget.BOTTOM
+                        else -> null
+                    }
+                    if (target != null) {
+                        var currentProject = project
+                        for (node in selectedNodes) {
+                            val updated = withAlignmentModifier(node, target)
+                            currentProject = currentProject.updateNode(updated)
+                        }
+                        return currentProject
+                    }
+                }
+                ComponentType.BOX, ComponentType.BOX_WITH_CONSTRAINTS -> {
+                    // Box supports 2D alignment
+                    val target = when (alignment) {
+                        AlignmentType.LEFT -> AlignTarget.CENTER_START
+                        AlignmentType.CENTER_HORIZONTALLY -> AlignTarget.CENTER
+                        AlignmentType.RIGHT -> AlignTarget.CENTER_END
+                        AlignmentType.TOP -> AlignTarget.TOP_CENTER
+                        AlignmentType.CENTER_VERTICALLY -> AlignTarget.CENTER
+                        AlignmentType.BOTTOM -> AlignTarget.BOTTOM_CENTER
+                    }
+                    var currentProject = project
+                    for (node in selectedNodes) {
+                        val updated = withAlignmentModifier(node, target)
+                        currentProject = currentProject.updateNode(updated)
+                    }
+                    return currentProject
+                }
+                else -> { /* Fallback to freeform position update */ }
+            }
+        }
+
+        // Top-level / freeform nodes: bounding box alignment
+        val minX = selectedNodes.minOf { it.position.x }
+        val maxX = selectedNodes.maxOf { it.position.x + it.size.width }
+        val minY = selectedNodes.minOf { it.position.y }
+        val maxY = selectedNodes.maxOf { it.position.y + it.size.height }
+        val centerX = (minX + maxX) / 2f
+        val centerY = (minY + maxY) / 2f
+
+        var currentProject = project
+        for (node in selectedNodes) {
+            val newPosition = when (alignment) {
+                AlignmentType.LEFT -> node.position.copy(x = minX)
+                AlignmentType.CENTER_HORIZONTALLY -> node.position.copy(x = centerX - node.size.width / 2f)
+                AlignmentType.RIGHT -> node.position.copy(x = maxX - node.size.width)
+                AlignmentType.TOP -> node.position.copy(y = minY)
+                AlignmentType.CENTER_VERTICALLY -> node.position.copy(y = centerY - node.size.height / 2f)
+                AlignmentType.BOTTOM -> node.position.copy(y = maxY - node.size.height)
+            }
+            if (newPosition != node.position) {
+                currentProject = updateNodePosition(currentProject, node.id, newPosition)
+            }
+        }
+        return currentProject
+    }
+
+    /**
+     * Distributes 3 or more nodes with equal spacing between them along the specified [distribution] axis.
+     */
+    fun distributeNodes(
+        project: M3EProject,
+        nodeIds: Set<String>,
+        distribution: DistributionType
+    ): M3EProject {
+        if (nodeIds.size < 3) return project
+        val selectedNodes = nodeIds.mapNotNull { project.findNode(it) }
+        if (selectedNodes.size < 3) return project
+
+        val parents = selectedNodes.map { findParent(project, it.id) }
+        val commonParent = if (parents.all { it != null && it.id == parents.first()?.id }) parents.first() else null
+
+        if (commonParent != null) {
+            when {
+                (commonParent.type == ComponentType.COLUMN || commonParent.type == ComponentType.LAZY_COLUMN) && distribution == DistributionType.VERTICALLY -> {
+                    // In a column, distribute vertically by reordering selected children in spatial order
+                    val sorted = selectedNodes.sortedBy { it.position.y }
+                    val newChildren = commonParent.children.toMutableList()
+                    val selectedIndices = sorted.map { node -> newChildren.indexOfFirst { it.id == node.id } }.sorted()
+                    for (i in sorted.indices) {
+                        newChildren[selectedIndices[i]] = sorted[i]
+                    }
+                    return project.updateNode(commonParent.copy(children = newChildren))
+                }
+                (commonParent.type == ComponentType.ROW || commonParent.type == ComponentType.LAZY_ROW) && distribution == DistributionType.HORIZONTALLY -> {
+                    // In a row, distribute horizontally by reordering selected children in spatial order
+                    val sorted = selectedNodes.sortedBy { it.position.x }
+                    val newChildren = commonParent.children.toMutableList()
+                    val selectedIndices = sorted.map { node -> newChildren.indexOfFirst { it.id == node.id } }.sorted()
+                    for (i in sorted.indices) {
+                        newChildren[selectedIndices[i]] = sorted[i]
+                    }
+                    return project.updateNode(commonParent.copy(children = newChildren))
+                }
+                else -> { /* Fall through to canvas position distribution */ }
+            }
+        }
+
+        var currentProject = project
+        when (distribution) {
+            DistributionType.HORIZONTALLY -> {
+                val sorted = selectedNodes.sortedBy { it.position.x }
+                val first = sorted.first()
+                val last = sorted.last()
+                val totalSpan = (last.position.x + last.size.width) - first.position.x
+                val totalItemWidth = sorted.sumOf { it.size.width.toDouble() }.toFloat()
+                val availableSpace = totalSpan - totalItemWidth
+                if (availableSpace > 0f) {
+                    val gap = availableSpace / (sorted.size - 1)
+                    var currentX = first.position.x
+                    for (node in sorted) {
+                        if (node.position.x != currentX) {
+                            currentProject = updateNodePosition(currentProject, node.id, node.position.copy(x = currentX))
+                        }
+                        currentX += node.size.width + gap
+                    }
+                }
+            }
+            DistributionType.VERTICALLY -> {
+                val sorted = selectedNodes.sortedBy { it.position.y }
+                val first = sorted.first()
+                val last = sorted.last()
+                val totalSpan = (last.position.y + last.size.height) - first.position.y
+                val totalItemHeight = sorted.sumOf { it.size.height.toDouble() }.toFloat()
+                val availableSpace = totalSpan - totalItemHeight
+                if (availableSpace > 0f) {
+                    val gap = availableSpace / (sorted.size - 1)
+                    var currentY = first.position.y
+                    for (node in sorted) {
+                        if (node.position.y != currentY) {
+                            currentProject = updateNodePosition(currentProject, node.id, node.position.copy(y = currentY))
+                        }
+                        currentY += node.size.height + gap
+                    }
+                }
+            }
+        }
+        return currentProject
+    }
+
+    private fun withAlignmentModifier(node: CanvasNode, alignTarget: AlignTarget): CanvasNode {
+        val existing = node.modifiers.filterIsInstance<ModifierSpec.Align>().firstOrNull()
+        return if (existing != null) {
+            node.updateModifier(existing.copy(alignment = alignTarget))
+        } else {
+            node.withModifier(ModifierSpec.Align(alignment = alignTarget))
+        }
+    }
+}
+
+/**
+ * Visual alignment operations across multiple selected components.
+ */
+enum class AlignmentType(val displayName: String) {
+    LEFT("Align Left"),
+    CENTER_HORIZONTALLY("Align Center Horizontally"),
+    RIGHT("Align Right"),
+    TOP("Align Top"),
+    CENTER_VERTICALLY("Align Center Vertically"),
+    BOTTOM("Align Bottom")
+}
+
+/**
+ * Equal spacing distribution operations across multiple selected components.
+ */
+enum class DistributionType(val displayName: String) {
+    HORIZONTALLY("Distribute Horizontally"),
+    VERTICALLY("Distribute Vertically")
 }

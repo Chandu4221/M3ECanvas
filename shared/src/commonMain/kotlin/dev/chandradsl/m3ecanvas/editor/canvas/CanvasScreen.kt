@@ -382,6 +382,14 @@ fun CanvasScreen(controller: EditorController) {
             }
         }
 
+        // Canvas Rulers (Top and Left dp guides)
+        if (state.showRulers && !state.isInteractiveMode) {
+            CanvasRulers(
+                zoom = viewport.zoom,
+                panOffset = Offset(viewport.panOffset.x, viewport.panOffset.y)
+            )
+        }
+
         // Floating Viewport Controls Toolbar
         ViewportControlBar(
             zoom = viewport.zoom,
@@ -390,6 +398,10 @@ fun CanvasScreen(controller: EditorController) {
             onToggleSnapping = { controller.toggleSnapping() },
             multiDevicePreview = state.multiDevicePreview,
             onToggleMultiDevicePreview = { controller.toggleMultiDevicePreview() },
+            showRulers = state.showRulers,
+            onToggleRulers = { controller.toggleRulers() },
+            showMeasurements = state.showMeasurements,
+            onToggleMeasurements = { controller.toggleMeasurements() },
             onZoomIn = { controller.zoomIn() },
             onZoomOut = { controller.zoomOut() },
             onResetZoom = { controller.resetZoom() },
@@ -477,6 +489,10 @@ private fun ViewportControlBar(
     onToggleSnapping: () -> Unit,
     multiDevicePreview: Boolean,
     onToggleMultiDevicePreview: () -> Unit,
+    showRulers: Boolean,
+    onToggleRulers: () -> Unit,
+    showMeasurements: Boolean,
+    onToggleMeasurements: () -> Unit,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onResetZoom: () -> Unit,
@@ -496,13 +512,39 @@ private fun ViewportControlBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            // Rulers Toggle
+            IconButton(
+                onClick = onToggleRulers,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.SquareFoot,
+                    contentDescription = if (showRulers) "Hide Rulers" else "Show Rulers",
+                    tint = if (showRulers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Distance Measurements Toggle
+            IconButton(
+                onClick = onToggleMeasurements,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Straighten,
+                    contentDescription = if (showMeasurements) "Hide Distance Measurements" else "Show Distance Measurements",
+                    tint = if (showMeasurements) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
             // Magnetic Snapping Toggle
             IconButton(
                 onClick = onToggleSnapping,
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Straighten,
+                    imageVector = Icons.Outlined.GridOn,
                     contentDescription = if (snappingEnabled) "Snapping Enabled" else "Snapping Disabled",
                     tint = if (snappingEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier.size(18.dp)

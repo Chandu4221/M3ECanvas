@@ -11,13 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowDropDown
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.ScreenRotation
-import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +24,8 @@ import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.editor.canvas.AVAILABLE_MATERIAL_ICONS
 import dev.chandradsl.m3ecanvas.editor.canvas.resolveMaterialIcon
 import dev.chandradsl.m3ecanvas.editor.component.ComponentRegistry
+import dev.chandradsl.m3ecanvas.editor.service.AlignmentType
+import dev.chandradsl.m3ecanvas.editor.service.DistributionType
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 import dev.chandradsl.m3ecanvas.editor.theme.CanvasThemeGenerator
 
@@ -456,6 +453,104 @@ private fun MultiSelectSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+
+    SectionLabel(text = "Alignment & Distribution")
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = { controller.alignSelectedNodes(AlignmentType.LEFT) },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.AlignHorizontalLeft,
+                contentDescription = "Align Left",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        IconButton(
+            onClick = { controller.alignSelectedNodes(AlignmentType.CENTER_HORIZONTALLY) },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AlignHorizontalCenter,
+                contentDescription = "Align Center Horizontally",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        IconButton(
+            onClick = { controller.alignSelectedNodes(AlignmentType.RIGHT) },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.AlignHorizontalRight,
+                contentDescription = "Align Right",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        VerticalDivider(modifier = Modifier.height(20.dp))
+
+        IconButton(
+            onClick = { controller.alignSelectedNodes(AlignmentType.TOP) },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AlignVerticalTop,
+                contentDescription = "Align Top",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        IconButton(
+            onClick = { controller.alignSelectedNodes(AlignmentType.CENTER_VERTICALLY) },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AlignVerticalCenter,
+                contentDescription = "Align Center Vertically",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        IconButton(
+            onClick = { controller.alignSelectedNodes(AlignmentType.BOTTOM) },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AlignVerticalBottom,
+                contentDescription = "Align Bottom",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+
+    if (selectedNodes.size >= 3) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = { controller.distributeSelectedNodes(DistributionType.HORIZONTALLY) },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+            ) {
+                Text(text = "Distribute H", style = MaterialTheme.typography.labelSmall)
+            }
+            OutlinedButton(
+                onClick = { controller.distributeSelectedNodes(DistributionType.VERTICALLY) },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+            ) {
+                Text(text = "Distribute V", style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 
