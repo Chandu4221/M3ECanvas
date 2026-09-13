@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
 import dev.chandradsl.m3ecanvas.editor.state.EditorMode
@@ -33,6 +34,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
 import dev.chandradsl.m3ecanvas.domain.model.ComponentType
@@ -42,6 +44,7 @@ import dev.chandradsl.m3ecanvas.editor.codegen.CodeExportPanel
 import dev.chandradsl.m3ecanvas.editor.history.HistoryDialog
 import dev.chandradsl.m3ecanvas.editor.inspector.LayersPanel
 import dev.chandradsl.m3ecanvas.editor.inspector.PropertiesPanel
+import dev.chandradsl.m3ecanvas.editor.palette.CommandPalette
 import dev.chandradsl.m3ecanvas.editor.palette.ComponentPalette
 import dev.chandradsl.m3ecanvas.editor.ui.HorizontalResizeSplitter
 import dev.chandradsl.m3ecanvas.editor.ui.VerticalResizeSplitter
@@ -230,6 +233,10 @@ fun App(repository: ProjectRepository) {
                                 statusMessage = if (controller.state.isInteractiveMode) "Interactive Preview Mode" else "Design Mode"
                                 return@onKeyEvent true
                             }
+                            event.key == Key.K -> {
+                                controller.toggleCommandPalette()
+                                return@onKeyEvent true
+                            }
                         }
                     }
 
@@ -343,7 +350,8 @@ fun App(repository: ProjectRepository) {
                 onToggleInteractiveMode = {
                     controller.toggleInteractiveMode()
                     statusMessage = if (controller.state.isInteractiveMode) "Interactive Preview Mode" else "Design Mode"
-                }
+                },
+                onOpenCommandPalette = { controller.openCommandPalette() }
             )
             HorizontalDivider()
             Row(modifier = Modifier.weight(weight = 1f)) {
@@ -394,7 +402,10 @@ fun App(repository: ProjectRepository) {
                                 }
                             },
                             modifier = Modifier.width(paletteWidth),
-                            onCollapse = { showPalette = false }
+                            onCollapse = { showPalette = false },
+                            favoriteTypes = controller.state.favoriteComponentTypes,
+                            onToggleFavorite = { controller.toggleFavoriteComponent(it) },
+                            recentTypes = controller.state.recentComponentTypes
                         )
                         VerticalResizeSplitter(
                             onResize = { deltaDp ->
@@ -616,6 +627,13 @@ fun App(repository: ProjectRepository) {
             )
         }
 
+        if (controller.state.isCommandPaletteOpen) {
+            CommandPalette(
+                controller = controller,
+                onDismissRequest = { controller.closeCommandPalette() }
+            )
+        }
+
         if (errorMessage != null) {
             AlertDialog(
                 onDismissRequest = { errorMessage = null },
@@ -683,7 +701,8 @@ private fun TopBar(
     showCodeExport: Boolean,
     onToggleCodeExport: () -> Unit,
     isInteractiveMode: Boolean = false,
-    onToggleInteractiveMode: () -> Unit = {}
+    onToggleInteractiveMode: () -> Unit = {},
+    onOpenCommandPalette: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -798,6 +817,45 @@ private fun TopBar(
                     },
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Quick Command Palette / Search Trigger (Ctrl+K)
+        Surface(
+            onClick = onOpenCommandPalette,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Search / Commands (Ctrl+K)",
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Search or jump to...",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = "Ctrl+K",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.weight(weight = 1f))

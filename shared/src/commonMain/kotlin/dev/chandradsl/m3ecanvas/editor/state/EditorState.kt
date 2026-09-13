@@ -2,6 +2,7 @@ package dev.chandradsl.m3ecanvas.editor.state
 
 import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
 import dev.chandradsl.m3ecanvas.domain.model.CanvasPosition
+import dev.chandradsl.m3ecanvas.domain.model.ComponentType
 import dev.chandradsl.m3ecanvas.domain.model.M3EProject
 
 /**
@@ -39,7 +40,10 @@ data class EditorState(
     val isViewportResizing: Boolean = false,
     val showRulers: Boolean = true,
     val showMeasurements: Boolean = true,
-    val collapsedNodeIds: Set<String> = emptySet()
+    val collapsedNodeIds: Set<String> = emptySet(),
+    val favoriteComponentTypes: Set<ComponentType> = emptySet(),
+    val recentComponentTypes: List<ComponentType> = emptyList(),
+    val isCommandPaletteOpen: Boolean = false
 ) {
 
     /** Returns true if the editor is in interactive preview mode. */

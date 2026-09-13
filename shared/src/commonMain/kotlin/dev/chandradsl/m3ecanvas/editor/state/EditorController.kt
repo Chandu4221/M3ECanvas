@@ -296,6 +296,7 @@ class EditorController(
 
         pushState()
         updateProject(newProject = updatedProject, selectedNodeIds = setOf(node.id))
+        recordRecentComponent(type)
         return true
     }
 
@@ -311,7 +312,61 @@ class EditorController(
 
         pushState()
         updateProject(newProject = updatedProject, selectedNodeIds = setOf(child.id))
+        recordRecentComponent(type)
         return true
+    }
+
+    /**
+     * Smart component insertion: automatically finds a valid target container starting from
+     * the currently selected node (or screen scaffold content), or adds to the root canvas if none exists.
+     * Records the inserted component type in [EditorState.recentComponentTypes].
+     */
+    fun insertComponent(type: ComponentType): Boolean {
+        val selected = state.selectedNodes.firstOrNull()
+        val targetContainer = findValidTargetContainer(forType = type, startingFromNodeId = selected?.id)
+        return if (targetContainer != null) {
+            addChildToContainer(containerId = targetContainer.id, type = type)
+        } else {
+            val count = state.project.nodes.size
+            val position = CanvasPosition(x = 40f + count * 24f, y = 40f + count * 24f)
+            addNode(type = type, position = position)
+        }
+    }
+
+    /**
+     * Records [type] into the recent components list (capped at 10 unique, most recent first).
+     */
+    fun recordRecentComponent(type: ComponentType) {
+        val currentRecents = state.recentComponentTypes.filterNot { it == type }
+        val updatedRecents = (listOf(type) + currentRecents).take(10)
+        state = state.copy(recentComponentTypes = updatedRecents)
+    }
+
+    /**
+     * Toggles [type] as a favorite component.
+     */
+    fun toggleFavoriteComponent(type: ComponentType) {
+        val updated = if (type in state.favoriteComponentTypes) {
+            state.favoriteComponentTypes - type
+        } else {
+            state.favoriteComponentTypes + type
+        }
+        state = state.copy(favoriteComponentTypes = updated)
+    }
+
+    /** Opens the Command Palette dialog. */
+    fun openCommandPalette() {
+        state = state.copy(isCommandPaletteOpen = true)
+    }
+
+    /** Closes the Command Palette dialog. */
+    fun closeCommandPalette() {
+        state = state.copy(isCommandPaletteOpen = false)
+    }
+
+    /** Toggles the Command Palette dialog. */
+    fun toggleCommandPalette() {
+        state = state.copy(isCommandPaletteOpen = !state.isCommandPaletteOpen)
     }
 
     /** Sets the slot role for [nodeId], replacing single-occupant occupants if necessary. */

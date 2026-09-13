@@ -90,6 +90,10 @@ fun EditorOverlayLayer(
                             controller.groupSelected()
                             true
                         }
+                        isCtrlOrCmd && event.key == Key.K -> {
+                            controller.toggleCommandPalette()
+                            true
+                        }
                         else -> false
                     }
                 } else false
