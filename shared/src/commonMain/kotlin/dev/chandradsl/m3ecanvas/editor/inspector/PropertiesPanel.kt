@@ -257,6 +257,16 @@ private fun NodeSection(node: CanvasNode, controller: EditorController) {
 
     if (node.isContainer) {
         LayoutSection(node = node, controller = controller)
+        if (node.type != ComponentType.SCAFFOLD && node.children.isNotEmpty()) {
+            OutlinedButton(
+                onClick = { controller.ungroupSelected() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.FolderOpen, contentDescription = "Ungroup", modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Ungroup Container (Ctrl+Shift+G)")
+            }
+        }
     }
     ModifierSection(node = node, controller = controller)
     AccessibilitySection(node = node, controller = controller)
@@ -826,6 +836,15 @@ private fun MultiSelectSection(
     }
 
     SectionLabel(text = "Quick Actions")
+
+    FilledTonalButton(
+        onClick = { controller.groupSelected() },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(Icons.Outlined.Workspaces, contentDescription = "Group", modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Group Selection (Ctrl+G)")
+    }
 
     Button(
         onClick = { controller.deleteSelected() },

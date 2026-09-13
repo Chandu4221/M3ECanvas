@@ -70,15 +70,24 @@ fun EditorOverlayLayer(
             .focusable()
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
-                    when (event.key) {
-                        Key.Delete, Key.Backspace -> {
+                    val isCtrlOrCmd = event.isCtrlPressed || event.isMetaPressed
+                    when {
+                        event.key == Key.Delete || event.key == Key.Backspace -> {
                             if (state.selectedNodeIds.isNotEmpty()) {
                                 controller.deleteSelected()
                                 true
                             } else false
                         }
-                        Key.Escape -> {
+                        event.key == Key.Escape -> {
                             controller.clearSelection()
+                            true
+                        }
+                        isCtrlOrCmd && event.key == Key.G && event.isShiftPressed -> {
+                            controller.ungroupSelected()
+                            true
+                        }
+                        isCtrlOrCmd && event.key == Key.G -> {
+                            controller.groupSelected()
                             true
                         }
                         else -> false

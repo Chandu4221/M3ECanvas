@@ -12,12 +12,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,8 +25,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.chandradsl.m3ecanvas.domain.model.CanvasNode
-import dev.chandradsl.m3ecanvas.domain.model.SlotRole
+import dev.chandradsl.m3ecanvas.domain.model.*
 import dev.chandradsl.m3ecanvas.editor.palette.icon
 import dev.chandradsl.m3ecanvas.editor.state.EditorController
 
@@ -77,6 +71,15 @@ fun LayersPanel(
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                     )
+                }
+                if (controller.state.selectedNodeIds.size > 1) {
+                    FilledTonalButton(
+                        onClick = { controller.groupSelected() },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.height(24.dp)
+                    ) {
+                        Text("Group (${controller.state.selectedNodeIds.size})", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
             if (onToggleExpand != null) {
@@ -323,6 +326,13 @@ private fun LayerRow(
                 contentDescription = "Rename",
                 onClick = { isEditing = true }
             )
+            if (node.isContainer && node.type != ComponentType.SCAFFOLD && node.children.isNotEmpty()) {
+                LayerActionIcon(
+                    imageVector = Icons.Outlined.FolderOpen,
+                    contentDescription = "Ungroup",
+                    onClick = { controller.ungroupSelected() }
+                )
+            }
             if (!node.isLocked) {
                 LayerActionIcon(
                     imageVector = Icons.Outlined.KeyboardArrowUp,

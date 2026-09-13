@@ -562,6 +562,213 @@ class DocumentEditorService {
             node.withModifier(ModifierSpec.Align(alignment = alignTarget))
         }
     }
+
+    /**
+     * Groups [nodeIds] into a single container of [containerType] (default [ComponentType.BOX]).
+     *
+     * Invariants:
+     * - At least 1 node must be provided.
+     * - Cannot group SCAFFOLD or Overlay nodes.
+     * - Locked nodes are skipped / cannot be grouped.
+     * - All selected nodes must share the same parent scope.
+     *
+     * Returns Pair(updatedProject, newContainerId).
+     */
+    fun groupNodes(
+        project: M3EProject,
+        nodeIds: Set<String>,
+        containerType: ComponentType = ComponentType.BOX
+    ): Pair<M3EProject, String?> {
+        val validNodes = nodeIds.mapNotNull { project.findNode(it) }
+            .filterNot { it.isLocked || it.type == ComponentType.SCAFFOLD || it.type.isOverlay() }
+        if (validNodes.isEmpty()) return Pair(project, null)
+
+        val firstParent = findParent(project, validNodes.first().id)
+        val allSameParent = validNodes.all { findParent(project, it.id) == firstParent }
+        if (!allSameParent) return Pair(project, null)
+
+        if (!validNodes.all { containerType.canAcceptChild(it.type) }) {
+            return Pair(project, null)
+        }
+
+        val existingGroupCount = project.allNodes().count { it.type == containerType && it.name.startsWith("Group") }
+        val groupName = "Group ${existingGroupCount + 1}"
+
+        if (firstParent == null) {
+            // Top-level nodes: calculate bounding box
+            val minX = validNodes.minOf { it.position.x }
+            val minY = validNodes.minOf { it.position.y }
+            val maxX = validNodes.maxOf { it.position.x + it.size.width }
+            val maxY = validNodes.maxOf { it.position.y + it.size.height }
+
+            val groupPosition = CanvasPosition(minX, minY)
+            val groupSize = CanvasSize(maxOf(1f, maxX - minX), maxOf(1f, maxY - minY))
+
+            val adjustedChildren = validNodes.map { node ->
+                node.copy(
+                    position = CanvasPosition(node.position.x - minX, node.position.y - minY)
+                )
+            }
+
+            val groupNode = CanvasNode(
+                type = containerType,
+                name = groupName,
+                position = groupPosition,
+                size = groupSize,
+                children = adjustedChildren
+            )
+
+            val validNodeIds = validNodes.map { it.id }.toSet()
+            val firstIndex = project.nodes.indexOfFirst { it.id in validNodeIds }.coerceAtLeast(0)
+            val remainingNodes = project.nodes.filterNot { it.id in validNodeIds }.toMutableList()
+            val insertIndex = firstIndex.coerceAtMost(remainingNodes.size)
+            remainingNodes.add(insertIndex, groupNode)
+
+            return Pair(project.copy(nodes = remainingNodes), groupNode.id)
+        } else {
+            // Nested siblings inside firstParent:
+            val validNodeIds = validNodes.map { it.id }.toSet()
+            val parentChildren = firstParent.children
+            val firstIndex = parentChildren.indexOfFirst { it.id in validNodeIds }.coerceAtLeast(0)
+
+            val groupNode = CanvasNode(
+                type = containerType,
+                name = groupName,
+                position = CanvasPosition.Zero,
+                size = CanvasSize(100f, 100f),
+                children = validNodes
+            )
+
+            val remainingChildren = parentChildren.filterNot { it.id in validNodeIds }.toMutableList()
+            val insertIndex = firstIndex.coerceAtMost(remainingChildren.size)
+            remainingChildren.add(insertIndex, groupNode)
+
+            val updatedParent = firstParent.copy(children = remainingChildren)
+            return Pair(project.updateNode(updatedParent), groupNode.id)
+        }
+    }
+
+    /**
+     * Dissolves [containerId], releasing its children into the container's parent
+     * (or canvas root) while preserving visual positions.
+     *
+     * Invariants:
+     * - Cannot ungroup SCAFFOLD or non-container nodes.
+     * - Locked containers cannot be ungrouped.
+     * - Empty containers cannot be ungrouped.
+     *
+     * Returns Pair(updatedProject, releasedChildrenIds).
+     */
+    fun ungroupNode(
+        project: M3EProject,
+        containerId: String
+    ): Pair<M3EProject, List<String>> {
+        val container = project.findNode(containerId) ?: return Pair(project, emptyList())
+        if (container.isLocked || !container.isContainer || container.type == ComponentType.SCAFFOLD || container.children.isEmpty()) {
+            return Pair(project, emptyList())
+        }
+
+        val parent = findParent(project, containerId)
+        val releasedIds = container.children.map { it.id }
+
+        if (parent == null) {
+            // Top-level container: project children positions to canvas coordinates
+            val projectedChildren = container.children.map { child ->
+                child.copy(
+                    position = CanvasPosition(
+                        x = container.position.x + child.position.x,
+                        y = container.position.y + child.position.y
+                    )
+                )
+            }
+
+            val containerIndex = project.nodes.indexOfFirst { it.id == containerId }
+            val mutableNodes = project.nodes.toMutableList()
+            if (containerIndex >= 0) {
+                mutableNodes.removeAt(containerIndex)
+                mutableNodes.addAll(containerIndex, projectedChildren)
+            } else {
+                mutableNodes.removeAll { it.id == containerId }
+                mutableNodes.addAll(projectedChildren)
+            }
+
+            return Pair(project.copy(nodes = mutableNodes), releasedIds)
+        } else {
+            // Nested container: promote children into parent
+            val containerIndex = parent.children.indexOfFirst { it.id == containerId }
+            val mutableChildren = parent.children.toMutableList()
+            if (containerIndex >= 0) {
+                mutableChildren.removeAt(containerIndex)
+                mutableChildren.addAll(containerIndex, container.children)
+            } else {
+                mutableChildren.removeAll { it.id == containerId }
+                mutableChildren.addAll(container.children)
+            }
+
+            val updatedParent = parent.copy(children = mutableChildren)
+            return Pair(project.updateNode(updatedParent), releasedIds)
+        }
+    }
+
+    /**
+     * Checks if [ancestorId] is an ancestor of [targetId] in the node hierarchy.
+     */
+    fun isAncestorOf(project: M3EProject, ancestorId: String, targetId: String): Boolean {
+        if (ancestorId == targetId) return true
+        val ancestorNode = project.findNode(ancestorId) ?: return false
+        return ancestorNode.findNode(targetId) != null
+    }
+
+    /**
+     * Reparents [nodeId] to [newParentId] (or moves to root if [newParentId] is null)
+     * at optional [targetIndex].
+     *
+     * Guards:
+     * - Locked nodes cannot be reparented.
+     * - Prevents cycles: [nodeId] cannot be an ancestor of [newParentId].
+     * - Checks [newParent.type.canAcceptChild(node.type)].
+     */
+    fun reparentNode(
+        project: M3EProject,
+        nodeId: String,
+        newParentId: String?,
+        targetIndex: Int? = null
+    ): M3EProject {
+        val node = project.findNode(nodeId) ?: return project
+        if (node.isLocked || node.type == ComponentType.SCAFFOLD || node.type.isOverlay()) return project
+
+        val currentParent = findParent(project, nodeId)
+        if (currentParent?.id == newParentId && targetIndex == null) return project
+
+        // Cycle prevention
+        if (newParentId != null) {
+            if (isAncestorOf(project, ancestorId = nodeId, targetId = newParentId)) {
+                return project // Cycle detected!
+            }
+            val newParent = project.findNode(newParentId) ?: return project
+            if (!newParent.isContainer || !newParent.type.canAcceptChild(node.type)) {
+                return project // Target cannot accept this child type!
+            }
+        }
+
+        // 1. Remove node from its current location
+        val projectWithoutNode = project.removeNode(nodeId)
+
+        // 2. Insert into new location
+        return if (newParentId == null) {
+            val mutableNodes = projectWithoutNode.nodes.toMutableList()
+            val idx = targetIndex?.coerceIn(0, mutableNodes.size) ?: mutableNodes.size
+            mutableNodes.add(idx, node.copy(slot = null))
+            projectWithoutNode.copy(nodes = mutableNodes)
+        } else {
+            val targetParent = projectWithoutNode.findNode(newParentId) ?: return project
+            val mutableChildren = targetParent.children.toMutableList()
+            val idx = targetIndex?.coerceIn(0, mutableChildren.size) ?: mutableChildren.size
+            mutableChildren.add(idx, node)
+            val updatedParent = targetParent.copy(children = mutableChildren)
+            projectWithoutNode.updateNode(updatedParent)
+        }
+    }
 }
 
 /**

@@ -486,6 +486,59 @@ class EditorController(
 
     //endregion
 
+    //region Grouping & Reparenting
+
+    /**
+     * Groups currently selected nodes into a container (default [ComponentType.BOX]).
+     */
+    fun groupSelected(containerType: ComponentType = ComponentType.BOX) {
+        val ids = state.selectedNodeIds
+        if (ids.isEmpty()) return
+        val (updated, newContainerId) = documentEditor.groupNodes(state.project, ids, containerType)
+        if (newContainerId != null && updated != state.project) {
+            pushState()
+            updateProject(newProject = updated, selectedNodeIds = setOf(newContainerId))
+        }
+    }
+
+    /**
+     * Dissolves selected container node(s), promoting children to their parent/canvas.
+     */
+    fun ungroupSelected() {
+        val ids = state.selectedNodeIds
+        if (ids.isEmpty()) return
+        var currentProject = state.project
+        val allReleased = mutableSetOf<String>()
+        var modified = false
+
+        for (id in ids) {
+            val (updated, released) = documentEditor.ungroupNode(currentProject, id)
+            if (released.isNotEmpty()) {
+                currentProject = updated
+                allReleased.addAll(released)
+                modified = true
+            }
+        }
+
+        if (modified) {
+            pushState()
+            updateProject(newProject = currentProject, selectedNodeIds = allReleased)
+        }
+    }
+
+    /**
+     * Reparents [nodeId] into [newParentId] (or moves to root if null).
+     */
+    fun reparentNode(nodeId: String, newParentId: String?, targetIndex: Int? = null) {
+        val updated = documentEditor.reparentNode(state.project, nodeId, newParentId, targetIndex)
+        if (updated != state.project) {
+            pushState()
+            updateProject(newProject = updated, selectedNodeIds = setOf(nodeId))
+        }
+    }
+
+    //endregion
+
     //region Drag
 
     /** Begins a drag on the node with [nodeId]. If multiple nodes are selected, all non-locked selected nodes move together. */
