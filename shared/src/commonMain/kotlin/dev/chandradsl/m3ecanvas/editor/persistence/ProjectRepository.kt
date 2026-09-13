@@ -1,6 +1,7 @@
 package dev.chandradsl.m3ecanvas.editor.persistence
 
 import dev.chandradsl.m3ecanvas.domain.model.M3EProject
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 sealed interface LoadResult {
@@ -11,7 +12,7 @@ sealed interface LoadResult {
 
 /**
  * Storage abstraction for [M3EProject]. Common code depends only on this
- * interface; each platform supplies an implementation.
+ * port; each platform supplies a driven adapter.
  */
 interface ProjectRepository {
 
@@ -20,7 +21,45 @@ interface ProjectRepository {
 
     /** Returns the result of loading the saved project. */
     suspend fun load(): LoadResult
+
+    /** Human-readable path or identifier of the storage location. */
+    val storageLocation: String get() = ""
 }
+
+@Serializable
+data class RecentProjectEntry(
+    val name: String,
+    val path: String,
+    val lastOpenedTimestamp: Long
+)
+
+/**
+ * Port for managing periodic recovery autosave snapshots and the most-recently-used (MRU) projects list.
+ */
+interface AutosaveManager {
+    suspend fun saveAutosave(project: M3EProject)
+    suspend fun loadAutosave(): LoadResult
+    suspend fun clearAutosave()
+    suspend fun hasAutosave(): Boolean
+    suspend fun addRecentProject(name: String, path: String)
+    suspend fun getRecentProjects(): List<RecentProjectEntry>
+
+    companion object {
+        val default: AutosaveManager get() = createDefaultAutosaveManager()
+    }
+}
+
+/** Expect declaration for the default platform-specific project repository. */
+expect fun createDefaultProjectRepository(): ProjectRepository
+
+/** Expect declaration for the default platform-specific autosave manager. */
+expect fun createDefaultAutosaveManager(): AutosaveManager
+
+/** Expect declaration for the default project storage location. */
+expect fun getDefaultProjectLocation(): String
+
+/** Expect declaration for obtaining current platform epoch time in milliseconds. */
+expect fun currentTimeMillis(): Long
 
 private val DEFAULT_M3E_JSON: Json = Json {
     prettyPrint = true

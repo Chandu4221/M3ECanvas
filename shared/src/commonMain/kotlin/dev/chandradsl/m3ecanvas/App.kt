@@ -52,7 +52,7 @@ import dev.chandradsl.m3ecanvas.editor.theme.EditorTheme
 
 import dev.chandradsl.m3ecanvas.editor.persistence.LoadResult
 import dev.chandradsl.m3ecanvas.editor.persistence.AutosaveManager
-import dev.chandradsl.m3ecanvas.editor.persistence.FileProjectRepository
+import dev.chandradsl.m3ecanvas.editor.persistence.getDefaultProjectLocation
 import dev.chandradsl.m3ecanvas.domain.model.M3EProject
 import dev.chandradsl.m3ecanvas.util.AppLogger
 import kotlinx.coroutines.Dispatchers
@@ -299,7 +299,7 @@ fun App(repository: ProjectRepository) {
                             try {
                                 autosaveManager.addRecentProject(
                                     name = controller.state.project.name,
-                                    path = FileProjectRepository.defaultFile().absolutePath
+                                    path = repository.storageLocation.ifEmpty { getDefaultProjectLocation() }
                                 )
                             } catch (_: Throwable) {}
                             statusMessage = "Saved"
